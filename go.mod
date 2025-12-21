@@ -1,6 +1,6 @@
 module cvx
 
-go 1.24.0
+go 1.25
 
 require (
 	github.com/anthropics/anthropic-sdk-go v1.19.0
