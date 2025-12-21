@@ -4,14 +4,14 @@ import (
 	"context"
 	"cvx/pkg/ai"
 	"cvx/pkg/config"
-	"cvx/pkg/gemini"
+	"cvx/pkg/project"
 	"cvx/pkg/schema"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
-	"os"
 	"os/exec"
+	"regexp"
 	"strings"
 	"time"
 
@@ -67,13 +67,22 @@ func runAdd(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("config error: %w", err)
 	}
 
+	// Resolve repo (flag > config)
+	repo := repoFlag
+	if repo == "" {
+		repo = cfg.Repo
+	}
+	if repo == "" && !dryRunFlag {
+		return fmt.Errorf("no repo configured. Run: cvx config")
+	}
+
 	// Resolve model (flag > config > default)
 	model := modelFlag
 	if model == "" {
 		model = cfg.Model
 	}
 	if model == "" {
-		model = gemini.DefaultModel
+		model = ai.DefaultModel()
 	}
 
 	// Validate model
@@ -81,22 +90,10 @@ func runAdd(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("unsupported model: %s (supported: %v)", model, ai.SupportedModels())
 	}
 
-	// Resolve repo (flag > config)
-	repo := repoFlag
-	if repo == "" {
-		repo = cfg.Repo
-	}
-	if repo == "" && !dryRunFlag {
-		return fmt.Errorf("no repo configured. Run: cvx config set repo owner/name")
-	}
-
-	// Resolve schema (flag > config)
+	// Resolve schema (flag > config > default)
 	schemaPath := schemaFlag
 	if schemaPath == "" {
 		schemaPath = cfg.Schema
-	}
-	if schemaPath == "" {
-		return fmt.Errorf("no schema configured. Run: cvx config set schema /path/to/job-app.yml")
 	}
 
 	// Load schema
@@ -191,41 +188,110 @@ func extractWithSchema(ctx context.Context, model string, sch *schema.Schema, ur
 	return data, nil
 }
 
+const (
+	cReset = "\033[0m"
+	cGreen = "\033[0;32m"
+	cCyan  = "\033[0;36m"
+)
+
 func printDynamicResult(title string, data map[string]any) {
-	fmt.Printf("\n%s\n", title)
+	company, _ := data["company"]
+	location, _ := data["location"]
 
-	// Print company if available
-	if company, ok := data["company"]; ok && company != nil {
-		fmt.Printf("Company: %v\n", company)
+	fmt.Printf("\n%s%s%s", cGreen, title, cReset)
+	if company != nil {
+		fmt.Printf(" @ %s%v%s", cCyan, company, cReset)
 	}
-
-	// Print location if available
-	if location, ok := data["location"]; ok && location != nil {
-		fmt.Printf("Location: %v\n", location)
+	if location != nil {
+		fmt.Printf(" (%v)", location)
 	}
-
 	fmt.Println()
 }
 
 func createDynamicIssue(repo string, sch *schema.Schema, title string, data map[string]any) error {
 	body := sch.BuildIssueBody(data)
 
-	ghArgs := []string{
-		"issue", "create",
-		"-R", repo,
-		"--title", title,
-		"--body", body,
-	}
-
-	log("Creating issue in %s...", repo)
-
-	gh := exec.Command("gh", ghArgs...)
-	gh.Stdout = os.Stdout
-	gh.Stderr = os.Stderr
-
-	if err := gh.Run(); err != nil {
+	gh := exec.Command("gh", "issue", "create", "-R", repo, "--title", title, "--body", body)
+	output, err := gh.Output()
+	if err != nil {
 		return fmt.Errorf("gh issue create failed: %w", err)
 	}
 
+	issueURL := strings.TrimSpace(string(output))
+	fmt.Printf("%sCreated:%s %s\n", cGreen, cReset, issueURL)
+
+	// Add to project if configured
+	cfg, _ := config.Load()
+	if cfg.Project.ID != "" {
+		if err := addToProject(cfg, repo, issueURL, data); err != nil {
+			fmt.Printf("Warning: Could not add to project: %v\n", err)
+		}
+	}
+
+	return nil
+}
+
+func addToProject(cfg *config.Config, repo, issueURL string, data map[string]any) error {
+	// Extract issue number from URL
+	re := regexp.MustCompile(`/issues/(\d+)$`)
+	matches := re.FindStringSubmatch(issueURL)
+	if len(matches) < 2 {
+		return fmt.Errorf("could not extract issue number from URL")
+	}
+	issueNum := 0
+	fmt.Sscanf(matches[1], "%d", &issueNum)
+
+	client := project.New(repo)
+
+	// Get issue node ID
+	nodeID, err := client.GetIssueNodeID(issueNum)
+	if err != nil {
+		return fmt.Errorf("failed to get issue node ID: %w", err)
+	}
+
+	// Add to project
+	itemID, err := client.AddItem(cfg.Project.ID, nodeID)
+	if err != nil {
+		return fmt.Errorf("failed to add to project: %w", err)
+	}
+
+	// Set Company field
+	if company, ok := data["company"].(string); ok && company != "" && cfg.Project.Fields.Company != "" {
+		if err := client.SetTextField(cfg.Project.ID, itemID, cfg.Project.Fields.Company, company); err != nil {
+			log("Warning: Could not set company field: %v", err)
+		}
+	}
+
+	// Set Deadline field (default +7 days)
+	if cfg.Project.Fields.Deadline != "" {
+		deadline := time.Now().AddDate(0, 0, 7).Format("2006-01-02")
+		if d, ok := data["deadline"].(string); ok && d != "" {
+			deadline = d
+		}
+		if err := client.SetDateField(cfg.Project.ID, itemID, cfg.Project.Fields.Deadline, deadline); err != nil {
+			log("Warning: Could not set deadline field: %v", err)
+		}
+	}
+
+	// Set initial status to "To be Applied"
+	if cfg.Project.Fields.Status != "" && len(cfg.Project.Statuses) > 0 {
+		var statusID string
+		if id, ok := cfg.Project.Statuses["to_be_applied"]; ok {
+			statusID = id
+		} else {
+			// Fallback to first available
+			for _, id := range cfg.Project.Statuses {
+				statusID = id
+				break
+			}
+		}
+		if statusID != "" {
+			if err := client.SetStatusField(cfg.Project.ID, itemID, cfg.Project.Fields.Status, statusID); err != nil {
+				log("Warning: Could not set status field: %v", err)
+			}
+		}
+	}
+
+	log("Added to project")
 	return nil
 }

@@ -9,9 +9,25 @@ import (
 )
 
 type Config struct {
-	Repo   string `yaml:"repo"`
-	Model  string `yaml:"model"`
-	Schema string `yaml:"schema"`
+	Repo    string        `yaml:"repo"`
+	Model   string        `yaml:"model"`
+	Schema  string        `yaml:"schema"`
+	Project ProjectConfig `yaml:"project"`
+}
+
+type ProjectConfig struct {
+	ID       string            `yaml:"id"`
+	Number   int               `yaml:"number"`
+	Title    string            `yaml:"title"`
+	Fields   FieldIDs          `yaml:"fields"`
+	Statuses map[string]string `yaml:"statuses"`
+}
+
+type FieldIDs struct {
+	Status      string `yaml:"status"`
+	Company     string `yaml:"company"`
+	Deadline    string `yaml:"deadline"`
+	AppliedDate string `yaml:"applied_date"`
 }
 
 var (
@@ -37,7 +53,7 @@ func Load() (*Config, error) {
 	}
 
 	cfg = &Config{
-		Model: "gemini-3.0-flash", // default
+		Model: "gemini-2.5-flash", // default
 	}
 
 	data, err := os.ReadFile(cfgPath)
@@ -118,4 +134,20 @@ func All() (map[string]string, error) {
 		"model":  c.Model,
 		"schema": c.Schema,
 	}, nil
+}
+
+// Save saves the full config
+func Save(c *Config) error {
+	cfg = c
+	return save(c)
+}
+
+// SaveProject saves project configuration
+func SaveProject(p ProjectConfig) error {
+	c, err := Load()
+	if err != nil {
+		return err
+	}
+	c.Project = p
+	return save(c)
 }

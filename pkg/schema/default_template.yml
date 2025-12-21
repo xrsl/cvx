@@ -1,0 +1,60 @@
+name: Job Application
+description: Track and monitor your job applications
+labels: []
+assignees: []
+body:
+  - type: input
+    id: job-posting
+    attributes:
+      label: Job Posting URL
+      placeholder: https://company.com/careers/job-id
+    validations:
+      required: true
+
+  - type: input
+    id: title
+    attributes:
+      label: Job Title
+      placeholder: ex. Senior Software Engineer
+    validations:
+      required: true
+
+  - type: input
+    id: company
+    attributes:
+      label: Company
+      placeholder: ex. Acme Corp
+    validations:
+      required: true
+
+  - type: input
+    id: location
+    attributes:
+      label: Location
+      placeholder: ex. Remote, New York, Hybrid
+    validations:
+      required: false
+
+  - type: input
+    id: department
+    attributes:
+      label: Department/Team
+      placeholder: ex. Engineering, Product, Data Science
+    validations:
+      required: false
+
+  - type: input
+    id: hiring-manager
+    attributes:
+      label: Hiring Manager
+      placeholder: ex. Jane Smith
+    validations:
+      required: false
+
+  - type: textarea
+    id: job-ad
+    attributes:
+      label: Full Job Ad
+      placeholder: Paste the full job posting text here
+    validations:
+      required: false

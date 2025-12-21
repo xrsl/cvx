@@ -48,7 +48,12 @@ type rawField struct {
 }
 
 // Load parses a GitHub issue template YAML file
+// If path is empty, returns the bundled default schema
 func Load(path string) (*Schema, error) {
+	if path == "" {
+		return LoadDefault()
+	}
+
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read schema: %w", err)

@@ -1,56 +1,131 @@
 # cvx
 
-**cvx** is a CLI tool that automates job application tracking using AI agents. It fetches job postings, extracts key details (like company, role, location) using models like Gemini or Claude, and automatically creates structured GitHub issues to track your applications.
+CLI tool for tracking job applications. Uses AI to extract job details and GitHub Issues + Projects for tracking.
 
-## Features
-
-- **AI Extraction**: Uses Gemini or Claude to parse job descriptions into structured data.
-- **GitHub Integration**: Automatically creates issues in your tracking repository using the `gh` CLI.
-- **Custom Schemas**: specific parsing rules via GitHub issue template schemas.
-
-## Installation
+## Install
 
 ```bash
-# Build from source
 go install github.com/xrsl/cvx@latest
 ```
 
-*Note: Requires [GitHub CLI](https://cli.github.com/) (`gh`) to be installed and authenticated.*
+**Requirements:**
+- [GitHub CLI](https://cli.github.com/) (`gh`) - installed and authenticated
+- One of: [Claude CLI](https://github.com/anthropics/claude-code), [Gemini CLI](https://github.com/google-gemini/gemini-cli), or API key
 
-## Configuration
-
-Set up your environment variables (e.g., `.env`):
+## Quick Start
 
 ```bash
-GEMINI_API_KEY=your_key_here
-# or
-ANTHROPIC_API_KEY=your_key_here
+cvx config
 ```
 
-Configure defaults:
+This runs the setup wizard:
+- Links your GitHub repo
+- Selects AI model
+- Creates a GitHub Project with job-tracking statuses
+
+Then add jobs:
 
 ```bash
-cvx config set repo owner/repo_name
-cvx config set schema /path/to/.github/ISSUE_TEMPLATE/job-ad.yml
+cvx add https://company.com/careers/role
 ```
 
-## Usage
+## Commands
 
-**Add a job application:**
+### `cvx add <url>`
+
+Fetches job posting, extracts details with AI, creates GitHub issue.
 
 ```bash
-cvx add https://jobs.example.com/software-engineer
+cvx add https://company.com/job
+cvx add https://company.com/job --dry-run    # extract only
+cvx add https://company.com/job -m claude-cli:opus-4.5
 ```
 
-**Dry run (extract only):**
+### `cvx list`
+
+Lists all job applications with status, company, and deadline.
 
 ```bash
-cvx add https://jobs.example.com/software-engineer --dry-run
+cvx list
+cvx list -r owner/repo    # specific repo
 ```
 
-**Specify model:**
+### `cvx status <issue> <status>`
+
+Updates application status.
 
 ```bash
-cvx add <url> -m gemini-pro
-cvx add <url> -m claude-3-sonnet
+cvx status 42 applied
+cvx status 42 interview
+cvx status --list         # show available statuses
+```
+
+Available statuses: `to_be_applied`, `applied`, `interview`, `offered`, `accepted`, `gone`, `let_go`
+
+### `cvx rm <issue>`
+
+Deletes an issue.
+
+```bash
+cvx rm 42
+```
+
+### `cvx config`
+
+Interactive setup wizard. Also supports direct access:
+
+```bash
+cvx config              # wizard
+cvx config list         # show all settings
+cvx config get model    # get value
+cvx config set model claude-cli:opus-4.5
+```
+
+## AI Models
+
+Priority order (first available is default):
+
+| Model | Notes |
+|-------|-------|
+| `claude-cli` | Uses Claude CLI (free with Claude subscription) |
+| `claude-cli:opus-4.5` | Specific Claude model via CLI |
+| `claude-cli:sonnet-4` | Specific Claude model via CLI |
+| `gemini-cli` | Uses Gemini CLI |
+| `gemini-2.5-flash` | Requires `GEMINI_API_KEY` |
+| `claude-sonnet-4` | Requires `ANTHROPIC_API_KEY` |
+
+## GitHub Project
+
+cvx automatically creates a GitHub Project with:
+
+**Fields:**
+- Application Status (single-select)
+- Company (text)
+- Deadline (date)
+- AppliedDate (date)
+
+**Statuses:**
+- To be Applied
+- Applied
+- Interview
+- Offered
+- Accepted
+- Gone
+- Let Go
+
+Issues are automatically added to the project when created with `cvx add`.
+
+## Config File
+
+Located at `~/.config/cvx/config.yaml`:
+
+```yaml
+repo: owner/repo
+model: claude-cli
+schema: ""  # uses bundled default
+project:
+  id: PVT_xxx
+  number: 1
+  title: Job Applications
+  # ... field IDs auto-configured
 ```

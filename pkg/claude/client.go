@@ -9,7 +9,7 @@ import (
 	"github.com/anthropics/anthropic-sdk-go/option"
 )
 
-const DefaultModel = "claude-sonnet-4"
+const DefaultModel = "claude-opus-4-5"
 
 var SupportedModels = []string{
 	"claude-opus-4-5",
