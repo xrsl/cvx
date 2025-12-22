@@ -18,7 +18,7 @@ var rmRepoFlag string
 
 var rmCmd = &cobra.Command{
 	Use:   "rm <issue-number>",
-	Short: "Remove (delete) a GitHub issue",
+	Short: "Remove a job application",
 	Long: `Delete a GitHub issue by its number.
 
 Examples:

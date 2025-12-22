@@ -13,7 +13,7 @@ var quiet bool
 var rootCmd = &cobra.Command{
 	Use:   "cvx",
 	Short: "A CLI for CV workflows powered by AI",
-	Long:  `cvx automates CV-related workflows using AI agents like Gemini and Claude.`,
+	Long:  `cvx automates CV-related workflows using AI agents like Claude and Gemini.`,
 }
 
 func Execute() {

@@ -330,14 +330,63 @@ func (c *Client) ListProjects() ([]ProjectInfo, error) {
 	if len(parts) != 2 {
 		return nil, fmt.Errorf("invalid repo format")
 	}
+	owner := parts[0]
 
+	// Try user projects first, then repo projects
+	projects, err := c.listUserProjects(owner)
+	if err == nil && len(projects) > 0 {
+		return projects, nil
+	}
+
+	return c.listRepoProjects(owner, parts[1])
+}
+
+func (c *Client) listUserProjects(owner string) ([]ProjectInfo, error) {
+	query := fmt.Sprintf(`query {
+		user(login: "%s") {
+			projectsV2(first: 20) {
+				nodes { id number title }
+			}
+		}
+	}`, owner)
+
+	out, err := graphql(query)
+	if err != nil {
+		return nil, err
+	}
+
+	var result struct {
+		Data struct {
+			User struct {
+				ProjectsV2 struct {
+					Nodes []struct {
+						ID     string `json:"id"`
+						Number int    `json:"number"`
+						Title  string `json:"title"`
+					} `json:"nodes"`
+				} `json:"projectsV2"`
+			} `json:"user"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(out, &result); err != nil {
+		return nil, err
+	}
+
+	var projects []ProjectInfo
+	for _, p := range result.Data.User.ProjectsV2.Nodes {
+		projects = append(projects, ProjectInfo{ID: p.ID, Number: p.Number, Title: p.Title})
+	}
+	return projects, nil
+}
+
+func (c *Client) listRepoProjects(owner, name string) ([]ProjectInfo, error) {
 	query := fmt.Sprintf(`query {
 		repository(owner: "%s", name: "%s") {
 			projectsV2(first: 20) {
 				nodes { id number title }
 			}
 		}
-	}`, parts[0], parts[1])
+	}`, owner, name)
 
 	out, err := graphql(query)
 	if err != nil {

@@ -21,7 +21,7 @@ var statusList bool
 
 var statusCmd = &cobra.Command{
 	Use:   "status <issue-number> <status>",
-	Short: "Update issue status in project",
+	Short: "Update job application status",
 	Long: `Update the status of an issue in the GitHub project.
 
 Available statuses depend on your project configuration.

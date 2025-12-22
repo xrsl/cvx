@@ -1,68 +1,24 @@
-# LaTeX auxiliary files
-*.aux
-*.lof
-*.log
-*.lot
-*.fls
+# CVX CLI
+.cvx/
+.cvx-config.yaml
+.env
+
+# Go
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
 *.out
-*.toc
-*.fmt
-*.fot
-*.cb
-*.cb2
-.*.lb
 
-# LaTeX intermediate files
-*.dvi
-*.xdv
-*-converted-to.*
-
-# Bibliography auxiliary files
-*.bbl
-*.bcf
-*.blg
-*-blx.aux
-*-blx.bib
-*.run.xml
-
-# Build tool auxiliary files
-*.fdb_latexmk
-*.synctex
-*.synctex(busy)
-*.synctex.gz
-*.synctex.gz(busy)
-*.pdfsync
-
-# Build directories - ignore artifacts but keep PDFs
-build/*.aux
-build/*.fdb_latexmk
-build/*.fls
-build/*.log
-build/*.out
-build/*.synctex.gz
-build/*.sty
-out/
-output/
-
-# Main PDF output (uncomment if you don't want to track the PDF)
-# *.pdf
-
-# Backup files
-*~
-*.backup
-*.bak
-
-# Editor files
-.DS_Store
+# IDE
+.idea/
+.vscode/
 *.swp
 *.swo
 *~
-.idea/
 
-# OS files
+# OS
 .DS_Store
 Thumbs.db
-
-# CV CLI working directory
-.cvx/
-.env

@@ -2,18 +2,20 @@ package config
 
 import (
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/spf13/viper"
+	"gopkg.in/yaml.v3"
 )
 
 type Config struct {
-	Repo           string        `mapstructure:"repo"`
-	Model          string        `mapstructure:"model"`
-	Schema         string        `mapstructure:"schema"`
-	Project        ProjectConfig `mapstructure:"project"`
-	CVPath         string        `mapstructure:"cv_path"`
-	ExperiencePath string        `mapstructure:"experience_path"`
+	Repo           string        `mapstructure:"repo" yaml:"repo,omitempty"`
+	Model          string        `mapstructure:"model" yaml:"model,omitempty"`
+	Schema         string        `mapstructure:"schema" yaml:"schema,omitempty"`
+	CVPath         string        `mapstructure:"cv_path" yaml:"cv_path,omitempty"`
+	ExperiencePath string        `mapstructure:"experience_path" yaml:"experience_path,omitempty"`
+	Project        ProjectConfig `mapstructure:"project" yaml:"project,omitempty"`
 }
 
 // Agent returns the CLI agent name derived from the model setting
@@ -25,23 +27,24 @@ func (c *Config) Agent() string {
 }
 
 type ProjectConfig struct {
-	ID       string            `mapstructure:"id"`
-	Number   int               `mapstructure:"number"`
-	Title    string            `mapstructure:"title"`
-	Fields   FieldIDs          `mapstructure:"fields"`
-	Statuses map[string]string `mapstructure:"statuses"`
+	ID       string            `mapstructure:"id" yaml:"id,omitempty"`
+	Number   int               `mapstructure:"number" yaml:"number,omitempty"`
+	Title    string            `mapstructure:"title" yaml:"title,omitempty"`
+	Fields   FieldIDs          `mapstructure:"fields" yaml:"fields,omitempty"`
+	Statuses map[string]string `mapstructure:"statuses" yaml:"statuses,omitempty"`
 }
 
 type FieldIDs struct {
-	Status      string `mapstructure:"status"`
-	Company     string `mapstructure:"company"`
-	Deadline    string `mapstructure:"deadline"`
-	AppliedDate string `mapstructure:"applied_date"`
+	Status      string `mapstructure:"status" yaml:"status,omitempty"`
+	Company     string `mapstructure:"company" yaml:"company,omitempty"`
+	Deadline    string `mapstructure:"deadline" yaml:"deadline,omitempty"`
+	AppliedDate string `mapstructure:"applied_date" yaml:"applied_date,omitempty"`
 }
 
-const configFile = ".cvx-config.yaml"
-
-var v *viper.Viper
+var (
+	configFile = ".cvx-config.yaml"
+	v          *viper.Viper
+)
 
 func init() {
 	v = viper.New()
@@ -81,17 +84,44 @@ func Get(key string) (string, error) {
 }
 
 func Set(key, value string) error {
+	cfg, err := Load()
+	if err != nil {
+		cfg = &Config{}
+	}
+
 	switch key {
-	case "repo", "model", "schema", "cv_path", "experience_path":
-		v.Set(key, value)
+	case "repo":
+		cfg.Repo = value
+	case "model":
+		cfg.Model = value
+	case "schema":
+		cfg.Schema = value
+	case "cv_path":
+		cfg.CVPath = value
+	case "experience_path":
+		cfg.ExperiencePath = value
 	default:
 		return fmt.Errorf("unknown config key: %s (valid: repo, model, schema, cv_path, experience_path)", key)
 	}
-	return save()
+
+	v.Set(key, value) // keep viper in sync
+	return writeConfig(cfg)
 }
 
 func save() error {
-	return v.WriteConfigAs(configFile)
+	cfg, err := Load()
+	if err != nil {
+		cfg = &Config{}
+	}
+	return writeConfig(cfg)
+}
+
+func writeConfig(cfg *Config) error {
+	data, err := yaml.Marshal(cfg)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(configFile, data, 0644)
 }
 
 func All() (map[string]string, error) {
@@ -106,24 +136,23 @@ func All() (map[string]string, error) {
 
 // Save saves the full config
 func Save(c *Config) error {
-	v.Set("repo", c.Repo)
-	v.Set("model", c.Model)
-	v.Set("schema", c.Schema)
-	v.Set("project", c.Project)
-	v.Set("cv_path", c.CVPath)
-	v.Set("experience_path", c.ExperiencePath)
-	return save()
+	return writeConfig(c)
 }
 
 // SaveProject saves project configuration
 func SaveProject(p ProjectConfig) error {
-	v.Set("project", p)
-	return save()
+	cfg, err := Load()
+	if err != nil {
+		cfg = &Config{}
+	}
+	cfg.Project = p
+	return writeConfig(cfg)
 }
 
 // ResetForTest resets viper for testing (only use in tests)
-func ResetForTest(testConfigFile string) {
+func ResetForTest(testPath string) {
+	configFile = testPath + "/.cvx-config.yaml"
 	v = viper.New()
-	v.SetConfigFile(testConfigFile)
+	v.SetConfigFile(configFile)
 	v.SetDefault("model", "claude-cli")
 }
