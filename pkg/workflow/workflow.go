@@ -10,7 +10,7 @@ import (
 var DefaultMatch string
 
 const (
-	DefaultSchemaPath = ".cvx/job-ad-schema.yaml"
+	DefaultSchemaPath = ".github/ISSUE_TEMPLATE/job-ad-schema.yaml"
 	MatchPath         = ".cvx/workflows/match.md"
 )
 
@@ -22,7 +22,7 @@ func Init(schemaPath string) error {
 	}
 
 	// Create directories
-	dirs := []string{".cvx/workflows", ".cvx/sessions", ".cvx/matches"}
+	dirs := []string{".cvx/workflows", ".cvx/sessions", ".cvx/matches", ".github/ISSUE_TEMPLATE"}
 	for _, dir := range dirs {
 		if err := os.MkdirAll(dir, 0755); err != nil {
 			return err

@@ -68,7 +68,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 
 	cfg, _ := config.Load()
 
-	fmt.Printf("\n%s%scvx init%s\n\n", initBold, initCyan, initReset)
+	fmt.Printf("\n%sPress Enter to accept defaults shown in brackets.%s\n\n", initGray, initReset)
 
 	// Step 1: Repository
 	repo := cfg.Repo
@@ -78,15 +78,16 @@ func runInit(cmd *cobra.Command, args []string) error {
 	for {
 		fmt.Printf("%s?%s Repository ", initGreen, initReset)
 		if repo != "" {
-			fmt.Printf("%s(%s)%s: ", initCyan, repo, initReset)
+			fmt.Printf("%s[%s]%s: ", initCyan, repo, initReset)
 		} else {
-			fmt.Printf("%s(owner/repo)%s: ", initCyan, initReset)
+			fmt.Printf("%s[owner/repo]%s: ", initCyan, initReset)
 		}
 
 		input, _ := reader.ReadString('\n')
 		input = strings.TrimSpace(input)
 
 		if input == "" && repo != "" {
+			fmt.Println()
 			break
 		} else if input != "" {
 			repo = input
@@ -142,7 +143,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 		}
 		fmt.Println()
 	}
-	fmt.Printf("\n  Choice %s(%d)%s: ", initCyan, currentIdx+1, initReset)
+	fmt.Printf("\n  Choice %s[%d]%s: ", initCyan, currentIdx+1, initReset)
 
 	input, _ := reader.ReadString('\n')
 	input = strings.TrimSpace(input)
@@ -162,33 +163,35 @@ func runInit(cmd *cobra.Command, args []string) error {
 	if cvPath == "" {
 		cvPath = "src/cv.tex"
 	}
-	fmt.Printf("%s?%s CV file path %s(%s)%s: ", initGreen, initReset, initCyan, cvPath, initReset)
+	fmt.Printf("%s?%s CV file path %s[%s]%s: ", initGreen, initReset, initCyan, cvPath, initReset)
 	input, _ = reader.ReadString('\n')
 	input = strings.TrimSpace(input)
 	if input != "" {
 		cvPath = input
 	}
 	config.Set("cv_path", cvPath)
+	fmt.Println()
 
 	// Step 4: Experience file path
 	expPath := cfg.ExperiencePath
 	if expPath == "" {
 		expPath = "reference/EXPERIENCE.md"
 	}
-	fmt.Printf("%s?%s Experience file path %s(%s)%s: ", initGreen, initReset, initCyan, expPath, initReset)
+	fmt.Printf("%s?%s Experience file path %s[%s]%s: ", initGreen, initReset, initCyan, expPath, initReset)
 	input, _ = reader.ReadString('\n')
 	input = strings.TrimSpace(input)
 	if input != "" {
 		expPath = input
 	}
 	config.Set("experience_path", expPath)
+	fmt.Println()
 
 	// Step 5: Job ad schema path
 	schemaPath := cfg.Schema
 	if schemaPath == "" {
 		schemaPath = workflow.DefaultSchemaPath
 	}
-	fmt.Printf("%s?%s Job ad schema path %s(%s)%s: ", initGreen, initReset, initCyan, schemaPath, initReset)
+	fmt.Printf("%s?%s Job ad schema (i.e., issue template) path %s[%s]%s: ", initGreen, initReset, initCyan, schemaPath, initReset)
 	input, _ = reader.ReadString('\n')
 	input = strings.TrimSpace(input)
 	if input != "" {
