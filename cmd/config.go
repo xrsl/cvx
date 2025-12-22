@@ -5,6 +5,7 @@ import (
 	"cvx/pkg/ai"
 	"cvx/pkg/config"
 	"cvx/pkg/project"
+	"cvx/pkg/workflow"
 	"fmt"
 	"os"
 	"os/exec"
@@ -292,7 +293,42 @@ func runConfigWizard(cmd *cobra.Command, args []string) error {
 	config.Set("model", selectedModel)
 	fmt.Printf("  Using %s%s%s\n\n", cfgCyan, selectedModel, cfgReset)
 
-	// Step 3: GitHub Project
+	// Step 3: CV Path (for match command)
+	cvPath := cfg.CVPath
+	fmt.Printf("%s?%s CV file path ", cfgGreen, cfgReset)
+	if cvPath != "" {
+		fmt.Printf("%s(%s)%s: ", cfgCyan, cvPath, cfgReset)
+	} else {
+		fmt.Printf("%s(e.g. src/cv.tex)%s: ", cfgCyan, cfgReset)
+	}
+	input, _ = reader.ReadString('\n')
+	input = strings.TrimSpace(input)
+	if input != "" {
+		cvPath = input
+	}
+	if cvPath != "" {
+		config.Set("cv_path", cvPath)
+	}
+
+	// Step 4: Experience/Skills file path
+	expPath := cfg.ExperiencePath
+	fmt.Printf("%s?%s Experience file path ", cfgGreen, cfgReset)
+	if expPath != "" {
+		fmt.Printf("%s(%s)%s: ", cfgCyan, expPath, cfgReset)
+	} else {
+		fmt.Printf("%s(e.g. reference/EXPERIENCE.md)%s: ", cfgCyan, cfgReset)
+	}
+	input, _ = reader.ReadString('\n')
+	input = strings.TrimSpace(input)
+	if input != "" {
+		expPath = input
+	}
+	if expPath != "" {
+		config.Set("experience_path", expPath)
+	}
+	fmt.Println()
+
+	// Step 5: GitHub Project
 	if cfg.Project.ID == "" {
 		fmt.Printf("%s?%s Create GitHub Project for tracking? %s(Y/n)%s: ", cfgGreen, cfgReset, cfgCyan, cfgReset)
 		input, _ := reader.ReadString('\n')
@@ -333,6 +369,11 @@ func runConfigWizard(cmd *cobra.Command, args []string) error {
 		fmt.Println()
 	} else {
 		fmt.Printf("%s✓%s GitHub Project #%d linked\n\n", cfgGreen, cfgReset, cfg.Project.Number)
+	}
+
+	// Initialize workflow directory structure
+	if err := workflow.Init(); err != nil {
+		fmt.Printf("  Warning: Could not initialize .cvx/ directory: %v\n", err)
 	}
 
 	// Done

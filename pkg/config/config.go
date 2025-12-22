@@ -2,18 +2,26 @@ package config
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/spf13/viper"
 )
 
 type Config struct {
-	Repo    string        `mapstructure:"repo"`
-	Model   string        `mapstructure:"model"`
-	Schema  string        `mapstructure:"schema"`
-	Project ProjectConfig `mapstructure:"project"`
+	Repo           string        `mapstructure:"repo"`
+	Model          string        `mapstructure:"model"`
+	Schema         string        `mapstructure:"schema"`
+	Project        ProjectConfig `mapstructure:"project"`
+	CVPath         string        `mapstructure:"cv_path"`
+	ExperiencePath string        `mapstructure:"experience_path"`
+}
+
+// Agent returns the CLI agent name derived from the model setting
+func (c *Config) Agent() string {
+	if strings.HasPrefix(c.Model, "gemini") {
+		return "gemini"
+	}
+	return "claude"
 }
 
 type ProjectConfig struct {
@@ -31,22 +39,13 @@ type FieldIDs struct {
 	AppliedDate string `mapstructure:"applied_date"`
 }
 
-var (
-	v       *viper.Viper
-	cfgPath string
-)
+const configFile = ".cvx-config.yaml"
+
+var v *viper.Viper
 
 func init() {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		home = "."
-	}
-	cfgPath = filepath.Join(home, ".config", "cvx")
-
 	v = viper.New()
-	v.SetConfigName("config")
-	v.SetConfigType("yaml")
-	v.AddConfigPath(cfgPath)
+	v.SetConfigFile(configFile)
 
 	// Defaults
 	v.SetDefault("model", "claude-cli")
@@ -61,7 +60,7 @@ func init() {
 }
 
 func Path() string {
-	return filepath.Join(cfgPath, "config.yaml")
+	return configFile
 }
 
 func Load() (*Config, error) {
@@ -74,7 +73,7 @@ func Load() (*Config, error) {
 
 func Get(key string) (string, error) {
 	switch key {
-	case "repo", "model", "schema":
+	case "repo", "model", "schema", "cv_path", "experience_path":
 		return v.GetString(key), nil
 	default:
 		return "", fmt.Errorf("unknown config key: %s", key)
@@ -83,28 +82,25 @@ func Get(key string) (string, error) {
 
 func Set(key, value string) error {
 	switch key {
-	case "repo", "model", "schema":
+	case "repo", "model", "schema", "cv_path", "experience_path":
 		v.Set(key, value)
 	default:
-		return fmt.Errorf("unknown config key: %s (valid: repo, model, schema)", key)
+		return fmt.Errorf("unknown config key: %s (valid: repo, model, schema, cv_path, experience_path)", key)
 	}
 	return save()
 }
 
 func save() error {
-	// Ensure config directory exists
-	if err := os.MkdirAll(cfgPath, 0755); err != nil {
-		return err
-	}
-
-	return v.WriteConfigAs(Path())
+	return v.WriteConfigAs(configFile)
 }
 
 func All() (map[string]string, error) {
 	return map[string]string{
-		"repo":   v.GetString("repo"),
-		"model":  v.GetString("model"),
-		"schema": v.GetString("schema"),
+		"repo":            v.GetString("repo"),
+		"model":           v.GetString("model"),
+		"schema":          v.GetString("schema"),
+		"cv_path":         v.GetString("cv_path"),
+		"experience_path": v.GetString("experience_path"),
 	}, nil
 }
 
@@ -114,6 +110,8 @@ func Save(c *Config) error {
 	v.Set("model", c.Model)
 	v.Set("schema", c.Schema)
 	v.Set("project", c.Project)
+	v.Set("cv_path", c.CVPath)
+	v.Set("experience_path", c.ExperiencePath)
 	return save()
 }
 
@@ -124,11 +122,8 @@ func SaveProject(p ProjectConfig) error {
 }
 
 // ResetForTest resets viper for testing (only use in tests)
-func ResetForTest(testPath string) {
-	cfgPath = testPath
+func ResetForTest(testConfigFile string) {
 	v = viper.New()
-	v.SetConfigName("config")
-	v.SetConfigType("yaml")
-	v.AddConfigPath(cfgPath)
+	v.SetConfigFile(testConfigFile)
 	v.SetDefault("model", "claude-cli")
 }
