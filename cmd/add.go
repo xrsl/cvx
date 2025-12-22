@@ -276,18 +276,8 @@ func addToProject(cfg *config.Config, repo, issueURL string, data map[string]any
 	}
 
 	// Set initial status to "To be Applied"
-	if cfg.Project.Fields.Status != "" && len(cfg.Project.Statuses) > 0 {
-		var statusID string
-		if id, ok := cfg.Project.Statuses["to_be_applied"]; ok {
-			statusID = id
-		} else {
-			// Fallback to first available
-			for _, id := range cfg.Project.Statuses {
-				statusID = id
-				break
-			}
-		}
-		if statusID != "" {
+	if cfg.Project.Fields.Status != "" {
+		if statusID, ok := cfg.Project.Statuses["to_be_applied"]; ok {
 			if err := client.SetStatusField(cfg.Project.ID, itemID, cfg.Project.Fields.Status, statusID); err != nil {
 				log("Warning: Could not set status field: %v", err)
 			}

@@ -275,9 +275,16 @@ func saveProjectConfig(proj *project.ProjectInfo, fields map[string]project.Fiel
 		Fields:   config.FieldIDs{},
 	}
 
+	// Look for status field (could be "status" from Create or "application_status" from DiscoverFields)
+	var statusField *project.FieldInfo
 	if f, ok := fields["status"]; ok {
-		projCfg.Fields.Status = f.ID
-		for _, opt := range f.Options {
+		statusField = &f
+	} else if f, ok := fields["application_status"]; ok {
+		statusField = &f
+	}
+	if statusField != nil {
+		projCfg.Fields.Status = statusField.ID
+		for _, opt := range statusField.Options {
 			key := strings.ToLower(strings.ReplaceAll(opt.Name, " ", "_"))
 			projCfg.Statuses[key] = opt.ID
 		}

@@ -1,6 +1,7 @@
 package config
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"strings"
@@ -117,11 +118,13 @@ func save() error {
 }
 
 func writeConfig(cfg *Config) error {
-	data, err := yaml.Marshal(cfg)
-	if err != nil {
+	var buf bytes.Buffer
+	enc := yaml.NewEncoder(&buf)
+	enc.SetIndent(2)
+	if err := enc.Encode(cfg); err != nil {
 		return err
 	}
-	return os.WriteFile(configFile, data, 0644)
+	return os.WriteFile(configFile, buf.Bytes(), 0644)
 }
 
 func All() (map[string]string, error) {
