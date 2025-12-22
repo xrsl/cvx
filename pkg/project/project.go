@@ -109,16 +109,30 @@ func (c *Client) Create(title string, statuses []string) (*ProjectInfo, map[stri
 		Title:  createResult.Data.CreateProjectV2.ProjectV2.Title,
 	}
 
-	// Create/configure fields
+	// Get existing fields to find the default Status field
+	existingFields, err := c.DiscoverFields(proj.ID)
+	if err != nil {
+		return proj, nil, fmt.Errorf("failed to discover fields: %w", err)
+	}
+
 	fields := make(map[string]FieldInfo)
 
-	// Create custom Application Status field with job-specific statuses
+	// Update the existing Status field with job-specific statuses
 	jobStatuses := []string{"To be Applied", "Applied", "Interview", "Offered", "Accepted", "Gone", "Let Go"}
-	statusField, err := c.createSingleSelectField(proj.ID, "Application Status", jobStatuses)
-	if err != nil {
-		return proj, nil, fmt.Errorf("failed to create Application Status field: %w", err)
+	if statusField, ok := existingFields["status"]; ok {
+		updatedField, err := c.updateSingleSelectOptions(proj.ID, statusField.ID, statusField.Options, jobStatuses)
+		if err != nil {
+			return proj, nil, fmt.Errorf("failed to update Status field: %w", err)
+		}
+		fields["status"] = *updatedField
+	} else {
+		// Fallback: create new field if Status doesn't exist
+		statusField, err := c.createSingleSelectField(proj.ID, "Application Status", jobStatuses)
+		if err != nil {
+			return proj, nil, fmt.Errorf("failed to create Application Status field: %w", err)
+		}
+		fields["status"] = *statusField
 	}
-	fields["status"] = *statusField
 
 	// Create Company field (text)
 	companyField, err := c.createTextField(proj.ID, "Company")
@@ -209,6 +223,67 @@ func (c *Client) createSingleSelectField(projectID, name string, options []strin
 		field.Options = append(field.Options, OptionInfo{ID: opt.ID, Name: opt.Name})
 	}
 	return field, nil
+}
+
+func (c *Client) updateSingleSelectOptions(projectID, fieldID string, existingOptions []OptionInfo, newOptions []string) (*FieldInfo, error) {
+	// Delete existing options
+	for _, opt := range existingOptions {
+		mutation := fmt.Sprintf(`mutation {
+			deleteProjectV2SingleSelectFieldOption(input: {
+				projectId: "%s"
+				fieldId: "%s"
+				optionId: "%s"
+			}) {
+				projectV2SingleSelectFieldOption { id }
+			}
+		}`, projectID, fieldID, opt.ID)
+		if _, err := graphql(mutation); err != nil {
+			return nil, fmt.Errorf("failed to delete option %s: %w", opt.Name, err)
+		}
+	}
+
+	// Create new options
+	var createdOptions []OptionInfo
+	for _, optName := range newOptions {
+		mutation := fmt.Sprintf(`mutation {
+			createProjectV2SingleSelectFieldOption(input: {
+				projectId: "%s"
+				fieldId: "%s"
+				name: "%s"
+				color: GRAY
+			}) {
+				projectV2SingleSelectFieldOption { id name }
+			}
+		}`, projectID, fieldID, optName)
+
+		out, err := graphql(mutation)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create option %s: %w", optName, err)
+		}
+
+		var result struct {
+			Data struct {
+				CreateProjectV2SingleSelectFieldOption struct {
+					ProjectV2SingleSelectFieldOption struct {
+						ID   string `json:"id"`
+						Name string `json:"name"`
+					} `json:"projectV2SingleSelectFieldOption"`
+				} `json:"createProjectV2SingleSelectFieldOption"`
+			} `json:"data"`
+		}
+		if err := json.Unmarshal(out, &result); err != nil {
+			return nil, err
+		}
+		opt := result.Data.CreateProjectV2SingleSelectFieldOption.ProjectV2SingleSelectFieldOption
+		createdOptions = append(createdOptions, OptionInfo{ID: opt.ID, Name: opt.Name})
+	}
+
+	return &FieldInfo{
+		ID:      fieldID,
+		Name:    "Status",
+		Type:    "SINGLE_SELECT",
+		Options: createdOptions,
+	}, nil
 }
 
 func (c *Client) createTextField(projectID, name string) (*FieldInfo, error) {

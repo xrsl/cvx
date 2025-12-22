@@ -275,11 +275,11 @@ func saveProjectConfig(proj *project.ProjectInfo, fields map[string]project.Fiel
 		Fields:   config.FieldIDs{},
 	}
 
-	// Look for status field (could be "status" from Create or "application_status" from DiscoverFields)
+	// Look for status field - prefer custom "Application Status" over default "Status"
 	var statusField *project.FieldInfo
-	if f, ok := fields["status"]; ok {
+	if f, ok := fields["application_status"]; ok {
 		statusField = &f
-	} else if f, ok := fields["application_status"]; ok {
+	} else if f, ok := fields["status"]; ok {
 		statusField = &f
 	}
 	if statusField != nil {
