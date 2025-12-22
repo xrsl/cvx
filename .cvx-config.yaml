@@ -1,20 +1,22 @@
 repo: xrsl/cvx
 model: claude-cli
 schema: .github/ISSUE_TEMPLATE/job-ad.yml
+cv_path: src/cv.tex
+experience_path: reference/EXPERIENCE.md
 project:
-  id: PVT_kwHOARqE184BLCJT
-  number: 8
-  title: Job Applications
-  fields:
-    status: PVTSSF_lAHOARqE184BLCJTzg6ukpQ
-    company: PVTF_lAHOARqE184BLCJTzg6ukpU
-    deadline: PVTF_lAHOARqE184BLCJTzg6ukpY
-    applied_date: PVTF_lAHOARqE184BLCJTzg6ukpc
-  statuses:
-    accepted: f68b4433
-    applied: "28108745"
-    gone: 6956f385
-    interview: b541f91c
-    let_go: af20b5b6
-    offered: c0012889
-    to_be_applied: c1d54078
+    id: PVT_kwHOARqE184BLCJT
+    number: 8
+    title: Job Applications
+    fields:
+        status: PVTSSF_lAHOARqE184BLCJTzg6ukpQ
+        company: PVTF_lAHOARqE184BLCJTzg6ukpU
+        deadline: PVTF_lAHOARqE184BLCJTzg6ukpY
+        applied_date: PVTF_lAHOARqE184BLCJTzg6ukpc
+    statuses:
+        accepted: f68b4433
+        applied: "28108745"
+        gone: 6956f385
+        interview: b541f91c
+        let_go: af20b5b6
+        offered: c0012889
+        to_be_applied: c1d54078

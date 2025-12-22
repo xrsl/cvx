@@ -175,8 +175,10 @@ func extractWithSchema(ctx context.Context, model string, sch *schema.Schema, ur
 	}
 
 	// Clean markdown code blocks
+	resp = strings.TrimSpace(resp)
 	resp = strings.TrimPrefix(resp, "```json")
 	resp = strings.TrimPrefix(resp, "```")
+	resp = strings.TrimSpace(resp)
 	resp = strings.TrimSuffix(resp, "```")
 	resp = strings.TrimSpace(resp)
 
