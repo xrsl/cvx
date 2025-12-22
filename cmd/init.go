@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -54,7 +55,12 @@ func runInit(cmd *cobra.Command, args []string) error {
 		fmt.Printf("  Config: %s%s%s\n\n", initGray, config.Path(), initReset)
 
 		// Ensure workflow files are up to date
-		if err := workflow.Init(); err != nil {
+		cfg, _ := config.Load()
+		schemaPath := cfg.Schema
+		if schemaPath == "" {
+			schemaPath = workflow.DefaultSchemaPath
+		}
+		if err := workflow.Init(schemaPath); err != nil {
 			fmt.Printf("  Warning: %v\n", err)
 		}
 		return nil
@@ -66,6 +72,9 @@ func runInit(cmd *cobra.Command, args []string) error {
 
 	// Step 1: Repository
 	repo := cfg.Repo
+	if repo == "" {
+		repo = inferRepo()
+	}
 	for {
 		fmt.Printf("%s?%s Repository ", initGreen, initReset)
 		if repo != "" {
@@ -148,7 +157,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 	config.Set("model", selectedModel)
 	fmt.Printf("  Using %s%s%s\n\n", initCyan, selectedModel, initReset)
 
-	// Step 3: CV Path
+	// Step 3: CV path (for match command)
 	cvPath := cfg.CVPath
 	if cvPath == "" {
 		cvPath = "src/cv.tex"
@@ -173,9 +182,22 @@ func runInit(cmd *cobra.Command, args []string) error {
 		expPath = input
 	}
 	config.Set("experience_path", expPath)
+
+	// Step 5: Job ad schema path
+	schemaPath := cfg.Schema
+	if schemaPath == "" {
+		schemaPath = workflow.DefaultSchemaPath
+	}
+	fmt.Printf("%s?%s Job ad schema path %s(%s)%s: ", initGreen, initReset, initCyan, schemaPath, initReset)
+	input, _ = reader.ReadString('\n')
+	input = strings.TrimSpace(input)
+	if input != "" {
+		schemaPath = input
+	}
+	config.Set("schema", schemaPath)
 	fmt.Println()
 
-	// Step 5: GitHub Project
+	// Step 6: GitHub Project
 	if cfg.Project.ID == "" {
 		fmt.Printf("%s?%s GitHub Project %s(number to use existing, 'new' to create, enter to skip)%s: ", initGreen, initReset, initCyan, initReset)
 		input, _ := reader.ReadString('\n')
@@ -226,7 +248,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 	}
 
 	// Initialize .cvx directory structure
-	if err := workflow.Init(); err != nil {
+	if err := workflow.Init(schemaPath); err != nil {
 		fmt.Printf("  Warning: Could not initialize .cvx/ directory: %v\n", err)
 	}
 
@@ -268,6 +290,45 @@ func saveProjectConfig(proj *project.ProjectInfo, fields map[string]project.Fiel
 	}
 
 	config.SaveProject(projCfg)
+}
+
+func inferRepo() string {
+	// Try git remote origin first
+	if out, err := exec.Command("git", "remote", "get-url", "origin").Output(); err == nil {
+		url := strings.TrimSpace(string(out))
+		// Parse git@github.com:owner/repo.git or https://github.com/owner/repo.git
+		url = strings.TrimSuffix(url, ".git")
+		if strings.Contains(url, "github.com") {
+			if strings.HasPrefix(url, "git@") {
+				// git@github.com:owner/repo
+				parts := strings.Split(url, ":")
+				if len(parts) == 2 {
+					return parts[1]
+				}
+			} else {
+				// https://github.com/owner/repo
+				parts := strings.Split(url, "github.com/")
+				if len(parts) == 2 {
+					return parts[1]
+				}
+			}
+		}
+	}
+
+	// Fallback: gh user + current directory name
+	user, err := exec.Command("gh", "api", "user", "-q", ".login").Output()
+	if err != nil {
+		return ""
+	}
+	username := strings.TrimSpace(string(user))
+
+	wd, err := os.Getwd()
+	if err != nil {
+		return ""
+	}
+	dirname := filepath.Base(wd)
+
+	return username + "/" + dirname
 }
 
 func buildModelList() []modelOption {

@@ -146,6 +146,21 @@ func SaveProject(p ProjectConfig) error {
 		cfg = &Config{}
 	}
 	cfg.Project = p
+
+	// Keep viper in sync so subsequent Load() calls include project data
+	v.Set("project", map[string]interface{}{
+		"id":     p.ID,
+		"number": p.Number,
+		"title":  p.Title,
+		"fields": map[string]string{
+			"status":       p.Fields.Status,
+			"company":      p.Fields.Company,
+			"deadline":     p.Fields.Deadline,
+			"applied_date": p.Fields.AppliedDate,
+		},
+		"statuses": p.Statuses,
+	})
+
 	return writeConfig(cfg)
 }
 

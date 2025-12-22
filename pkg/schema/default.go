@@ -9,6 +9,11 @@ import (
 //go:embed default_template.yml
 var defaultSchemaYAML []byte
 
+// DefaultSchemaYAML returns the raw default schema YAML bytes
+func DefaultSchemaYAML() []byte {
+	return defaultSchemaYAML
+}
+
 // LoadDefault returns the bundled default schema
 func LoadDefault() (*Schema, error) {
 	var raw rawTemplate
