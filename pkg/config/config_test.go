@@ -2,35 +2,26 @@ package config
 
 import (
 	"os"
-	"path/filepath"
 	"testing"
 )
 
 func TestLoadDefaults(t *testing.T) {
-	// Reset cached config
-	cfg = nil
-
-	// Use temp dir
 	tmpDir := t.TempDir()
-	cfgPath = filepath.Join(tmpDir, "config.yaml")
+	ResetForTest(tmpDir)
 
 	c, err := Load()
 	if err != nil {
 		t.Fatalf("Load() error: %v", err)
 	}
 
-	if c.Model != "gemini-2.5-flash" {
-		t.Errorf("Expected default model 'gemini-2.5-flash', got '%s'", c.Model)
+	if c.Model != "claude-cli" {
+		t.Errorf("Expected default model 'claude-cli', got '%s'", c.Model)
 	}
 }
 
 func TestSetAndGet(t *testing.T) {
-	// Reset cached config
-	cfg = nil
-
-	// Use temp dir
 	tmpDir := t.TempDir()
-	cfgPath = filepath.Join(tmpDir, "config.yaml")
+	ResetForTest(tmpDir)
 
 	// Set values
 	if err := Set("repo", "owner/repo"); err != nil {
@@ -39,9 +30,6 @@ func TestSetAndGet(t *testing.T) {
 	if err := Set("model", "claude-cli"); err != nil {
 		t.Fatalf("Set model error: %v", err)
 	}
-
-	// Reset cache to force reload from file
-	cfg = nil
 
 	// Get values
 	repo, err := Get("repo")
@@ -62,9 +50,8 @@ func TestSetAndGet(t *testing.T) {
 }
 
 func TestSetInvalidKey(t *testing.T) {
-	cfg = nil
 	tmpDir := t.TempDir()
-	cfgPath = filepath.Join(tmpDir, "config.yaml")
+	ResetForTest(tmpDir)
 
 	err := Set("invalid_key", "value")
 	if err == nil {
@@ -73,9 +60,8 @@ func TestSetInvalidKey(t *testing.T) {
 }
 
 func TestGetInvalidKey(t *testing.T) {
-	cfg = nil
 	tmpDir := t.TempDir()
-	cfgPath = filepath.Join(tmpDir, "config.yaml")
+	ResetForTest(tmpDir)
 
 	_, err := Get("invalid_key")
 	if err == nil {
@@ -84,9 +70,8 @@ func TestGetInvalidKey(t *testing.T) {
 }
 
 func TestSaveProject(t *testing.T) {
-	cfg = nil
 	tmpDir := t.TempDir()
-	cfgPath = filepath.Join(tmpDir, "config.yaml")
+	ResetForTest(tmpDir)
 
 	proj := ProjectConfig{
 		ID:     "PVT_test123",
@@ -102,8 +87,7 @@ func TestSaveProject(t *testing.T) {
 		t.Fatalf("SaveProject error: %v", err)
 	}
 
-	// Reset and reload
-	cfg = nil
+	// Reload and check
 	c, err := Load()
 	if err != nil {
 		t.Fatalf("Load error: %v", err)
@@ -131,15 +115,14 @@ func TestConfigPath(t *testing.T) {
 }
 
 func TestConfigFileCreated(t *testing.T) {
-	cfg = nil
 	tmpDir := t.TempDir()
-	cfgPath = filepath.Join(tmpDir, "subdir", "config.yaml")
+	ResetForTest(tmpDir)
 
 	if err := Set("repo", "test/repo"); err != nil {
 		t.Fatalf("Set error: %v", err)
 	}
 
-	if _, err := os.Stat(cfgPath); os.IsNotExist(err) {
+	if _, err := os.Stat(Path()); os.IsNotExist(err) {
 		t.Error("Config file was not created")
 	}
 }
