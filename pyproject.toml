@@ -1,0 +1,8 @@
+[project]
+name = "cvx-docs"
+version = "0.0.0"
+description = "Documentation for cvx"
+requires-python = ">=3.10"
+dependencies = [
+    "mkdocs-material>=9.5",
+]

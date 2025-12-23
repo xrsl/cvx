@@ -1,4 +1,4 @@
-.PHONY: all build install clean
+.PHONY: all build install clean docs docs-serve
 
 # Default target
 all: build install clean
@@ -13,3 +13,10 @@ install: build
 
 clean:
 	@rm -f cvx
+
+# Documentation
+docs:
+	@uv run mkdocs build
+
+docs-serve:
+	@uv run mkdocs serve

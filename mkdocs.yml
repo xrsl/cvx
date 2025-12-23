@@ -1,0 +1,40 @@
+site_name: cvx
+site_description: CLI for tracking job applications with AI
+site_url: https://xrsl.github.io/cvx
+repo_url: https://github.com/xrsl/cvx
+repo_name: xrsl/cvx
+
+theme:
+  name: material
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Dark mode
+    - scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Light mode
+  features:
+    - navigation.instant
+    - navigation.sections
+    - content.code.copy
+
+markdown_extensions:
+  - admonition
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - tables
+
+nav:
+  - Overview: index.md
+  - Getting Started: getting-started.md
+  - Commands: commands.md
+  - Configuration: configuration.md
