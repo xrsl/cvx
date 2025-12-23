@@ -136,9 +136,7 @@ repo: owner/repo
 agent: claude-cli
 cv_path: src/cv.tex
 reference_path: reference/
-project:
-  number: 1
-  owner: owner  # optional, inferred from repo
+project: owner/1
 ```
 
 The `reference_path` directory should contain your experience documentation, guidelines, and other reference materials used by `advise` and `tailor` commands.

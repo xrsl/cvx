@@ -7,12 +7,9 @@ Located at `.cvx-config.yaml` in your repo root:
 ```yaml
 repo: owner/repo
 agent: claude-cli
-schema: ""
 cv_path: src/cv.tex
 reference_path: reference/
-project:
-  number: 1
-  owner: owner
+project: owner/1
 ```
 
 ## Settings
@@ -24,8 +21,7 @@ project:
 | `schema` | Job schema file path | Built-in |
 | `cv_path` | CV file for advise/tailor | `src/cv.tex` |
 | `reference_path` | Reference materials directory | `reference/` |
-| `project.number` | GitHub Project number | - |
-| `project.owner` | Project owner | From repo |
+| `project` | GitHub Project (owner/number) | - |
 
 ## AI Agents
 

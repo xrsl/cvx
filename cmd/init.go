@@ -39,14 +39,40 @@ Run this once per repository to set up cvx.`,
 	RunE: runInit,
 }
 
-var initResetWorkflowsFlag bool
+var (
+	initResetWorkflowsFlag bool
+	initDeleteFlag         bool
+	initQuietFlag          bool
+	initCheckFlag          bool
+)
 
 func init() {
 	initCmd.Flags().BoolVar(&initResetWorkflowsFlag, "reset-workflows", false, "Reset workflows to defaults")
+	initCmd.Flags().BoolVarP(&initDeleteFlag, "delete", "d", false, "Remove .cvx/ and config file")
+	initCmd.Flags().BoolVarP(&initQuietFlag, "quiet", "q", false, "Non-interactive with defaults")
+	initCmd.Flags().BoolVarP(&initCheckFlag, "check", "c", false, "Validate config resources exist")
 	rootCmd.AddCommand(initCmd)
 }
 
 func runInit(cmd *cobra.Command, args []string) error {
+	// Handle --delete flag
+	if initDeleteFlag {
+		os.RemoveAll(".cvx")
+		os.Remove(config.Path())
+		fmt.Printf("%s✓%s Deleted\n", initGreen, initReset)
+		return nil
+	}
+
+	// Handle --check flag
+	if initCheckFlag {
+		cfg, _, err := config.LoadWithCache()
+		if err != nil {
+			return fmt.Errorf("no config found: %w", err)
+		}
+		validateConfig(cfg)
+		return nil
+	}
+
 	reader := bufio.NewReader(os.Stdin)
 
 	// Handle --reset-workflows flag
@@ -55,6 +81,35 @@ func runInit(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("failed to reset workflows: %w", err)
 		}
 		fmt.Printf("%s✓%s Workflows reset to defaults\n", initGreen, initReset)
+		return nil
+	}
+
+	// Handle --quiet flag
+	if initQuietFlag {
+		repo := inferRepo()
+		if repo == "" {
+			return fmt.Errorf("could not infer repo from git remote")
+		}
+		// Extract owner for project
+		owner := ""
+		if parts := strings.Split(repo, "/"); len(parts) == 2 {
+			owner = parts[0]
+		}
+		cfg := &config.Config{
+			Repo:          repo,
+			Agent:         "claude-cli",
+			Schema:        workflow.DefaultSchemaPath,
+			CVPath:        "src/cv.tex",
+			ReferencePath: "reference/",
+			Project:       owner + "/1",
+		}
+		if err := config.Save(cfg); err != nil {
+			return fmt.Errorf("failed to save config: %w", err)
+		}
+		if err := workflow.Init(workflow.DefaultSchemaPath); err != nil {
+			return fmt.Errorf("failed to init workflows: %w", err)
+		}
+		fmt.Printf("%s✓%s Initialized with defaults\n", initGreen, initReset)
 		return nil
 	}
 
@@ -213,7 +268,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 	fmt.Println()
 
 	// Step 6: GitHub Project
-	if cfg.Project.ID == "" {
+	if cfg.Project == "" {
 		fmt.Printf("%s?%s GitHub Project %s(number to use existing, 'new' to create, enter to skip)%s: ", initGreen, initReset, initCyan, initReset)
 		input, _ := reader.ReadString('\n')
 		input = strings.TrimSpace(strings.ToLower(input))
@@ -259,7 +314,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 		}
 		fmt.Println()
 	} else {
-		fmt.Printf("%s✓%s GitHub Project #%d linked\n\n", initGreen, initReset, cfg.Project.Number)
+		fmt.Printf("%s✓%s GitHub Project %s linked\n\n", initGreen, initReset, cfg.Project)
 	}
 
 	// Initialize .cvx directory structure
@@ -285,10 +340,8 @@ func saveProjectConfig(proj *project.ProjectInfo, fields map[string]project.Fiel
 		owner = parts[0]
 	}
 
-	projCfg := config.ProjectConfig{
+	cache := config.ProjectCache{
 		ID:       proj.ID,
-		Number:   proj.Number,
-		Owner:    owner,
 		Title:    proj.Title,
 		Statuses: make(map[string]string),
 		Fields:   config.FieldIDs{},
@@ -302,23 +355,23 @@ func saveProjectConfig(proj *project.ProjectInfo, fields map[string]project.Fiel
 		statusField = &f
 	}
 	if statusField != nil {
-		projCfg.Fields.Status = statusField.ID
+		cache.Fields.Status = statusField.ID
 		for _, opt := range statusField.Options {
 			key := strings.ToLower(strings.ReplaceAll(opt.Name, " ", "_"))
-			projCfg.Statuses[key] = opt.ID
+			cache.Statuses[key] = opt.ID
 		}
 	}
 	if f, ok := fields["company"]; ok {
-		projCfg.Fields.Company = f.ID
+		cache.Fields.Company = f.ID
 	}
 	if f, ok := fields["deadline"]; ok {
-		projCfg.Fields.Deadline = f.ID
+		cache.Fields.Deadline = f.ID
 	}
 	if f, ok := fields["applied_date"]; ok {
-		projCfg.Fields.AppliedDate = f.ID
+		cache.Fields.AppliedDate = f.ID
 	}
 
-	config.SaveProject(projCfg)
+	config.SaveProject(owner, proj.Number, cache)
 }
 
 func inferRepo() string {
@@ -385,4 +438,59 @@ func buildAgentList() []agentOption {
 	}
 
 	return agents
+}
+
+func validateConfig(cfg *config.Config) {
+	warn := func(msg string) {
+		fmt.Printf("  %sWarning:%s %s\n", initCyan, initReset, msg)
+	}
+
+	// Check repo access
+	if cfg.Repo != "" {
+		cmd := exec.Command("gh", "repo", "view", cfg.Repo, "--json", "name")
+		if err := cmd.Run(); err != nil {
+			warn(fmt.Sprintf("repo %s not accessible", cfg.Repo))
+		}
+	}
+
+	// Check cv_path exists
+	if cfg.CVPath != "" {
+		if _, err := os.Stat(cfg.CVPath); os.IsNotExist(err) {
+			warn(fmt.Sprintf("cv_path %s does not exist", cfg.CVPath))
+		}
+	}
+
+	// Check reference_path exists
+	if cfg.ReferencePath != "" {
+		if _, err := os.Stat(cfg.ReferencePath); os.IsNotExist(err) {
+			warn(fmt.Sprintf("reference_path %s does not exist", cfg.ReferencePath))
+		}
+	}
+
+	// Check project exists (Projects v2 via GraphQL)
+	if cfg.Project != "" {
+		owner := cfg.ProjectOwner()
+		number := cfg.ProjectNumber()
+		if number > 0 {
+			query := fmt.Sprintf(`query { user(login: "%s") { projectV2(number: %d) { id } } }`, owner, number)
+			cmd := exec.Command("gh", "api", "graphql", "-f", "query="+query, "--jq", ".data.user.projectV2.id")
+			out, err := cmd.Output()
+			if err != nil || strings.TrimSpace(string(out)) == "" || strings.TrimSpace(string(out)) == "null" {
+				// Try org project
+				query = fmt.Sprintf(`query { organization(login: "%s") { projectV2(number: %d) { id } } }`, owner, number)
+				cmd = exec.Command("gh", "api", "graphql", "-f", "query="+query, "--jq", ".data.organization.projectV2.id")
+				out, err = cmd.Output()
+				if err != nil || strings.TrimSpace(string(out)) == "" || strings.TrimSpace(string(out)) == "null" {
+					warn(fmt.Sprintf("project %s not found", cfg.Project))
+				}
+			}
+		}
+	}
+
+	// Check schema exists (if not default)
+	if cfg.Schema != "" && cfg.Schema != workflow.DefaultSchemaPath {
+		if _, err := os.Stat(cfg.Schema); os.IsNotExist(err) {
+			warn(fmt.Sprintf("schema %s does not exist", cfg.Schema))
+		}
+	}
 }

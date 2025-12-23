@@ -61,8 +61,8 @@ func runAdd(cmd *cobra.Command, args []string) error {
 	ctx := context.Background()
 	url := args[0]
 
-	// Load config with cached project IDs
-	cfg, err := config.LoadWithCache()
+	// Load config
+	cfg, _, err := config.LoadWithCache()
 	if err != nil {
 		return fmt.Errorf("config error: %w", err)
 	}
@@ -230,9 +230,9 @@ func createDynamicIssue(repo string, sch *schema.Schema, title string, data map[
 	fmt.Printf("%sCreated:%s %s\n", cGreen, cReset, issueURL)
 
 	// Add to project if configured
-	cfg, _ := config.Load()
-	if cfg.Project.ID != "" {
-		if err := addToProject(cfg, repo, issueURL, data); err != nil {
+	_, projectCache, _ := config.LoadWithCache()
+	if projectCache != nil && projectCache.ID != "" {
+		if err := addToProject(projectCache, repo, issueURL, data); err != nil {
 			fmt.Printf("Warning: Could not add to project: %v\n", err)
 		}
 	}
@@ -240,7 +240,7 @@ func createDynamicIssue(repo string, sch *schema.Schema, title string, data map[
 	return nil
 }
 
-func addToProject(cfg *config.Config, repo, issueURL string, data map[string]any) error {
+func addToProject(proj *config.ProjectCache, repo, issueURL string, data map[string]any) error {
 	// Extract issue number from URL
 	re := regexp.MustCompile(`/issues/(\d+)$`)
 	matches := re.FindStringSubmatch(issueURL)
@@ -259,33 +259,33 @@ func addToProject(cfg *config.Config, repo, issueURL string, data map[string]any
 	}
 
 	// Add to project
-	itemID, err := client.AddItem(cfg.Project.ID, nodeID)
+	itemID, err := client.AddItem(proj.ID, nodeID)
 	if err != nil {
 		return fmt.Errorf("failed to add to project: %w", err)
 	}
 
 	// Set Company field
-	if company, ok := data["company"].(string); ok && company != "" && cfg.Project.Fields.Company != "" {
-		if err := client.SetTextField(cfg.Project.ID, itemID, cfg.Project.Fields.Company, company); err != nil {
+	if company, ok := data["company"].(string); ok && company != "" && proj.Fields.Company != "" {
+		if err := client.SetTextField(proj.ID, itemID, proj.Fields.Company, company); err != nil {
 			log("Warning: Could not set company field: %v", err)
 		}
 	}
 
 	// Set Deadline field (default +7 days)
-	if cfg.Project.Fields.Deadline != "" {
+	if proj.Fields.Deadline != "" {
 		deadline := time.Now().AddDate(0, 0, 7).Format("2006-01-02")
 		if d, ok := data["deadline"].(string); ok && d != "" {
 			deadline = d
 		}
-		if err := client.SetDateField(cfg.Project.ID, itemID, cfg.Project.Fields.Deadline, deadline); err != nil {
+		if err := client.SetDateField(proj.ID, itemID, proj.Fields.Deadline, deadline); err != nil {
 			log("Warning: Could not set deadline field: %v", err)
 		}
 	}
 
 	// Set initial status to "To be Applied"
-	if cfg.Project.Fields.Status != "" {
-		if statusID, ok := cfg.Project.Statuses["to_be_applied"]; ok {
-			if err := client.SetStatusField(cfg.Project.ID, itemID, cfg.Project.Fields.Status, statusID); err != nil {
+	if proj.Fields.Status != "" {
+		if statusID, ok := proj.Statuses["to_be_applied"]; ok {
+			if err := client.SetStatusField(proj.ID, itemID, proj.Fields.Status, statusID); err != nil {
 				log("Warning: Could not set status field: %v", err)
 			}
 		}

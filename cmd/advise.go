@@ -53,8 +53,8 @@ func init() {
 func runAdvise(cmd *cobra.Command, args []string) error {
 	target := args[0]
 
-	// Load config with cached project IDs
-	cfg, err := config.LoadWithCache()
+	// Load config
+	cfg, _, err := config.LoadWithCache()
 	if err != nil {
 		return fmt.Errorf("config error: %w", err)
 	}

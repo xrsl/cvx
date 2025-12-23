@@ -38,7 +38,7 @@ func init() {
 func runTailor(cmd *cobra.Command, args []string) error {
 	issueNum := args[0]
 
-	cfg, err := config.LoadWithCache()
+	cfg, _, err := config.LoadWithCache()
 	if err != nil {
 		return fmt.Errorf("config error: %w", err)
 	}
