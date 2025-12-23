@@ -20,7 +20,7 @@ cvx config
 
 This runs the setup wizard:
 - Links your GitHub repo
-- Selects AI model
+- Selects AI agent
 - Creates a GitHub Project with job-tracking statuses
 
 Then add jobs:
@@ -38,7 +38,7 @@ Fetches job posting, extracts details with AI, creates GitHub issue.
 ```bash
 cvx add https://company.com/job
 cvx add https://company.com/job --dry-run    # extract only
-cvx add https://company.com/job -m claude-cli:opus-4.5
+cvx add https://company.com/job -a claude-cli:opus-4.5
 ```
 
 ### `cvx list`
@@ -77,19 +77,19 @@ Interactive setup wizard. Also supports direct access:
 ```bash
 cvx config              # wizard
 cvx config list         # show all settings
-cvx config get model    # get value
-cvx config set model claude-cli:opus-4.5
+cvx config get agent    # get value
+cvx config set agent claude-cli:opus-4.5
 ```
 
-## AI Models
+## AI Agents
 
 Priority order (first available is default):
 
-| Model | Notes |
+| Agent | Notes |
 |-------|-------|
 | `claude-cli` | Uses Claude CLI (free with Claude subscription) |
-| `claude-cli:opus-4.5` | Specific Claude model via CLI |
-| `claude-cli:sonnet-4` | Specific Claude model via CLI |
+| `claude-cli:opus-4.5` | Specific Claude agent via CLI |
+| `claude-cli:sonnet-4` | Specific Claude agent via CLI |
 | `gemini-cli` | Uses Gemini CLI |
 | `gemini-2.5-flash` | Requires `GEMINI_API_KEY` |
 | `claude-sonnet-4` | Requires `ANTHROPIC_API_KEY` |
@@ -117,15 +117,15 @@ Issues are automatically added to the project when created with `cvx add`.
 
 ## Config File
 
-Located at `~/.config/cvx/config.yaml`:
+Located at `.cvx-config.yaml` in your repo root:
 
 ```yaml
 repo: owner/repo
-model: claude-cli
+agent: claude-cli
 schema: ""  # uses bundled default
 project:
-  id: PVT_xxx
   number: 1
-  title: Job Applications
-  # ... field IDs auto-configured
+  owner: owner  # optional, inferred from repo
 ```
+
+Internal project IDs are cached in `.cvx/cache.yaml` (auto-managed).

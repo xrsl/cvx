@@ -20,7 +20,7 @@ import (
 
 var (
 	textFlag   string
-	modelFlag  string
+	agentFlag  string
 	repoFlag   string
 	schemaFlag string
 	dryRunFlag bool
@@ -36,7 +36,7 @@ Fields are extracted based on schema (GitHub issue template YAML).
 Examples:
   cvx add https://company.com/job
   cvx add https://company.com/job --dry-run
-  cvx add https://company.com/job -m claude-sonnet-4
+  cvx add https://company.com/job -a claude-sonnet-4
   cvx add https://company.com/job -s /path/to/job-app.yml`,
 	Args: cobra.ExactArgs(1),
 	RunE: runAdd,
@@ -44,7 +44,7 @@ Examples:
 
 func init() {
 	addCmd.Flags().StringVarP(&textFlag, "text", "t", "", "Job posting text (skips URL fetch)")
-	addCmd.Flags().StringVarP(&modelFlag, "model", "m", "", "AI model (overrides config)")
+	addCmd.Flags().StringVarP(&agentFlag, "agent", "a", "", "AI agent (overrides config)")
 	addCmd.Flags().StringVarP(&repoFlag, "repo", "r", "", "GitHub repo (overrides config)")
 	addCmd.Flags().StringVarP(&schemaFlag, "schema", "s", "", "Schema file (overrides config)")
 	addCmd.Flags().BoolVar(&dryRunFlag, "dry-run", false, "Extract only, don't create issue")
@@ -61,8 +61,8 @@ func runAdd(cmd *cobra.Command, args []string) error {
 	ctx := context.Background()
 	url := args[0]
 
-	// Load config
-	cfg, err := config.Load()
+	// Load config with cached project IDs
+	cfg, err := config.LoadWithCache()
 	if err != nil {
 		return fmt.Errorf("config error: %w", err)
 	}
@@ -76,18 +76,18 @@ func runAdd(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("no repo configured. Run: cvx config")
 	}
 
-	// Resolve model (flag > config > default)
-	model := modelFlag
-	if model == "" {
-		model = cfg.Model
+	// Resolve agent (flag > config > default)
+	agent := agentFlag
+	if agent == "" {
+		agent = cfg.Agent
 	}
-	if model == "" {
-		model = ai.DefaultModel()
+	if agent == "" {
+		agent = ai.DefaultAgent()
 	}
 
-	// Validate model
-	if !ai.IsModelSupported(model) {
-		return fmt.Errorf("unsupported model: %s (supported: %v)", model, ai.SupportedModels())
+	// Validate agent
+	if !ai.IsAgentSupported(agent) {
+		return fmt.Errorf("unsupported agent: %s (supported: %v)", agent, ai.SupportedAgents())
 	}
 
 	// Resolve schema (flag > config > default)
@@ -109,8 +109,8 @@ func runAdd(cmd *cobra.Command, args []string) error {
 	}
 
 	// Extract using AI
-	log("Extracting with %s...", model)
-	data, err := extractWithSchema(ctx, model, sch, url, jobText)
+	log("Extracting with %s...", agent)
+	data, err := extractWithSchema(ctx, agent, sch, url, jobText)
 	if err != nil {
 		return err
 	}
@@ -160,8 +160,8 @@ func getJobText(url string) (string, error) {
 	return string(body), nil
 }
 
-func extractWithSchema(ctx context.Context, model string, sch *schema.Schema, url, jobText string) (map[string]any, error) {
-	client, err := ai.NewClient(model)
+func extractWithSchema(ctx context.Context, agent string, sch *schema.Schema, url, jobText string) (map[string]any, error) {
+	client, err := ai.NewClient(agent)
 	if err != nil {
 		return nil, err
 	}

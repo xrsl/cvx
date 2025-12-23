@@ -14,8 +14,8 @@ func TestLoadDefaults(t *testing.T) {
 		t.Fatalf("Load() error: %v", err)
 	}
 
-	if c.Model != "claude-cli" {
-		t.Errorf("Expected default model 'claude-cli', got '%s'", c.Model)
+	if c.Agent != "claude-cli" {
+		t.Errorf("Expected default agent 'claude-cli', got '%s'", c.Agent)
 	}
 }
 
@@ -27,8 +27,8 @@ func TestSetAndGet(t *testing.T) {
 	if err := Set("repo", "owner/repo"); err != nil {
 		t.Fatalf("Set repo error: %v", err)
 	}
-	if err := Set("model", "claude-cli"); err != nil {
-		t.Fatalf("Set model error: %v", err)
+	if err := Set("agent", "claude-cli"); err != nil {
+		t.Fatalf("Set agent error: %v", err)
 	}
 
 	// Get values
@@ -40,12 +40,12 @@ func TestSetAndGet(t *testing.T) {
 		t.Errorf("Expected repo 'owner/repo', got '%s'", repo)
 	}
 
-	model, err := Get("model")
+	agent, err := Get("agent")
 	if err != nil {
-		t.Fatalf("Get model error: %v", err)
+		t.Fatalf("Get agent error: %v", err)
 	}
-	if model != "claude-cli" {
-		t.Errorf("Expected model 'claude-cli', got '%s'", model)
+	if agent != "claude-cli" {
+		t.Errorf("Expected agent 'claude-cli', got '%s'", agent)
 	}
 }
 
@@ -76,6 +76,7 @@ func TestSaveProject(t *testing.T) {
 	proj := ProjectConfig{
 		ID:     "PVT_test123",
 		Number: 1,
+		Owner:  "testowner",
 		Title:  "Test Project",
 		Statuses: map[string]string{
 			"todo":    "abc123",
@@ -87,23 +88,31 @@ func TestSaveProject(t *testing.T) {
 		t.Fatalf("SaveProject error: %v", err)
 	}
 
-	// Reload and check
+	// Check user-facing config (only number and owner)
 	c, err := Load()
 	if err != nil {
 		t.Fatalf("Load error: %v", err)
 	}
-
-	if c.Project.ID != "PVT_test123" {
-		t.Errorf("Expected project ID 'PVT_test123', got '%s'", c.Project.ID)
-	}
 	if c.Project.Number != 1 {
 		t.Errorf("Expected project number 1, got %d", c.Project.Number)
 	}
-	if c.Project.Title != "Test Project" {
-		t.Errorf("Expected project title 'Test Project', got '%s'", c.Project.Title)
+	if c.Project.Owner != "testowner" {
+		t.Errorf("Expected project owner 'testowner', got '%s'", c.Project.Owner)
 	}
-	if len(c.Project.Statuses) != 2 {
-		t.Errorf("Expected 2 statuses, got %d", len(c.Project.Statuses))
+
+	// Check full config with cache (includes internal IDs)
+	cFull, err := LoadWithCache()
+	if err != nil {
+		t.Fatalf("LoadWithCache error: %v", err)
+	}
+	if cFull.Project.ID != "PVT_test123" {
+		t.Errorf("Expected project ID 'PVT_test123', got '%s'", cFull.Project.ID)
+	}
+	if cFull.Project.Title != "Test Project" {
+		t.Errorf("Expected project title 'Test Project', got '%s'", cFull.Project.Title)
+	}
+	if len(cFull.Project.Statuses) != 2 {
+		t.Errorf("Expected 2 statuses, got %d", len(cFull.Project.Statuses))
 	}
 }
 

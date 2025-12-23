@@ -29,7 +29,7 @@ var matchCmd = &cobra.Command{
 
 Takes a GitHub issue number or job posting URL and analyzes
 how well your CV matches the position. Uses claude or gemini
-CLI based on your model setting.
+CLI based on your agent setting.
 
 Examples:
   cvx match 42                    # Analyze issue #42
@@ -51,14 +51,14 @@ func init() {
 func runMatch(cmd *cobra.Command, args []string) error {
 	target := args[0]
 
-	// Load config
-	cfg, err := config.Load()
+	// Load config with cached project IDs
+	cfg, err := config.LoadWithCache()
 	if err != nil {
 		return fmt.Errorf("config error: %w", err)
 	}
 
-	// Get agent from model setting
-	agent := cfg.Agent()
+	// Get CLI agent name from agent setting
+	agent := cfg.AgentCLI()
 
 	// Check if target is URL or issue number
 	isURL := strings.HasPrefix(target, "http://") || strings.HasPrefix(target, "https://")

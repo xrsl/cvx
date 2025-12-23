@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/spf13/viper"
@@ -12,27 +13,31 @@ import (
 
 type Config struct {
 	Repo           string        `mapstructure:"repo" yaml:"repo,omitempty"`
-	Model          string        `mapstructure:"model" yaml:"model,omitempty"`
+	Agent          string        `mapstructure:"agent" yaml:"agent,omitempty"`
 	Schema         string        `mapstructure:"schema" yaml:"schema,omitempty"`
 	CVPath         string        `mapstructure:"cv_path" yaml:"cv_path,omitempty"`
 	ExperiencePath string        `mapstructure:"experience_path" yaml:"experience_path,omitempty"`
 	Project        ProjectConfig `mapstructure:"project" yaml:"project,omitempty"`
 }
 
-// Agent returns the CLI agent name derived from the model setting
-func (c *Config) Agent() string {
-	if strings.HasPrefix(c.Model, "gemini") {
+// AgentCLI returns the CLI agent name derived from the agent setting
+func (c *Config) AgentCLI() string {
+	if strings.HasPrefix(c.Agent, "gemini") {
 		return "gemini"
 	}
 	return "claude"
 }
 
+// ProjectConfig contains user-facing project configuration
+// Only Number and Owner are saved to config file; IDs are cached separately
 type ProjectConfig struct {
-	ID       string            `mapstructure:"id" yaml:"id,omitempty"`
-	Number   int               `mapstructure:"number" yaml:"number,omitempty"`
-	Title    string            `mapstructure:"title" yaml:"title,omitempty"`
-	Fields   FieldIDs          `mapstructure:"fields" yaml:"fields,omitempty"`
-	Statuses map[string]string `mapstructure:"statuses" yaml:"statuses,omitempty"`
+	Number int    `mapstructure:"number" yaml:"number,omitempty"`
+	Owner  string `mapstructure:"owner" yaml:"owner,omitempty"`
+	// Internal fields - not saved to user config, loaded from cache
+	ID       string            `mapstructure:"id" yaml:"-"`
+	Title    string            `mapstructure:"title" yaml:"-"`
+	Fields   FieldIDs          `mapstructure:"fields" yaml:"-"`
+	Statuses map[string]string `mapstructure:"statuses" yaml:"-"`
 }
 
 type FieldIDs struct {
@@ -52,7 +57,7 @@ func init() {
 	v.SetConfigFile(configFile)
 
 	// Defaults
-	v.SetDefault("model", "claude-cli")
+	v.SetDefault("agent", "claude-cli")
 
 	// Environment variables
 	v.SetEnvPrefix("CVX")
@@ -77,7 +82,7 @@ func Load() (*Config, error) {
 
 func Get(key string) (string, error) {
 	switch key {
-	case "repo", "model", "schema", "cv_path", "experience_path":
+	case "repo", "agent", "schema", "cv_path", "experience_path":
 		return v.GetString(key), nil
 	default:
 		return "", fmt.Errorf("unknown config key: %s", key)
@@ -93,8 +98,8 @@ func Set(key, value string) error {
 	switch key {
 	case "repo":
 		cfg.Repo = value
-	case "model":
-		cfg.Model = value
+	case "agent":
+		cfg.Agent = value
 	case "schema":
 		cfg.Schema = value
 	case "cv_path":
@@ -102,7 +107,7 @@ func Set(key, value string) error {
 	case "experience_path":
 		cfg.ExperiencePath = value
 	default:
-		return fmt.Errorf("unknown config key: %s (valid: repo, model, schema, cv_path, experience_path)", key)
+		return fmt.Errorf("unknown config key: %s (valid: repo, agent, schema, cv_path, experience_path)", key)
 	}
 
 	v.Set(key, value) // keep viper in sync
@@ -130,7 +135,7 @@ func writeConfig(cfg *Config) error {
 func All() (map[string]string, error) {
 	return map[string]string{
 		"repo":            v.GetString("repo"),
-		"model":           v.GetString("model"),
+		"agent":           v.GetString("agent"),
 		"schema":          v.GetString("schema"),
 		"cv_path":         v.GetString("cv_path"),
 		"experience_path": v.GetString("experience_path"),
@@ -143,34 +148,102 @@ func Save(c *Config) error {
 }
 
 // SaveProject saves project configuration
+// User-facing fields (number, owner) go to config file
+// Internal IDs go to cache file in .cvx/cache.yaml
 func SaveProject(p ProjectConfig) error {
 	cfg, err := Load()
 	if err != nil {
 		cfg = &Config{}
 	}
-	cfg.Project = p
 
-	// Keep viper in sync so subsequent Load() calls include project data
+	// Only save user-facing fields to config
+	cfg.Project.Number = p.Number
+	cfg.Project.Owner = p.Owner
+
+	// Keep viper in sync for user-facing fields only
 	v.Set("project", map[string]interface{}{
-		"id":     p.ID,
 		"number": p.Number,
-		"title":  p.Title,
-		"fields": map[string]string{
-			"status":       p.Fields.Status,
-			"company":      p.Fields.Company,
-			"deadline":     p.Fields.Deadline,
-			"applied_date": p.Fields.AppliedDate,
-		},
-		"statuses": p.Statuses,
+		"owner":  p.Owner,
 	})
 
+	// Save internal IDs to cache
+	cache := ProjectCache{
+		ID:       p.ID,
+		Number:   p.Number,
+		Title:    p.Title,
+		Fields:   p.Fields,
+		Statuses: p.Statuses,
+	}
+	if err := saveProjectCache(cache); err != nil {
+		return fmt.Errorf("failed to save project cache: %w", err)
+	}
+
 	return writeConfig(cfg)
+}
+
+// ProjectCache stores internal project IDs (not user-facing)
+type ProjectCache struct {
+	ID       string            `yaml:"id"`
+	Number   int               `yaml:"number"`
+	Title    string            `yaml:"title"`
+	Fields   FieldIDs          `yaml:"fields"`
+	Statuses map[string]string `yaml:"statuses"`
+}
+
+var cacheFile = ".cvx/cache.yaml"
+
+func saveProjectCache(cache ProjectCache) error {
+	cacheDir := filepath.Dir(cacheFile)
+	os.MkdirAll(cacheDir, 0755)
+	var buf bytes.Buffer
+	enc := yaml.NewEncoder(&buf)
+	enc.SetIndent(2)
+	if err := enc.Encode(map[string]ProjectCache{"project": cache}); err != nil {
+		return err
+	}
+	return os.WriteFile(cacheFile, buf.Bytes(), 0644)
+}
+
+// LoadProjectCache loads cached project IDs
+func LoadProjectCache() (*ProjectCache, error) {
+	data, err := os.ReadFile(cacheFile)
+	if err != nil {
+		return nil, err
+	}
+	var cache struct {
+		Project ProjectCache `yaml:"project"`
+	}
+	if err := yaml.Unmarshal(data, &cache); err != nil {
+		return nil, err
+	}
+	return &cache.Project, nil
+}
+
+// LoadWithCache loads config and merges in cached project IDs
+func LoadWithCache() (*Config, error) {
+	cfg, err := Load()
+	if err != nil {
+		return nil, err
+	}
+
+	// Try to load cached project IDs
+	if cfg.Project.Number > 0 {
+		if cache, err := LoadProjectCache(); err == nil && cache.Number == cfg.Project.Number {
+			cfg.Project.ID = cache.ID
+			cfg.Project.Title = cache.Title
+			cfg.Project.Fields = cache.Fields
+			cfg.Project.Statuses = cache.Statuses
+		}
+	}
+
+	return cfg, nil
 }
 
 // ResetForTest resets viper for testing (only use in tests)
 func ResetForTest(testPath string) {
 	configFile = testPath + "/.cvx-config.yaml"
+	cacheFile = testPath + "/.cvx/cache.yaml"
 	v = viper.New()
 	v.SetConfigFile(configFile)
-	v.SetDefault("model", "claude-cli")
+	v.SetDefault("agent", "claude-cli")
 }

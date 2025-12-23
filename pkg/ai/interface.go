@@ -15,76 +15,76 @@ type Client interface {
 	Close()
 }
 
-// DefaultModel returns the best available model
+// DefaultAgent returns the best available agent
 // Prefers claude-cli, then gemini-cli, then gemini API
-func DefaultModel() string {
+func DefaultAgent() string {
 	if IsClaudeCLIAvailable() {
 		return "claude-cli"
 	}
 	if IsGeminiCLIAvailable() {
 		return "gemini-cli"
 	}
-	return gemini.DefaultModel
+	return gemini.DefaultAgent
 }
 
-// NewClient creates an AI client based on model prefix
-func NewClient(model string) (Client, error) {
+// NewClient creates an AI client based on agent prefix
+func NewClient(agent string) (Client, error) {
 	switch {
-	case model == "claude-cli" || strings.HasPrefix(model, "claude-cli:"):
+	case agent == "claude-cli" || strings.HasPrefix(agent, "claude-cli:"):
 		if !IsClaudeCLIAvailable() {
 			return nil, fmt.Errorf("claude CLI not found in PATH")
 		}
 		// Parse "claude-cli:sonnet-4.5" → "sonnet-4.5"
-		subModel := ""
-		if idx := strings.Index(model, ":"); idx != -1 {
-			subModel = model[idx+1:]
+		subAgent := ""
+		if idx := strings.Index(agent, ":"); idx != -1 {
+			subAgent = agent[idx+1:]
 		}
-		return NewClaudeCLI(subModel), nil
-	case model == "gemini-cli" || strings.HasPrefix(model, "gemini-cli:"):
+		return NewClaudeCLI(subAgent), nil
+	case agent == "gemini-cli" || strings.HasPrefix(agent, "gemini-cli:"):
 		if !IsGeminiCLIAvailable() {
 			return nil, fmt.Errorf("gemini CLI not found in PATH")
 		}
 		// Parse "gemini-cli:flash" → "flash"
-		subModel := ""
-		if idx := strings.Index(model, ":"); idx != -1 {
-			subModel = model[idx+1:]
+		subAgent := ""
+		if idx := strings.Index(agent, ":"); idx != -1 {
+			subAgent = agent[idx+1:]
 		}
-		return NewGeminiCLI(subModel), nil
-	case strings.HasPrefix(model, "gemini"):
-		return gemini.NewClient(model)
-	case strings.HasPrefix(model, "claude"):
-		return claude.NewClient(model)
+		return NewGeminiCLI(subAgent), nil
+	case strings.HasPrefix(agent, "gemini"):
+		return gemini.NewClient(agent)
+	case strings.HasPrefix(agent, "claude"):
+		return claude.NewClient(agent)
 	default:
-		return nil, fmt.Errorf("unknown model: %s (use claude-cli, gemini-cli, gemini-*, or claude-*)", model)
+		return nil, fmt.Errorf("unknown agent: %s (use claude-cli, gemini-cli, gemini-*, or claude-*)", agent)
 	}
 }
 
-// IsModelSupported checks if a model is supported by any provider
-func IsModelSupported(model string) bool {
+// IsAgentSupported checks if an agent is supported by any provider
+func IsAgentSupported(agent string) bool {
 	switch {
-	case model == "claude-cli" || strings.HasPrefix(model, "claude-cli:"):
+	case agent == "claude-cli" || strings.HasPrefix(agent, "claude-cli:"):
 		return IsClaudeCLIAvailable()
-	case model == "gemini-cli" || strings.HasPrefix(model, "gemini-cli:"):
+	case agent == "gemini-cli" || strings.HasPrefix(agent, "gemini-cli:"):
 		return IsGeminiCLIAvailable()
-	case strings.HasPrefix(model, "gemini"):
-		return gemini.IsModelSupported(model)
-	case strings.HasPrefix(model, "claude"):
-		return claude.IsModelSupported(model)
+	case strings.HasPrefix(agent, "gemini"):
+		return gemini.IsAgentSupported(agent)
+	case strings.HasPrefix(agent, "claude"):
+		return claude.IsAgentSupported(agent)
 	default:
 		return false
 	}
 }
 
-// SupportedModels returns all supported models
-func SupportedModels() []string {
-	models := []string{}
+// SupportedAgents returns all supported agents
+func SupportedAgents() []string {
+	agents := []string{}
 	if IsClaudeCLIAvailable() {
-		models = append(models, "claude-cli")
+		agents = append(agents, "claude-cli")
 	}
 	if IsGeminiCLIAvailable() {
-		models = append(models, "gemini-cli")
+		agents = append(agents, "gemini-cli")
 	}
-	models = append(models, gemini.SupportedModels...)
-	models = append(models, claude.SupportedModels...)
-	return models
+	agents = append(agents, gemini.SupportedAgents...)
+	agents = append(agents, claude.SupportedAgents...)
+	return agents
 }

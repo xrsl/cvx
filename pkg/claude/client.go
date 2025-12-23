@@ -9,9 +9,9 @@ import (
 	"github.com/anthropics/anthropic-sdk-go/option"
 )
 
-const DefaultModel = "claude-opus-4-5"
+const DefaultAgent = "claude-opus-4-5"
 
-var SupportedModels = []string{
+var SupportedAgents = []string{
 	"claude-opus-4-5",
 	"claude-sonnet-4",
 	"claude-opus-4",
@@ -19,9 +19,9 @@ var SupportedModels = []string{
 	"claude-3-5-haiku",
 }
 
-func IsModelSupported(model string) bool {
-	for _, m := range SupportedModels {
-		if m == model {
+func IsAgentSupported(agent string) bool {
+	for _, a := range SupportedAgents {
+		if a == agent {
 			return true
 		}
 	}
@@ -40,7 +40,7 @@ func NewClient(model string) (*Client, error) {
 	}
 
 	if model == "" {
-		model = DefaultModel
+		model = DefaultAgent
 	}
 
 	client := anthropic.NewClient(option.WithAPIKey(apiKey))

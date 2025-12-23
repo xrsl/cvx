@@ -5,59 +5,59 @@ import (
 	"testing"
 )
 
-func TestIsModelSupported(t *testing.T) {
+func TestIsAgentSupported(t *testing.T) {
 	tests := []struct {
-		model    string
+		agent    string
 		expected bool
 	}{
 		{"gemini-2.5-flash", true},
 		{"gemini-2.5-pro", true},
 		{"claude-sonnet-4", true},
 		{"claude-opus-4", true},
-		{"invalid-model", false},
+		{"invalid-agent", false},
 		{"", false},
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.model, func(t *testing.T) {
-			got := IsModelSupported(tt.model)
+		t.Run(tt.agent, func(t *testing.T) {
+			got := IsAgentSupported(tt.agent)
 			if got != tt.expected {
-				t.Errorf("IsModelSupported(%q) = %v, want %v", tt.model, got, tt.expected)
+				t.Errorf("IsAgentSupported(%q) = %v, want %v", tt.agent, got, tt.expected)
 			}
 		})
 	}
 }
 
-func TestSupportedModels(t *testing.T) {
-	models := SupportedModels()
+func TestSupportedAgents(t *testing.T) {
+	agents := SupportedAgents()
 
-	if len(models) == 0 {
-		t.Error("SupportedModels() returned empty list")
+	if len(agents) == 0 {
+		t.Error("SupportedAgents() returned empty list")
 	}
 
-	// Should include Gemini models
+	// Should include Gemini agents
 	hasGemini := false
-	for _, m := range models {
-		if strings.HasPrefix(m, "gemini") {
+	for _, a := range agents {
+		if strings.HasPrefix(a, "gemini") {
 			hasGemini = true
 			break
 		}
 	}
 	if !hasGemini {
-		t.Error("SupportedModels() should include Gemini models")
+		t.Error("SupportedAgents() should include Gemini agents")
 	}
 }
 
-func TestDefaultModel(t *testing.T) {
-	model := DefaultModel()
+func TestDefaultAgent(t *testing.T) {
+	agent := DefaultAgent()
 
-	if model == "" {
-		t.Error("DefaultModel() returned empty string")
+	if agent == "" {
+		t.Error("DefaultAgent() returned empty string")
 	}
 
-	// Default should be a supported model
-	if !IsModelSupported(model) {
-		t.Errorf("DefaultModel() returned unsupported model: %s", model)
+	// Default should be a supported agent
+	if !IsAgentSupported(agent) {
+		t.Errorf("DefaultAgent() returned unsupported agent: %s", agent)
 	}
 }
 
@@ -75,9 +75,9 @@ func TestNewClientGemini(t *testing.T) {
 }
 
 func TestNewClientInvalid(t *testing.T) {
-	_, err := NewClient("invalid-model")
+	_, err := NewClient("invalid-agent")
 	if err == nil {
-		t.Error("Expected error for invalid model")
+		t.Error("Expected error for invalid agent")
 	}
 }
 
@@ -94,7 +94,7 @@ func TestNewClientClaudeCLI(t *testing.T) {
 	defer client.Close()
 }
 
-func TestNewClientClaudeCLIWithModel(t *testing.T) {
+func TestNewClientClaudeCLIWithSubAgent(t *testing.T) {
 	if !IsClaudeCLIAvailable() {
 		t.Skip("Claude CLI not available")
 	}
@@ -107,19 +107,19 @@ func TestNewClientClaudeCLIWithModel(t *testing.T) {
 	defer client.Close()
 }
 
-func TestIsModelSupportedCLI(t *testing.T) {
-	// CLI models should be supported if CLI is available
+func TestIsAgentSupportedCLI(t *testing.T) {
+	// CLI agents should be supported if CLI is available
 	if IsClaudeCLIAvailable() {
-		if !IsModelSupported("claude-cli") {
+		if !IsAgentSupported("claude-cli") {
 			t.Error("claude-cli should be supported when CLI is available")
 		}
-		if !IsModelSupported("claude-cli:opus-4.5") {
+		if !IsAgentSupported("claude-cli:opus-4.5") {
 			t.Error("claude-cli:opus-4.5 should be supported when CLI is available")
 		}
 	}
 
 	if IsGeminiCLIAvailable() {
-		if !IsModelSupported("gemini-cli") {
+		if !IsAgentSupported("gemini-cli") {
 			t.Error("gemini-cli should be supported when CLI is available")
 		}
 	}

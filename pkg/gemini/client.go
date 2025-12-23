@@ -9,9 +9,9 @@ import (
 	"google.golang.org/api/option"
 )
 
-const DefaultModel = "gemini-2.5-flash"
+const DefaultAgent = "gemini-2.5-flash"
 
-var SupportedModels = []string{
+var SupportedAgents = []string{
 	"gemini-2.5-flash",
 	"gemini-2.5-pro",
 	"gemini-2.0-flash",
@@ -19,9 +19,9 @@ var SupportedModels = []string{
 	"gemini-1.5-flash",
 }
 
-func IsModelSupported(model string) bool {
-	for _, m := range SupportedModels {
-		if m == model {
+func IsAgentSupported(agent string) bool {
+	for _, a := range SupportedAgents {
+		if a == agent {
 			return true
 		}
 	}
@@ -40,7 +40,7 @@ func NewClient(model string) (*Client, error) {
 	}
 
 	if model == "" {
-		model = DefaultModel
+		model = DefaultAgent
 	}
 
 	ctx := context.Background()

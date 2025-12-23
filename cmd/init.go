@@ -115,31 +115,31 @@ func runInit(cmd *cobra.Command, args []string) error {
 	}
 	config.Set("repo", repo)
 
-	// Step 2: AI Model
-	models := buildModelList()
-	defaultModel := models[0].name
-	currentModel := cfg.Model
-	if currentModel == "" {
-		currentModel = defaultModel
+	// Step 2: AI Agent
+	agents := buildAgentList()
+	defaultAgent := agents[0].name
+	currentAgent := cfg.Agent
+	if currentAgent == "" {
+		currentAgent = defaultAgent
 	}
 
 	currentIdx := 0
-	for i, m := range models {
-		if m.name == currentModel {
+	for i, a := range agents {
+		if a.name == currentAgent {
 			currentIdx = i
 			break
 		}
 	}
 
-	fmt.Printf("%s?%s AI Model\n", initGreen, initReset)
-	for i, m := range models {
+	fmt.Printf("%s?%s AI Agent\n", initGreen, initReset)
+	for i, a := range agents {
 		marker := "   "
 		if i == currentIdx {
 			marker = fmt.Sprintf("  %s→%s", initGreen, initReset)
 		}
-		fmt.Printf("%s%s%d)%s %s", marker, initCyan, i+1, initReset, m.name)
-		if m.note != "" {
-			fmt.Printf(" %s(%s)%s", initGray, m.note, initReset)
+		fmt.Printf("%s%s%d)%s %s", marker, initCyan, i+1, initReset, a.name)
+		if a.note != "" {
+			fmt.Printf(" %s(%s)%s", initGray, a.note, initReset)
 		}
 		fmt.Println()
 	}
@@ -148,15 +148,15 @@ func runInit(cmd *cobra.Command, args []string) error {
 	input, _ := reader.ReadString('\n')
 	input = strings.TrimSpace(input)
 
-	selectedModel := currentModel
+	selectedAgent := currentAgent
 	if input != "" {
-		if idx, err := strconv.Atoi(input); err == nil && idx >= 1 && idx <= len(models) {
-			selectedModel = models[idx-1].name
+		if idx, err := strconv.Atoi(input); err == nil && idx >= 1 && idx <= len(agents) {
+			selectedAgent = agents[idx-1].name
 		}
 	}
 
-	config.Set("model", selectedModel)
-	fmt.Printf("  Using %s%s%s\n\n", initCyan, selectedModel, initReset)
+	config.Set("agent", selectedAgent)
+	fmt.Printf("  Using %s%s%s\n\n", initCyan, selectedAgent, initReset)
 
 	// Step 3: CV path (for match command)
 	cvPath := cfg.CVPath
@@ -215,7 +215,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 				fmt.Printf("\n  %sFailed:%s %v\n", initCyan, initReset, err)
 			} else {
 				fmt.Printf("%s✓%s\n", initGreen, initReset)
-				saveProjectConfig(proj, fields)
+				saveProjectConfig(proj, fields, repo)
 				fmt.Printf("  Project #%d created\n", proj.Number)
 			}
 		} else if projNum, err := strconv.Atoi(input); err == nil {
@@ -239,7 +239,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 						fmt.Printf("\n  %sFailed:%s %v\n", initCyan, initReset, err)
 					} else {
 						fmt.Printf("%s✓%s\n", initGreen, initReset)
-						saveProjectConfig(found, fields)
+						saveProjectConfig(found, fields, repo)
 						fmt.Printf("  Linked to \"%s\"\n", found.Title)
 					}
 				}
@@ -261,15 +261,22 @@ func runInit(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-type modelOption struct {
+type agentOption struct {
 	name string
 	note string
 }
 
-func saveProjectConfig(proj *project.ProjectInfo, fields map[string]project.FieldInfo) {
+func saveProjectConfig(proj *project.ProjectInfo, fields map[string]project.FieldInfo, repo string) {
+	// Extract owner from repo (owner/name)
+	owner := ""
+	if parts := strings.Split(repo, "/"); len(parts) == 2 {
+		owner = parts[0]
+	}
+
 	projCfg := config.ProjectConfig{
 		ID:       proj.ID,
 		Number:   proj.Number,
+		Owner:    owner,
 		Title:    proj.Title,
 		Statuses: make(map[string]string),
 		Fields:   config.FieldIDs{},
@@ -341,33 +348,33 @@ func inferRepo() string {
 	return username + "/" + dirname
 }
 
-func buildModelList() []modelOption {
-	var models []modelOption
+func buildAgentList() []agentOption {
+	var agents []agentOption
 
 	if ai.IsClaudeCLIAvailable() {
-		models = append(models,
-			modelOption{"claude-cli", "uses CLI-configured model"},
-			modelOption{"claude-cli:opus-4.5", ""},
-			modelOption{"claude-cli:sonnet-4", ""},
+		agents = append(agents,
+			agentOption{"claude-cli", "uses CLI-configured agent"},
+			agentOption{"claude-cli:opus-4.5", ""},
+			agentOption{"claude-cli:sonnet-4", ""},
 		)
 	}
 
 	if ai.IsGeminiCLIAvailable() {
-		models = append(models, modelOption{"gemini-cli", "uses CLI-configured model"})
+		agents = append(agents, agentOption{"gemini-cli", "uses CLI-configured agent"})
 	}
 
-	for _, m := range ai.SupportedModels() {
-		if m == "claude-cli" || m == "gemini-cli" {
+	for _, a := range ai.SupportedAgents() {
+		if a == "claude-cli" || a == "gemini-cli" {
 			continue
 		}
 		note := ""
-		if strings.HasPrefix(m, "gemini") {
+		if strings.HasPrefix(a, "gemini") {
 			note = "requires GEMINI_API_KEY"
-		} else if strings.HasPrefix(m, "claude") {
+		} else if strings.HasPrefix(a, "claude") {
 			note = "requires ANTHROPIC_API_KEY"
 		}
-		models = append(models, modelOption{m, note})
+		agents = append(agents, agentOption{a, note})
 	}
 
-	return models
+	return agents
 }
