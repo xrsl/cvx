@@ -6,6 +6,9 @@ import (
 	"os"
 )
 
+//go:embed defaults/add.md
+var DefaultAdd string
+
 //go:embed defaults/advise.md
 var DefaultAdvise string
 
@@ -14,6 +17,7 @@ var DefaultTailor string
 
 const (
 	DefaultSchemaPath = ".github/ISSUE_TEMPLATE/job-ad-schema.yaml"
+	AddPath           = ".cvx/workflows/add.md"
 	AdvisePath        = ".cvx/workflows/advise.md"
 	TailorPath        = ".cvx/workflows/tailor.md"
 )
@@ -36,6 +40,13 @@ func Init(schemaPath string) error {
 	// Create default job-ad-schema.yaml if it doesn't exist
 	if _, err := os.Stat(schemaPath); os.IsNotExist(err) {
 		if err := os.WriteFile(schemaPath, schema.DefaultSchemaYAML(), 0644); err != nil {
+			return err
+		}
+	}
+
+	// Create default add.md if it doesn't exist
+	if _, err := os.Stat(AddPath); os.IsNotExist(err) {
+		if err := os.WriteFile(AddPath, []byte(DefaultAdd), 0644); err != nil {
 			return err
 		}
 	}
@@ -75,9 +86,21 @@ func LoadTailor() (string, error) {
 	return string(content), nil
 }
 
+// LoadAdd loads the add workflow from .cvx/workflows/add.md
+func LoadAdd() (string, error) {
+	content, err := os.ReadFile(AddPath)
+	if err != nil {
+		return "", err
+	}
+	return string(content), nil
+}
+
 // ResetWorkflows overwrites workflow files with defaults
 func ResetWorkflows() error {
 	os.MkdirAll(".cvx/workflows", 0755)
+	if err := os.WriteFile(AddPath, []byte(DefaultAdd), 0644); err != nil {
+		return err
+	}
 	if err := os.WriteFile(AdvisePath, []byte(DefaultAdvise), 0644); err != nil {
 		return err
 	}

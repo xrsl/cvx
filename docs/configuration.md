@@ -6,7 +6,7 @@ Located at `.cvx-config.yaml` in your repo root:
 
 ```yaml
 repo: owner/repo
-agent: claude-cli
+agent: claude
 cv_path: src/cv.tex
 reference_path: reference/
 project: owner/1
@@ -17,7 +17,7 @@ project: owner/1
 | Key | Description | Default |
 |-----|-------------|---------|
 | `repo` | GitHub repository (owner/repo) | Auto-detected |
-| `agent` | AI agent to use | `claude-cli` |
+| `agent` | AI agent to use | `claude` |
 | `schema` | Job schema file path | Built-in |
 | `cv_path` | CV file for advise/tailor | `src/cv.tex` |
 | `reference_path` | Reference materials directory | `reference/` |
@@ -29,8 +29,8 @@ Priority order (first available is default):
 
 | Agent | Notes |
 |-------|-------|
-| `claude-cli` | Uses Claude Code CLI |
-| `gemini-cli` | Uses Gemini CLI |
+| `claude` | Uses Claude Code CLI |
+| `gemini` | Uses Gemini CLI |
 | `claude-sonnet-4` | Requires `ANTHROPIC_API_KEY` |
 | `claude-sonnet-4-5` | Requires `ANTHROPIC_API_KEY` |
 | `claude-opus-4` | Requires `ANTHROPIC_API_KEY` |

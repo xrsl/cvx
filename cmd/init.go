@@ -47,7 +47,7 @@ var (
 )
 
 func init() {
-	initCmd.Flags().BoolVar(&initResetWorkflowsFlag, "reset-workflows", false, "Reset workflows to defaults")
+	initCmd.Flags().BoolVarP(&initResetWorkflowsFlag, "reset-workflows", "r", false, "Reset workflows to defaults")
 	initCmd.Flags().BoolVarP(&initDeleteFlag, "delete", "d", false, "Remove .cvx/ and config file")
 	initCmd.Flags().BoolVarP(&initQuietFlag, "quiet", "q", false, "Non-interactive with defaults")
 	initCmd.Flags().BoolVarP(&initCheckFlag, "check", "c", false, "Validate config resources exist")
@@ -97,7 +97,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 		}
 		cfg := &config.Config{
 			Repo:          repo,
-			Agent:         "claude-cli",
+			Agent:         "claude",
 			Schema:        workflow.DefaultSchemaPath,
 			CVPath:        "src/cv.tex",
 			ReferencePath: "reference/",
@@ -417,21 +417,21 @@ func buildAgentList() []agentOption {
 	var agents []agentOption
 
 	if ai.IsClaudeCLIAvailable() {
-		agents = append(agents, agentOption{"claude-cli", ""})
+		agents = append(agents, agentOption{"claude", ""})
 	}
 
 	if ai.IsGeminiCLIAvailable() {
-		agents = append(agents, agentOption{"gemini-cli", ""})
+		agents = append(agents, agentOption{"gemini", ""})
 	}
 
 	for _, a := range ai.SupportedAgents() {
-		if a == "claude-cli" || a == "gemini-cli" {
+		if a == "claude" || a == "gemini" {
 			continue
 		}
 		note := ""
-		if strings.HasPrefix(a, "gemini") {
+		if strings.HasPrefix(a, "gemini-") {
 			note = "GEMINI_API_KEY"
-		} else if strings.HasPrefix(a, "claude") {
+		} else if strings.HasPrefix(a, "claude-") {
 			note = "ANTHROPIC_API_KEY"
 		}
 		agents = append(agents, agentOption{a, note})

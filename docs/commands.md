@@ -25,15 +25,16 @@ cvx add <url> [flags]
 | `--agent` | `-a` | AI agent (overrides config) |
 | `--repo` | `-r` | GitHub repo (overrides config) |
 | `--schema` | `-s` | Schema file path |
-| `--text` | `-t` | Job text (skips URL fetch) |
 | `--dry-run` | | Extract only, don't create issue |
+
+If `.cvx/body.md` exists with content, uses that instead of fetching URL.
 
 **Examples:**
 
 ```bash
 cvx add https://company.com/job
 cvx add https://company.com/job --dry-run
-cvx add https://company.com/job -a claude-cli:opus-4.5
+cvx add https://company.com/job -a gemini
 ```
 
 ---

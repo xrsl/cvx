@@ -80,7 +80,7 @@ func init() {
 	v.SetConfigFile(configFile)
 
 	// Defaults
-	v.SetDefault("agent", "claude-cli")
+	v.SetDefault("agent", "claude")
 
 	// Environment variables
 	v.SetEnvPrefix("CVX")
@@ -245,5 +245,5 @@ func ResetForTest(testPath string) {
 	cacheFile = testPath + "/.cvx/cache.yaml"
 	v = viper.New()
 	v.SetConfigFile(configFile)
-	v.SetDefault("agent", "claude-cli")
+	v.SetDefault("agent", "claude")
 }

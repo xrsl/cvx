@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strings"
 	"text/template"
 
 	"github.com/spf13/cobra"
@@ -46,7 +47,7 @@ func runTailor(cmd *cobra.Command, args []string) error {
 	// Tailor requires CLI for interactive feedback loop
 	if !ai.IsAgentCLI(cfg.Agent) {
 		fmt.Printf("Note: tailor requires CLI agent for interactive feedback.\n")
-		fmt.Printf("Configure claude-cli or gemini-cli with 'cvx config set agent claude-cli'\n")
+		fmt.Printf("Configure claude or gemini with 'cvx config set agent claude'\n")
 		return fmt.Errorf("tailor requires CLI agent")
 	}
 
@@ -82,7 +83,12 @@ func runTailor(cmd *cobra.Command, args []string) error {
 			prompt = fmt.Sprintf("%s\n\nAdditional context: %s", prompt, tailorContextFlag)
 		}
 
-		execCmd = exec.Command(agent, "-p", prompt)
+		// Use -i for gemini (prompt-interactive), -p for claude
+		if agent == "gemini" || strings.HasPrefix(agent, "gemini:") {
+			execCmd = exec.Command("gemini", "-i", prompt)
+		} else {
+			execCmd = exec.Command("claude", "-p", prompt)
+		}
 	}
 
 	execCmd.Stdin = os.Stdin

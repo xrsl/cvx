@@ -22,7 +22,7 @@ func IsGeminiCLIAvailable() bool {
 }
 
 func (c *GeminiCLI) GenerateContent(ctx context.Context, prompt string) (string, error) {
-	args := []string{"-p", prompt}
+	args := []string{"-p", prompt, "-o", "text"}
 	if c.model != "" {
 		args = append(args, "--model", c.model)
 	}

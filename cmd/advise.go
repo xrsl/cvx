@@ -30,8 +30,7 @@ var adviseCmd = &cobra.Command{
 	Long: `Analyze job-CV match quality and get strategic career advice.
 
 Takes a GitHub issue number or job posting URL and analyzes
-how well your CV matches the position. Uses claude or gemini
-CLI based on your agent setting.
+how well your CV matches the position.
 
 Examples:
   cvx advise 42                    # Analyze issue #42
@@ -108,7 +107,7 @@ func runAdviseURL(cfg *config.Config, agent, url string) error {
 			prompt = fmt.Sprintf("%s\n\nAdditional context: %s", prompt, adviseContextFlag)
 		}
 
-		args := []string{"-p", prompt, "--output-format", "json"}
+		args := buildCLIArgs(agent, prompt, "", false)
 		output, err := runAgentWithSpinner(agent, args, "Analyzing job posting...")
 		if err != nil {
 			return fmt.Errorf("agent error: %w", err)
@@ -242,9 +241,8 @@ func runAdviseAnalysis(cfg *config.Config, agent, issueNum, sessionKey string, h
 			prompt = fmt.Sprintf("%s\n\nAdditional context: %s", prompt, adviseContextFlag)
 		}
 
-		args := []string{"-p", prompt, "--output-format", "json"}
+		args := buildCLIArgs(agent, prompt, sessionID, hasSession)
 		if hasSession {
-			args = append(args, "--resume", sessionID)
 			if adviseContextFlag != "" {
 				fmt.Printf("Resuming session for issue #%s with new context...\n", issueNum)
 			} else {
@@ -319,7 +317,12 @@ func runAdviseInteractive(cfg *config.Config, agent, issueNum, sessionKey string
 			prompt = fmt.Sprintf("%s\n\nAdditional context: %s", prompt, adviseContextFlag)
 		}
 
-		cmd = exec.Command(agent, "-p", prompt)
+		// Use -i for gemini (prompt-interactive), -p for claude
+		if agent == "gemini" || strings.HasPrefix(agent, "gemini:") {
+			cmd = exec.Command("gemini", "-i", prompt)
+		} else {
+			cmd = exec.Command("claude", "-p", prompt)
+		}
 	}
 
 	cmd.Stdin = os.Stdin
@@ -428,13 +431,50 @@ func getMostRecentAgentSession(agent string) string {
 		return ""
 	}
 
-	wd, err := os.Getwd()
-	if err != nil {
-		return ""
-	}
+	isGemini := agent == "gemini" || strings.HasPrefix(agent, "gemini:")
 
-	slug := strings.ReplaceAll(wd, "/", "-")
-	sessionDir := filepath.Join(home, "."+agent, "projects", slug)
+	var sessionDir string
+	var fileExt string
+
+	if isGemini {
+		// Gemini uses ~/.gemini/history/{project-hash}/
+		// Get project hash by listing directories and finding one that contains recent sessions
+		historyDir := filepath.Join(home, ".gemini", "history")
+		entries, err := os.ReadDir(historyDir)
+		if err != nil {
+			return ""
+		}
+		// Find the most recently modified project directory
+		var mostRecentDir string
+		var mostRecentTime time.Time
+		for _, entry := range entries {
+			if !entry.IsDir() {
+				continue
+			}
+			info, err := entry.Info()
+			if err != nil {
+				continue
+			}
+			if info.ModTime().After(mostRecentTime) {
+				mostRecentTime = info.ModTime()
+				mostRecentDir = entry.Name()
+			}
+		}
+		if mostRecentDir == "" {
+			return ""
+		}
+		sessionDir = filepath.Join(historyDir, mostRecentDir)
+		fileExt = ".json"
+	} else {
+		// Claude uses ~/.claude/projects/{slug}/
+		wd, err := os.Getwd()
+		if err != nil {
+			return ""
+		}
+		slug := strings.ReplaceAll(wd, "/", "-")
+		sessionDir = filepath.Join(home, ".claude", "projects", slug)
+		fileExt = ".jsonl"
+	}
 
 	entries, err := os.ReadDir(sessionDir)
 	if err != nil {
@@ -445,7 +485,7 @@ func getMostRecentAgentSession(agent string) string {
 	var mostRecentTime time.Time
 
 	for _, entry := range entries {
-		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".jsonl") {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), fileExt) {
 			continue
 		}
 		info, err := entry.Info()
@@ -462,15 +502,53 @@ func getMostRecentAgentSession(agent string) string {
 		return ""
 	}
 
-	return strings.TrimSuffix(mostRecentFile, ".jsonl")
+	return strings.TrimSuffix(mostRecentFile, fileExt)
 }
 
 func cleanupSession(agent, sessionID string) {
 	home, _ := os.UserHomeDir()
-	wd, _ := os.Getwd()
-	slug := strings.ReplaceAll(wd, "/", "-")
-	sessionFile := filepath.Join(home, "."+agent, "projects", slug, sessionID+".jsonl")
-	os.Remove(sessionFile)
+	isGemini := agent == "gemini" || strings.HasPrefix(agent, "gemini:")
+
+	if isGemini {
+		// Gemini session cleanup - find the session file in history
+		historyDir := filepath.Join(home, ".gemini", "history")
+		entries, _ := os.ReadDir(historyDir)
+		for _, entry := range entries {
+			if !entry.IsDir() {
+				continue
+			}
+			sessionFile := filepath.Join(historyDir, entry.Name(), sessionID+".json")
+			os.Remove(sessionFile)
+		}
+	} else {
+		// Claude session cleanup
+		wd, _ := os.Getwd()
+		slug := strings.ReplaceAll(wd, "/", "-")
+		sessionFile := filepath.Join(home, ".claude", "projects", slug, sessionID+".jsonl")
+		os.Remove(sessionFile)
+	}
+}
+
+// buildCLIArgs constructs CLI arguments for both claude and gemini
+func buildCLIArgs(agent, prompt, sessionID string, hasSession bool) []string {
+	isGemini := agent == "gemini" || strings.HasPrefix(agent, "gemini:")
+
+	var args []string
+	args = append(args, "-p", prompt)
+
+	// Output format flag
+	if isGemini {
+		args = append(args, "-o", "json")
+	} else {
+		args = append(args, "--output-format", "json")
+	}
+
+	// Resume flag
+	if hasSession && sessionID != "" {
+		args = append(args, "--resume", sessionID)
+	}
+
+	return args
 }
 
 // Agent execution

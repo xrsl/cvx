@@ -38,7 +38,7 @@ Fetches job posting, extracts details with AI, creates GitHub issue.
 ```bash
 cvx add https://company.com/job
 cvx add https://company.com/job --dry-run    # extract only
-cvx add https://company.com/job -a claude-cli:opus-4.5
+cvx add https://company.com/job -a gemini
 ```
 
 ### `cvx list`
@@ -88,7 +88,7 @@ Interactive setup wizard. Also supports direct access:
 cvx config              # wizard
 cvx config list         # show all settings
 cvx config get agent    # get value
-cvx config set agent claude-cli:opus-4.5
+cvx config set agent gemini
 ```
 
 ## AI Agents
@@ -97,8 +97,8 @@ Priority order (first available is default):
 
 | Agent | Notes |
 |-------|-------|
-| `claude-cli` | Uses Claude Code CLI |
-| `gemini-cli` | Uses Gemini CLI |
+| `claude` | Uses Claude Code CLI |
+| `gemini` | Uses Gemini CLI |
 | `claude-sonnet-4` | Requires `ANTHROPIC_API_KEY` |
 | `claude-sonnet-4-5` | Requires `ANTHROPIC_API_KEY` |
 | `claude-opus-4` | Requires `ANTHROPIC_API_KEY` |
@@ -133,7 +133,7 @@ Located at `.cvx-config.yaml` in your repo root:
 
 ```yaml
 repo: owner/repo
-agent: claude-cli
+agent: claude
 cv_path: src/cv.tex
 reference_path: reference/
 project: owner/1

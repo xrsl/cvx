@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"os/exec"
 	"regexp"
 	"strings"
@@ -19,7 +20,6 @@ import (
 )
 
 var (
-	textFlag   string
 	agentFlag  string
 	repoFlag   string
 	schemaFlag string
@@ -32,18 +32,17 @@ var addCmd = &cobra.Command{
 	Long: `Fetch job posting, extract details with AI, and create a GitHub issue.
 
 Fields are extracted based on schema (GitHub issue template YAML).
+If .cvx/body.md exists with content, uses that instead of fetching URL.
 
 Examples:
   cvx add https://company.com/job
   cvx add https://company.com/job --dry-run
-  cvx add https://company.com/job -a claude-sonnet-4
-  cvx add https://company.com/job -s /path/to/job-app.yml`,
+  cvx add https://company.com/job -a gemini`,
 	Args: cobra.ExactArgs(1),
 	RunE: runAdd,
 }
 
 func init() {
-	addCmd.Flags().StringVarP(&textFlag, "text", "t", "", "Job posting text (skips URL fetch)")
 	addCmd.Flags().StringVarP(&agentFlag, "agent", "a", "", "AI agent (overrides config)")
 	addCmd.Flags().StringVarP(&repoFlag, "repo", "r", "", "GitHub repo (overrides config)")
 	addCmd.Flags().StringVarP(&schemaFlag, "schema", "s", "", "Schema file (overrides config)")
@@ -129,9 +128,13 @@ func runAdd(cmd *cobra.Command, args []string) error {
 }
 
 func getJobText(url string) (string, error) {
-	if textFlag != "" {
-		log("Using provided text")
-		return textFlag, nil
+	// Check for .cvx/body.md fallback
+	bodyPath := ".cvx/body.md"
+	if content, err := os.ReadFile(bodyPath); err == nil && len(strings.TrimSpace(string(content))) > 0 {
+		log("Using job posting from %s", bodyPath)
+		// Clear body.md to prevent stale data reuse
+		os.WriteFile(bodyPath, []byte(""), 0644)
+		return string(content), nil
 	}
 
 	log("Fetching %s", url)
