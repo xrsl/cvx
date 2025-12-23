@@ -89,8 +89,15 @@ func Load(path string) (*Schema, error) {
 	return schema, nil
 }
 
-// GeneratePrompt creates an AI prompt for extracting fields
+// GeneratePrompt creates an AI prompt for extracting fields (combined)
 func (s *Schema) GeneratePrompt(url, jobText string) string {
+	system, user := s.GeneratePromptParts(url, jobText)
+	return system + "\n" + user
+}
+
+// GeneratePromptParts returns system (cacheable) and user (variable) prompt parts
+// Use this with APIs that support prompt caching
+func (s *Schema) GeneratePromptParts(url, jobText string) (system, user string) {
 	var sb strings.Builder
 
 	sb.WriteString("Extract job posting info. Return ONLY valid JSON with these exact keys:\n")
@@ -109,9 +116,9 @@ func (s *Schema) GeneratePrompt(url, jobText string) string {
 		sb.WriteString(fmt.Sprintf("- %s: %s%s\n", f.ID, hint, nullHint))
 	}
 
-	sb.WriteString(fmt.Sprintf("\nJob URL: %s\n\nJob posting:\n%s", url, jobText))
-
-	return sb.String()
+	system = sb.String()
+	user = fmt.Sprintf("Job URL: %s\n\nJob posting:\n%s", url, jobText)
+	return
 }
 
 // BuildIssueBody creates GitHub issue body from extracted data

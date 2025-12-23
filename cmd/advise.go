@@ -2,6 +2,8 @@ package cmd
 
 import (
 	"bytes"
+	"context"
+	"cvx/pkg/ai"
 	"cvx/pkg/config"
 	"cvx/pkg/workflow"
 	"encoding/json"
@@ -17,38 +19,38 @@ import (
 )
 
 var (
-	matchContextFlag     string
-	matchInteractiveFlag bool
-	matchPushFlag        bool
+	adviseContextFlag     string
+	adviseInteractiveFlag bool
+	advisePushFlag        bool
 )
 
-var matchCmd = &cobra.Command{
-	Use:   "match <issue-number-or-url>",
-	Short: "Run job match analysis",
-	Long: `Analyze job-CV match quality using AI.
+var adviseCmd = &cobra.Command{
+	Use:   "advise <issue-number-or-url>",
+	Short: "Get career advice on job match",
+	Long: `Analyze job-CV match quality and get strategic career advice.
 
 Takes a GitHub issue number or job posting URL and analyzes
 how well your CV matches the position. Uses claude or gemini
 CLI based on your agent setting.
 
 Examples:
-  cvx match 42                    # Analyze issue #42
-  cvx match 42 --push             # Analyze and post as comment
-  cvx match https://example.com/job
-  cvx match 42 -c "Focus on backend"
-  cvx match 42 -i                 # Interactive session`,
+  cvx advise 42                    # Analyze issue #42
+  cvx advise 42 --push             # Analyze and post as comment
+  cvx advise https://example.com/job
+  cvx advise 42 -c "Focus on backend"
+  cvx advise 42 -i                 # Interactive session`,
 	Args: cobra.ExactArgs(1),
-	RunE: runMatch,
+	RunE: runAdvise,
 }
 
 func init() {
-	matchCmd.Flags().StringVarP(&matchContextFlag, "context", "c", "", "Additional context for analysis")
-	matchCmd.Flags().BoolVarP(&matchInteractiveFlag, "interactive", "i", false, "Join session interactively")
-	matchCmd.Flags().BoolVarP(&matchPushFlag, "push", "p", false, "Post analysis to GitHub issue")
-	rootCmd.AddCommand(matchCmd)
+	adviseCmd.Flags().StringVarP(&adviseContextFlag, "context", "c", "", "Additional context for analysis")
+	adviseCmd.Flags().BoolVarP(&adviseInteractiveFlag, "interactive", "i", false, "Join session interactively")
+	adviseCmd.Flags().BoolVarP(&advisePushFlag, "push", "p", false, "Post analysis to GitHub issue")
+	rootCmd.AddCommand(adviseCmd)
 }
 
-func runMatch(cmd *cobra.Command, args []string) error {
+func runAdvise(cmd *cobra.Command, args []string) error {
 	target := args[0]
 
 	// Load config with cached project IDs
@@ -64,41 +66,62 @@ func runMatch(cmd *cobra.Command, args []string) error {
 	isURL := strings.HasPrefix(target, "http://") || strings.HasPrefix(target, "https://")
 
 	if isURL {
-		return runMatchURL(cfg, agent, target)
+		return runAdviseURL(cfg, agent, target)
 	}
-	return runMatchIssue(cfg, agent, target)
+	return runAdviseIssue(cfg, agent, target)
 }
 
-func runMatchURL(cfg *config.Config, agent, url string) error {
-	if matchPushFlag {
+func runAdviseURL(cfg *config.Config, agent, url string) error {
+	if advisePushFlag {
 		fmt.Println("Warning: --push flag is not supported for URL-based analysis")
-		fmt.Println("Create an issue first, then run 'cvx match <issue-number> --push'")
+		fmt.Println("Create an issue first, then run 'cvx advise <issue-number> --push'")
 	}
-	if matchInteractiveFlag {
+	if adviseInteractiveFlag {
 		fmt.Println("Warning: --interactive flag is not supported for URL-based analysis")
 	}
 
-	// Build prompt
-	prompt, err := buildMatchPrompt(cfg, url, "")
-	if err != nil {
-		return err
+	fmt.Printf("Running analysis for: %s\n", url)
+
+	var result string
+
+	// Use API client with caching when agent is not CLI-based
+	if !ai.IsAgentCLI(cfg.Agent) {
+		systemPrompt, userPrompt, err := buildAdvisePromptParts(cfg, url, "")
+		if err != nil {
+			return err
+		}
+		if adviseContextFlag != "" {
+			userPrompt = fmt.Sprintf("%s\n\nAdditional context: %s", userPrompt, adviseContextFlag)
+		}
+
+		result, err = runAdviseWithAPI(cfg.Agent, systemPrompt, userPrompt)
+		if err != nil {
+			return err
+		}
+	} else {
+		// CLI agent path
+		prompt, err := buildAdvisePrompt(cfg, url, "")
+		if err != nil {
+			return err
+		}
+		if adviseContextFlag != "" {
+			prompt = fmt.Sprintf("%s\n\nAdditional context: %s", prompt, adviseContextFlag)
+		}
+
+		args := []string{"-p", prompt, "--output-format", "json"}
+		output, err := runAgentWithSpinner(agent, args, "Analyzing job posting...")
+		if err != nil {
+			return fmt.Errorf("agent error: %w", err)
+		}
+
+		var sessionID string
+		result, sessionID = parseAgentOutput(output)
+
+		// Clean up session (one-off analysis)
+		if sessionID != "" {
+			cleanupSession(agent, sessionID)
+		}
 	}
-
-	if matchContextFlag != "" {
-		prompt = fmt.Sprintf("%s\n\nAdditional context: %s", prompt, matchContextFlag)
-	}
-
-	fmt.Printf("Running match analysis for: %s\n", url)
-
-	// Run agent with JSON output
-	args := []string{"-p", prompt, "--output-format", "json"}
-	output, err := runAgentWithSpinner(agent, args, "Analyzing job posting...")
-	if err != nil {
-		return fmt.Errorf("agent error: %w", err)
-	}
-
-	// Parse JSON result
-	result, sessionID := parseAgentOutput(output)
 
 	// Display result
 	fmt.Println("\nMatch Analysis:")
@@ -111,32 +134,47 @@ func runMatchURL(cfg *config.Config, agent, url string) error {
 	if err := os.WriteFile(matchPath, []byte(result), 0644); err != nil {
 		fmt.Printf("Warning: Could not save analysis: %v\n", err)
 	} else {
-		fmt.Printf("\n%sMatch analysis saved to %s%s\n", cGreen, matchPath, cReset)
-	}
-
-	// Clean up session (one-off analysis)
-	if sessionID != "" {
-		cleanupSession(agent, sessionID)
+		fmt.Printf("\n%sAnalysis saved to %s%s\n", cGreen, matchPath, cReset)
 	}
 
 	return nil
 }
 
-func runMatchIssue(cfg *config.Config, agent, issueNum string) error {
-	sessionKey := fmt.Sprintf("match-%s", issueNum)
+// runAdviseWithAPI runs analysis using API client with caching
+func runAdviseWithAPI(agent, systemPrompt, userPrompt string) (string, error) {
+	client, err := ai.NewClient(agent)
+	if err != nil {
+		return "", fmt.Errorf("error creating AI client: %w", err)
+	}
+	defer client.Close()
+
+	ctx := context.Background()
+
+	// Use caching if supported
+	if cachingClient, ok := client.(ai.CachingClient); ok {
+		return cachingClient.GenerateContentWithSystem(ctx, systemPrompt, userPrompt)
+	}
+
+	// Fall back to regular prompt
+	prompt := systemPrompt + "\n\n" + userPrompt
+	return client.GenerateContent(ctx, prompt)
+}
+
+func runAdviseIssue(cfg *config.Config, agent, issueNum string) error {
+	sessionKey := issueNum
 	matchPath := filepath.Join(".cvx", "matches", issueNum+".md")
 
 	// Check for existing session
 	sessionID, hasSession := getSession(sessionKey)
 
 	// Handle --push flag
-	if matchPushFlag {
+	if advisePushFlag {
 		// Check if analysis exists
 		content, err := os.ReadFile(matchPath)
 		if err != nil && os.IsNotExist(err) {
 			// Create analysis first
 			fmt.Printf("No existing analysis found, creating new analysis for issue #%s...\n", issueNum)
-			if err := runMatchAnalysis(cfg, agent, issueNum, sessionKey, hasSession, sessionID); err != nil {
+			if err := runAdviseAnalysis(cfg, agent, issueNum, sessionKey, hasSession, sessionID); err != nil {
 				return err
 			}
 			content, err = os.ReadFile(matchPath)
@@ -148,71 +186,90 @@ func runMatchIssue(cfg *config.Config, agent, issueNum string) error {
 		}
 
 		// Post as comment
-		fmt.Printf("Posting match analysis to issue #%s...\n", issueNum)
+		fmt.Printf("Posting analysis to issue #%s...\n", issueNum)
 		ghCmd := exec.Command("gh", "issue", "comment", issueNum,
 			"--repo", cfg.Repo,
 			"--body", string(content))
 		if output, err := ghCmd.CombinedOutput(); err != nil {
 			return fmt.Errorf("error posting comment: %w\nOutput: %s", err, string(output))
 		}
-		fmt.Printf("%sMatch analysis posted as comment to issue #%s%s\n", cGreen, issueNum, cReset)
+		fmt.Printf("%sAnalysis posted as comment to issue #%s%s\n", cGreen, issueNum, cReset)
 		return nil
 	}
 
 	// Interactive mode
-	if matchInteractiveFlag {
-		return runMatchInteractive(cfg, agent, issueNum, sessionKey, hasSession, sessionID)
+	if adviseInteractiveFlag {
+		return runAdviseInteractive(cfg, agent, issueNum, sessionKey, hasSession, sessionID)
 	}
 
 	// Normal analysis
-	return runMatchAnalysis(cfg, agent, issueNum, sessionKey, hasSession, sessionID)
+	return runAdviseAnalysis(cfg, agent, issueNum, sessionKey, hasSession, sessionID)
 }
 
-func runMatchAnalysis(cfg *config.Config, agent, issueNum, sessionKey string, hasSession bool, sessionID string) error {
+func runAdviseAnalysis(cfg *config.Config, agent, issueNum, sessionKey string, hasSession bool, sessionID string) error {
 	// Fetch issue body for context
 	issueBody, err := fetchIssueBody(cfg.Repo, issueNum)
 	if err != nil {
 		return fmt.Errorf("error fetching issue: %w", err)
 	}
 
-	// Build prompt
-	prompt, err := buildMatchPrompt(cfg, "", issueBody)
-	if err != nil {
-		return err
-	}
+	var result string
 
-	if matchContextFlag != "" {
-		prompt = fmt.Sprintf("%s\n\nAdditional context: %s", prompt, matchContextFlag)
-	}
+	// Use API client with caching when agent is not CLI-based
+	if !ai.IsAgentCLI(cfg.Agent) {
+		fmt.Printf("Running analysis for issue #%s...\n", issueNum)
 
-	// Build args
-	args := []string{"-p", prompt, "--output-format", "json"}
-	if hasSession {
-		args = append(args, "--resume", sessionID)
-		if matchContextFlag != "" {
-			fmt.Printf("Resuming session for issue #%s with new context...\n", issueNum)
-		} else {
-			fmt.Printf("Resuming existing session for issue #%s...\n", issueNum)
+		systemPrompt, userPrompt, err := buildAdvisePromptParts(cfg, "", issueBody)
+		if err != nil {
+			return err
+		}
+		if adviseContextFlag != "" {
+			userPrompt = fmt.Sprintf("%s\n\nAdditional context: %s", userPrompt, adviseContextFlag)
+		}
+
+		result, err = runAdviseWithAPI(cfg.Agent, systemPrompt, userPrompt)
+		if err != nil {
+			return err
 		}
 	} else {
-		fmt.Printf("Running match analysis for issue #%s...\n", issueNum)
-	}
+		// CLI agent path with session support
+		prompt, err := buildAdvisePrompt(cfg, "", issueBody)
+		if err != nil {
+			return err
+		}
 
-	output, err := runAgentWithSpinner(agent, args, "Analyzing job match...")
-	if err != nil {
-		return fmt.Errorf("agent error: %w", err)
-	}
+		if adviseContextFlag != "" {
+			prompt = fmt.Sprintf("%s\n\nAdditional context: %s", prompt, adviseContextFlag)
+		}
 
-	// Parse result
-	result, newSessionID := parseAgentOutput(output)
-
-	// Save session if new
-	if !hasSession && newSessionID != "" {
-		if err := saveSession(sessionKey, newSessionID); err != nil {
-			fmt.Printf("Warning: Could not save session: %v\n", err)
+		args := []string{"-p", prompt, "--output-format", "json"}
+		if hasSession {
+			args = append(args, "--resume", sessionID)
+			if adviseContextFlag != "" {
+				fmt.Printf("Resuming session for issue #%s with new context...\n", issueNum)
+			} else {
+				fmt.Printf("Resuming existing session for issue #%s...\n", issueNum)
+			}
 		} else {
-			fmt.Printf("%sSession saved. Use 'cvx match %s -c \"context\"' or 'cvx match %s -i' to continue.%s\n",
-				cGreen, issueNum, issueNum, cReset)
+			fmt.Printf("Running analysis for issue #%s...\n", issueNum)
+		}
+
+		output, err := runAgentWithSpinner(agent, args, "Analyzing job match...")
+		if err != nil {
+			return fmt.Errorf("agent error: %w", err)
+		}
+
+		var newSessionID string
+		result, newSessionID = parseAgentOutput(output)
+
+		// Save session if new
+		if !hasSession && newSessionID != "" {
+			if err := saveSession(sessionKey, newSessionID); err != nil {
+				fmt.Printf("Warning: Could not save session: %v\n", err)
+			} else {
+				fmt.Printf("%sSession saved. Use 'cvx advise %s -c \"context\"' or 'cvx advise %s -i' to continue.%s\n",
+					cGreen, issueNum, issueNum, cReset)
+			}
 		}
 	}
 
@@ -222,7 +279,7 @@ func runMatchAnalysis(cfg *config.Config, agent, issueNum, sessionKey string, ha
 	if err := os.WriteFile(matchPath, []byte(result), 0644); err != nil {
 		fmt.Printf("Warning: Could not save analysis: %v\n", err)
 	} else {
-		fmt.Printf("%sMatch analysis saved to %s%s\n", cGreen, matchPath, cReset)
+		fmt.Printf("%sAnalysis saved to %s%s\n", cGreen, matchPath, cReset)
 	}
 
 	fmt.Println("\nMatch Analysis:")
@@ -231,7 +288,14 @@ func runMatchAnalysis(cfg *config.Config, agent, issueNum, sessionKey string, ha
 	return nil
 }
 
-func runMatchInteractive(cfg *config.Config, agent, issueNum, sessionKey string, hasSession bool, sessionID string) error {
+func runAdviseInteractive(cfg *config.Config, agent, issueNum, sessionKey string, hasSession bool, sessionID string) error {
+	// Interactive mode requires CLI agent
+	if !ai.IsAgentCLI(cfg.Agent) {
+		fmt.Printf("Note: Interactive mode requires CLI agent (claude-cli or gemini-cli).\n")
+		fmt.Printf("Running single analysis instead.\n\n")
+		return runAdviseAnalysis(cfg, agent, issueNum, sessionKey, hasSession, sessionID)
+	}
+
 	var cmd *exec.Cmd
 
 	if hasSession {
@@ -246,13 +310,13 @@ func runMatchInteractive(cfg *config.Config, agent, issueNum, sessionKey string,
 			return fmt.Errorf("error fetching issue: %w", err)
 		}
 
-		prompt, err := buildMatchPrompt(cfg, "", issueBody)
+		prompt, err := buildAdvisePrompt(cfg, "", issueBody)
 		if err != nil {
 			return err
 		}
 
-		if matchContextFlag != "" {
-			prompt = fmt.Sprintf("%s\n\nAdditional context: %s", prompt, matchContextFlag)
+		if adviseContextFlag != "" {
+			prompt = fmt.Sprintf("%s\n\nAdditional context: %s", prompt, adviseContextFlag)
 		}
 
 		cmd = exec.Command(agent, "-p", prompt)
@@ -276,42 +340,53 @@ func runMatchInteractive(cfg *config.Config, agent, issueNum, sessionKey string,
 	return nil
 }
 
-func buildMatchPrompt(cfg *config.Config, url, issueBody string) (string, error) {
-	// Load workflow
-	workflowContent, err := workflow.LoadMatch()
+func buildAdvisePrompt(cfg *config.Config, url, issueBody string) (string, error) {
+	system, user, err := buildAdvisePromptParts(cfg, url, issueBody)
 	if err != nil {
-		return "", fmt.Errorf("error loading workflow: %w", err)
+		return "", err
+	}
+	return system + "\n\n" + user, nil
+}
+
+// buildAdvisePromptParts returns the prompt split for caching:
+// - system: workflow template with paths (cacheable)
+// - user: job content + context (variable)
+func buildAdvisePromptParts(cfg *config.Config, url, issueBody string) (system, user string, err error) {
+	// Load workflow
+	workflowContent, err := workflow.LoadAdvise()
+	if err != nil {
+		return "", "", fmt.Errorf("error loading workflow: %w", err)
 	}
 
 	// Substitute config paths
 	tmpl, err := template.New("match").Parse(workflowContent)
 	if err != nil {
-		return "", fmt.Errorf("error parsing workflow template: %w", err)
+		return "", "", fmt.Errorf("error parsing workflow template: %w", err)
 	}
 
 	data := struct {
 		CVPath         string
-		ExperiencePath string
+		ReferencePath string
 	}{
 		CVPath:         cfg.CVPath,
-		ExperiencePath: cfg.ExperiencePath,
+		ReferencePath: cfg.ReferencePath,
 	}
 
 	var buf bytes.Buffer
 	if err := tmpl.Execute(&buf, data); err != nil {
-		return "", fmt.Errorf("error executing workflow template: %w", err)
+		return "", "", fmt.Errorf("error executing workflow template: %w", err)
 	}
 
-	prompt := buf.String()
+	system = buf.String()
 
-	// Add job content
+	// Build user part with job content
 	if url != "" {
-		prompt = fmt.Sprintf("%s\n\n## Job Posting URL\n%s", prompt, url)
+		user = fmt.Sprintf("## Job Posting URL\n%s", url)
 	} else if issueBody != "" {
-		prompt = fmt.Sprintf("%s\n\n## Job Posting Content\n%s", prompt, issueBody)
+		user = fmt.Sprintf("## Job Posting Content\n%s", issueBody)
 	}
 
-	return prompt, nil
+	return system, user, nil
 }
 
 func fetchIssueBody(repo, issueNum string) (string, error) {

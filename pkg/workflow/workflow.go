@@ -6,12 +6,16 @@ import (
 	"os"
 )
 
-//go:embed defaults/match.md
-var DefaultMatch string
+//go:embed defaults/advise.md
+var DefaultAdvise string
+
+//go:embed defaults/tailor.md
+var DefaultTailor string
 
 const (
 	DefaultSchemaPath = ".github/ISSUE_TEMPLATE/job-ad-schema.yaml"
-	MatchPath         = ".cvx/workflows/match.md"
+	AdvisePath        = ".cvx/workflows/advise.md"
+	TailorPath        = ".cvx/workflows/tailor.md"
 )
 
 // Init creates .cvx/ directory structure with default workflow files.
@@ -36,9 +40,16 @@ func Init(schemaPath string) error {
 		}
 	}
 
-	// Create default match.md if it doesn't exist
-	if _, err := os.Stat(MatchPath); os.IsNotExist(err) {
-		if err := os.WriteFile(MatchPath, []byte(DefaultMatch), 0644); err != nil {
+	// Create default advise.md if it doesn't exist
+	if _, err := os.Stat(AdvisePath); os.IsNotExist(err) {
+		if err := os.WriteFile(AdvisePath, []byte(DefaultAdvise), 0644); err != nil {
+			return err
+		}
+	}
+
+	// Create default tailor.md if it doesn't exist
+	if _, err := os.Stat(TailorPath); os.IsNotExist(err) {
+		if err := os.WriteFile(TailorPath, []byte(DefaultTailor), 0644); err != nil {
 			return err
 		}
 	}
@@ -46,11 +57,32 @@ func Init(schemaPath string) error {
 	return nil
 }
 
-// LoadMatch loads the match workflow from .cvx/workflows/match.md
-func LoadMatch() (string, error) {
-	content, err := os.ReadFile(".cvx/workflows/match.md")
+// LoadAdvise loads the advise workflow from .cvx/workflows/advise.md
+func LoadAdvise() (string, error) {
+	content, err := os.ReadFile(AdvisePath)
 	if err != nil {
 		return "", err
 	}
 	return string(content), nil
+}
+
+// LoadTailor loads the tailor workflow from .cvx/workflows/tailor.md
+func LoadTailor() (string, error) {
+	content, err := os.ReadFile(TailorPath)
+	if err != nil {
+		return "", err
+	}
+	return string(content), nil
+}
+
+// ResetWorkflows overwrites workflow files with defaults
+func ResetWorkflows() error {
+	os.MkdirAll(".cvx/workflows", 0755)
+	if err := os.WriteFile(AdvisePath, []byte(DefaultAdvise), 0644); err != nil {
+		return err
+	}
+	if err := os.WriteFile(TailorPath, []byte(DefaultTailor), 0644); err != nil {
+		return err
+	}
+	return nil
 }

@@ -9,7 +9,7 @@ repo: owner/repo
 agent: claude-cli
 schema: ""
 cv_path: src/cv.tex
-experience_path: reference/EXPERIENCE.md
+reference_path: reference/
 project:
   number: 1
   owner: owner
@@ -22,8 +22,8 @@ project:
 | `repo` | GitHub repository (owner/repo) | Auto-detected |
 | `agent` | AI agent to use | `claude-cli` |
 | `schema` | Job schema file path | Built-in |
-| `cv_path` | CV file for match analysis | `src/cv.tex` |
-| `experience_path` | Experience reference file | `reference/EXPERIENCE.md` |
+| `cv_path` | CV file for advise/tailor | `src/cv.tex` |
+| `reference_path` | Reference materials directory | `reference/` |
 | `project.number` | GitHub Project number | - |
 | `project.owner` | Project owner | From repo |
 
@@ -33,12 +33,14 @@ Priority order (first available is default):
 
 | Agent | Notes |
 |-------|-------|
-| `claude-cli` | Uses Claude CLI |
-| `claude-cli:opus-4.5` | Specific Claude agent |
-| `claude-cli:sonnet-4` | Specific Claude agent |
+| `claude-cli` | Uses Claude Code CLI |
 | `gemini-cli` | Uses Gemini CLI |
-| `gemini-2.5-flash` | Requires `GEMINI_API_KEY` |
 | `claude-sonnet-4` | Requires `ANTHROPIC_API_KEY` |
+| `claude-sonnet-4-5` | Requires `ANTHROPIC_API_KEY` |
+| `claude-opus-4` | Requires `ANTHROPIC_API_KEY` |
+| `claude-opus-4-5` | Requires `ANTHROPIC_API_KEY` |
+| `gemini-2.5-flash` | Requires `GEMINI_API_KEY` |
+| `gemini-2.5-pro` | Requires `GEMINI_API_KEY` |
 
 ## Environment Variables
 

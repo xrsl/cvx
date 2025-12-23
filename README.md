@@ -50,17 +50,27 @@ cvx list
 cvx list -r owner/repo    # specific repo
 ```
 
-### `cvx status <issue> <status>`
+### `cvx advise <issue>`
 
-Updates application status.
+Get career advice on job match quality.
 
 ```bash
-cvx status 42 applied
-cvx status 42 interview
-cvx status --list         # show available statuses
+cvx advise 42                    # Analyze issue #42
+cvx advise 42 --push             # Post analysis as comment
+cvx advise 42 -i                 # Interactive session
+cvx advise https://example.com/job
 ```
 
-Available statuses: `to_be_applied`, `applied`, `interview`, `offered`, `accepted`, `gone`, `let_go`
+### `cvx tailor <issue>`
+
+Tailor CV and cover letter interactively.
+
+```bash
+cvx tailor 42                    # Start/resume tailoring session
+cvx tailor 42 -c "Emphasize Python"
+```
+
+Sessions are shared per issue - `advise` and `tailor` continue the same conversation.
 
 ### `cvx rm <issue>`
 
@@ -87,12 +97,14 @@ Priority order (first available is default):
 
 | Agent | Notes |
 |-------|-------|
-| `claude-cli` | Uses Claude CLI (free with Claude subscription) |
-| `claude-cli:opus-4.5` | Specific Claude agent via CLI |
-| `claude-cli:sonnet-4` | Specific Claude agent via CLI |
+| `claude-cli` | Uses Claude Code CLI |
 | `gemini-cli` | Uses Gemini CLI |
-| `gemini-2.5-flash` | Requires `GEMINI_API_KEY` |
 | `claude-sonnet-4` | Requires `ANTHROPIC_API_KEY` |
+| `claude-sonnet-4-5` | Requires `ANTHROPIC_API_KEY` |
+| `claude-opus-4` | Requires `ANTHROPIC_API_KEY` |
+| `claude-opus-4-5` | Requires `ANTHROPIC_API_KEY` |
+| `gemini-2.5-flash` | Requires `GEMINI_API_KEY` |
+| `gemini-2.5-pro` | Requires `GEMINI_API_KEY` |
 
 ## GitHub Project
 
@@ -122,10 +134,13 @@ Located at `.cvx-config.yaml` in your repo root:
 ```yaml
 repo: owner/repo
 agent: claude-cli
-schema: ""  # uses bundled default
+cv_path: src/cv.tex
+reference_path: reference/
 project:
   number: 1
   owner: owner  # optional, inferred from repo
 ```
+
+The `reference_path` directory should contain your experience documentation, guidelines, and other reference materials used by `advise` and `tailor` commands.
 
 Internal project IDs are cached in `.cvx/cache.yaml` (auto-managed).

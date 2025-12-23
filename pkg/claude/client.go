@@ -9,14 +9,13 @@ import (
 	"github.com/anthropics/anthropic-sdk-go/option"
 )
 
-const DefaultAgent = "claude-opus-4-5"
+const DefaultAgent = "claude-sonnet-4"
 
 var SupportedAgents = []string{
-	"claude-opus-4-5",
 	"claude-sonnet-4",
+	"claude-sonnet-4-5",
 	"claude-opus-4",
-	"claude-3-5-sonnet",
-	"claude-3-5-haiku",
+	"claude-opus-4-5",
 }
 
 func IsAgentSupported(agent string) bool {
@@ -52,13 +51,34 @@ func NewClient(model string) (*Client, error) {
 }
 
 func (c *Client) GenerateContent(ctx context.Context, prompt string) (string, error) {
-	message, err := c.client.Messages.New(ctx, anthropic.MessageNewParams{
+	return c.GenerateContentWithSystem(ctx, "", prompt)
+}
+
+// GenerateContentWithSystem sends a prompt with a cached system message
+// The system prompt is marked for caching (5-min TTL, 90% cost reduction on cache hit)
+func (c *Client) GenerateContentWithSystem(ctx context.Context, systemPrompt, userPrompt string) (string, error) {
+	params := anthropic.MessageNewParams{
 		Model:     anthropic.Model(c.model),
 		MaxTokens: 4096,
 		Messages: []anthropic.MessageParam{
-			anthropic.NewUserMessage(anthropic.NewTextBlock(prompt)),
+			anthropic.NewUserMessage(anthropic.NewTextBlock(userPrompt)),
 		},
-	})
+	}
+
+	// Add system prompt with cache control if provided
+	if systemPrompt != "" {
+		params.System = []anthropic.TextBlockParam{
+			{
+				Type: "text",
+				Text: systemPrompt,
+				CacheControl: anthropic.CacheControlEphemeralParam{
+					Type: "ephemeral",
+				},
+			},
+		}
+	}
+
+	message, err := c.client.Messages.New(ctx, params)
 	if err != nil {
 		return "", fmt.Errorf("claude API error: %w", err)
 	}

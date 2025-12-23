@@ -167,9 +167,16 @@ func extractWithSchema(ctx context.Context, agent string, sch *schema.Schema, ur
 	}
 	defer client.Close()
 
-	prompt := sch.GeneratePrompt(url, jobText)
+	var resp string
 
-	resp, err := client.GenerateContent(ctx, prompt)
+	// Use prompt caching if client supports it (Claude API)
+	if cachingClient, ok := client.(ai.CachingClient); ok {
+		systemPrompt, userPrompt := sch.GeneratePromptParts(url, jobText)
+		resp, err = cachingClient.GenerateContentWithSystem(ctx, systemPrompt, userPrompt)
+	} else {
+		prompt := sch.GeneratePrompt(url, jobText)
+		resp, err = client.GenerateContent(ctx, prompt)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("extraction failed: %w", err)
 	}

@@ -59,7 +59,19 @@ func NewClient(model string) (*Client, error) {
 }
 
 func (c *Client) GenerateContent(ctx context.Context, prompt string) (string, error) {
-	resp, err := c.model.GenerateContent(ctx, genai.Text(prompt))
+	return c.GenerateContentWithSystem(ctx, "", prompt)
+}
+
+// GenerateContentWithSystem uses system instruction for the prompt
+// Note: Gemini's context caching requires separate cache creation, so this just uses system instruction
+func (c *Client) GenerateContentWithSystem(ctx context.Context, systemPrompt, userPrompt string) (string, error) {
+	if systemPrompt != "" {
+		c.model.SystemInstruction = &genai.Content{
+			Parts: []genai.Part{genai.Text(systemPrompt)},
+		}
+	}
+
+	resp, err := c.model.GenerateContent(ctx, genai.Text(userPrompt))
 	if err != nil {
 		return "", err
 	}

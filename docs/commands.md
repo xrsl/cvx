@@ -52,40 +52,12 @@ cvx list [flags]
 
 ---
 
-## cvx status
+## cvx advise
 
-Update application status.
-
-```bash
-cvx status <issue> <status>
-cvx status --list
-```
-
-**Available statuses:**
-
-- `to_be_applied`
-- `applied`
-- `interview`
-- `offered`
-- `accepted`
-- `gone`
-- `let_go`
-
-**Examples:**
+Get career advice on job match quality.
 
 ```bash
-cvx status 42 applied
-cvx status 42 interview
-```
-
----
-
-## cvx match
-
-Analyze job-CV match quality using AI.
-
-```bash
-cvx match <issue-or-url> [flags]
+cvx advise <issue-or-url> [flags]
 ```
 
 | Flag | Short | Description |
@@ -97,10 +69,33 @@ cvx match <issue-or-url> [flags]
 **Examples:**
 
 ```bash
-cvx match 42                    # Analyze issue #42
-cvx match 42 --push             # Post as comment
-cvx match 42 -c "Focus on backend"
-cvx match 42 -i                 # Interactive mode
+cvx advise 42                    # Analyze issue #42
+cvx advise 42 --push             # Post as comment
+cvx advise 42 -c "Focus on backend"
+cvx advise 42 -i                 # Interactive mode
+```
+
+---
+
+## cvx tailor
+
+Tailor CV and cover letter interactively.
+
+```bash
+cvx tailor <issue> [flags]
+```
+
+| Flag | Short | Description |
+|------|-------|-------------|
+| `--context` | `-c` | Additional context |
+
+Sessions are shared per issue - `advise` and `tailor` continue the same conversation.
+
+**Examples:**
+
+```bash
+cvx tailor 42                    # Start/resume session
+cvx tailor 42 -c "Emphasize Python"
 ```
 
 ---

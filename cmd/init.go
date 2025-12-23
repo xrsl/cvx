@@ -39,12 +39,24 @@ Run this once per repository to set up cvx.`,
 	RunE: runInit,
 }
 
+var initResetWorkflowsFlag bool
+
 func init() {
+	initCmd.Flags().BoolVar(&initResetWorkflowsFlag, "reset-workflows", false, "Reset workflows to defaults")
 	rootCmd.AddCommand(initCmd)
 }
 
 func runInit(cmd *cobra.Command, args []string) error {
 	reader := bufio.NewReader(os.Stdin)
+
+	// Handle --reset-workflows flag
+	if initResetWorkflowsFlag {
+		if err := workflow.ResetWorkflows(); err != nil {
+			return fmt.Errorf("failed to reset workflows: %w", err)
+		}
+		fmt.Printf("%s✓%s Workflows reset to defaults\n", initGreen, initReset)
+		return nil
+	}
 
 	// Check if already initialized
 	_, configExists := os.Stat(config.Path())
@@ -172,18 +184,18 @@ func runInit(cmd *cobra.Command, args []string) error {
 	config.Set("cv_path", cvPath)
 	fmt.Println()
 
-	// Step 4: Experience file path
-	expPath := cfg.ExperiencePath
-	if expPath == "" {
-		expPath = "reference/EXPERIENCE.md"
+	// Step 4: Reference directory path
+	refPath := cfg.ReferencePath
+	if refPath == "" {
+		refPath = "reference/"
 	}
-	fmt.Printf("%s?%s Experience file path %s[%s]%s: ", initGreen, initReset, initCyan, expPath, initReset)
+	fmt.Printf("%s?%s Reference directory %s[%s]%s: ", initGreen, initReset, initCyan, refPath, initReset)
 	input, _ = reader.ReadString('\n')
 	input = strings.TrimSpace(input)
 	if input != "" {
-		expPath = input
+		refPath = input
 	}
-	config.Set("experience_path", expPath)
+	config.Set("reference_path", refPath)
 	fmt.Println()
 
 	// Step 5: Job ad schema path
@@ -352,15 +364,11 @@ func buildAgentList() []agentOption {
 	var agents []agentOption
 
 	if ai.IsClaudeCLIAvailable() {
-		agents = append(agents,
-			agentOption{"claude-cli", "uses CLI-configured agent"},
-			agentOption{"claude-cli:opus-4.5", ""},
-			agentOption{"claude-cli:sonnet-4", ""},
-		)
+		agents = append(agents, agentOption{"claude-cli", ""})
 	}
 
 	if ai.IsGeminiCLIAvailable() {
-		agents = append(agents, agentOption{"gemini-cli", "uses CLI-configured agent"})
+		agents = append(agents, agentOption{"gemini-cli", ""})
 	}
 
 	for _, a := range ai.SupportedAgents() {
@@ -369,9 +377,9 @@ func buildAgentList() []agentOption {
 		}
 		note := ""
 		if strings.HasPrefix(a, "gemini") {
-			note = "requires GEMINI_API_KEY"
+			note = "GEMINI_API_KEY"
 		} else if strings.HasPrefix(a, "claude") {
-			note = "requires ANTHROPIC_API_KEY"
+			note = "ANTHROPIC_API_KEY"
 		}
 		agents = append(agents, agentOption{a, note})
 	}

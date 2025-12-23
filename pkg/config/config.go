@@ -12,12 +12,12 @@ import (
 )
 
 type Config struct {
-	Repo           string        `mapstructure:"repo" yaml:"repo,omitempty"`
-	Agent          string        `mapstructure:"agent" yaml:"agent,omitempty"`
-	Schema         string        `mapstructure:"schema" yaml:"schema,omitempty"`
-	CVPath         string        `mapstructure:"cv_path" yaml:"cv_path,omitempty"`
-	ExperiencePath string        `mapstructure:"experience_path" yaml:"experience_path,omitempty"`
-	Project        ProjectConfig `mapstructure:"project" yaml:"project,omitempty"`
+	Repo          string        `mapstructure:"repo" yaml:"repo,omitempty"`
+	Agent         string        `mapstructure:"agent" yaml:"agent,omitempty"`
+	Schema        string        `mapstructure:"schema" yaml:"schema,omitempty"`
+	CVPath        string        `mapstructure:"cv_path" yaml:"cv_path,omitempty"`
+	ReferencePath string        `mapstructure:"reference_path" yaml:"reference_path,omitempty"`
+	Project       ProjectConfig `mapstructure:"project" yaml:"project,omitempty"`
 }
 
 // AgentCLI returns the CLI agent name derived from the agent setting
@@ -82,7 +82,7 @@ func Load() (*Config, error) {
 
 func Get(key string) (string, error) {
 	switch key {
-	case "repo", "agent", "schema", "cv_path", "experience_path":
+	case "repo", "agent", "schema", "cv_path", "reference_path":
 		return v.GetString(key), nil
 	default:
 		return "", fmt.Errorf("unknown config key: %s", key)
@@ -104,10 +104,10 @@ func Set(key, value string) error {
 		cfg.Schema = value
 	case "cv_path":
 		cfg.CVPath = value
-	case "experience_path":
-		cfg.ExperiencePath = value
+	case "reference_path":
+		cfg.ReferencePath = value
 	default:
-		return fmt.Errorf("unknown config key: %s (valid: repo, agent, schema, cv_path, experience_path)", key)
+		return fmt.Errorf("unknown config key: %s (valid: repo, agent, schema, cv_path, reference_path)", key)
 	}
 
 	v.Set(key, value) // keep viper in sync
@@ -134,11 +134,11 @@ func writeConfig(cfg *Config) error {
 
 func All() (map[string]string, error) {
 	return map[string]string{
-		"repo":            v.GetString("repo"),
-		"agent":           v.GetString("agent"),
-		"schema":          v.GetString("schema"),
-		"cv_path":         v.GetString("cv_path"),
-		"experience_path": v.GetString("experience_path"),
+		"repo":           v.GetString("repo"),
+		"agent":          v.GetString("agent"),
+		"schema":         v.GetString("schema"),
+		"cv_path":        v.GetString("cv_path"),
+		"reference_path": v.GetString("reference_path"),
 	}, nil
 }
 

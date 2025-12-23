@@ -13,7 +13,9 @@ func TestIsAgentSupported(t *testing.T) {
 		{"gemini-2.5-flash", true},
 		{"gemini-2.5-pro", true},
 		{"claude-sonnet-4", true},
+		{"claude-sonnet-4-5", true},
 		{"claude-opus-4", true},
+		{"claude-opus-4-5", true},
 		{"invalid-agent", false},
 		{"", false},
 	}
