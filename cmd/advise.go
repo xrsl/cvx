@@ -3,9 +3,6 @@ package cmd
 import (
 	"bytes"
 	"context"
-	"cvx/pkg/ai"
-	"cvx/pkg/config"
-	"cvx/pkg/workflow"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -16,6 +13,10 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+
+	"cvx/pkg/ai"
+	"cvx/pkg/config"
+	"cvx/pkg/workflow"
 )
 
 var (
@@ -370,10 +371,10 @@ func buildAdvisePromptParts(cfg *config.Config, url, issueBody string) (system, 
 	}
 
 	data := struct {
-		CVPath         string
+		CVPath        string
 		ReferencePath string
 	}{
-		CVPath:         cfg.CVPath,
+		CVPath:        cfg.CVPath,
 		ReferencePath: cfg.ReferencePath,
 	}
 

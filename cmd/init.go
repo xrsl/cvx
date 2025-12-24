@@ -2,10 +2,6 @@ package cmd
 
 import (
 	"bufio"
-	"cvx/pkg/ai"
-	"cvx/pkg/config"
-	"cvx/pkg/project"
-	"cvx/pkg/workflow"
 	"fmt"
 	"os"
 	"os/exec"
@@ -14,6 +10,11 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+
+	"cvx/pkg/ai"
+	"cvx/pkg/config"
+	"cvx/pkg/project"
+	"cvx/pkg/workflow"
 )
 
 const (
@@ -250,7 +251,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 	if input != "" {
 		refPath = input
 	}
-	config.Set("reference_path", refPath)
+	_ = config.Set("reference_path", refPath)
 	fmt.Println()
 
 	// Step 5: Job ad schema path
@@ -264,7 +265,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 	if input != "" {
 		schemaPath = input
 	}
-	config.Set("schema", schemaPath)
+	_ = config.Set("schema", schemaPath)
 	fmt.Println()
 
 	// Step 6: GitHub Project

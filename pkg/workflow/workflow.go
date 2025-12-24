@@ -1,9 +1,10 @@
 package workflow
 
 import (
-	"cvx/pkg/schema"
 	_ "embed"
 	"os"
+
+	"cvx/pkg/schema"
 )
 
 //go:embed defaults/add.md

@@ -2,10 +2,6 @@ package cmd
 
 import (
 	"context"
-	"cvx/pkg/ai"
-	"cvx/pkg/config"
-	"cvx/pkg/project"
-	"cvx/pkg/schema"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -17,6 +13,11 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+
+	"cvx/pkg/ai"
+	"cvx/pkg/config"
+	"cvx/pkg/project"
+	"cvx/pkg/schema"
 )
 
 var (

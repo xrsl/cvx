@@ -28,10 +28,10 @@ type Schema struct {
 
 // Raw structures for parsing GitHub issue template YAML
 type rawTemplate struct {
-	Name        string   `yaml:"name"`
-	Description string   `yaml:"description"`
-	Labels      []string `yaml:"labels"`
-	Assignees   []string `yaml:"assignees"`
+	Name        string     `yaml:"name"`
+	Description string     `yaml:"description"`
+	Labels      []string   `yaml:"labels"`
+	Assignees   []string   `yaml:"assignees"`
 	Body        []rawField `yaml:"body"`
 }
 
