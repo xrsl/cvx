@@ -61,7 +61,6 @@ Lists all job applications with status, company, and deadline.
 cvx list
 cvx list --state closed   # show closed issues
 cvx list --company google # filter by company
-cvx list -r owner/repo    # specific repo
 ```
 
 ### `cvx advise <issue>`

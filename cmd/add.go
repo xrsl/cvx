@@ -14,10 +14,10 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"cvx/pkg/ai"
-	"cvx/pkg/config"
-	"cvx/pkg/project"
-	"cvx/pkg/schema"
+	"github.com/xrsl/cvx/pkg/ai"
+	"github.com/xrsl/cvx/pkg/config"
+	"github.com/xrsl/cvx/pkg/project"
+	"github.com/xrsl/cvx/pkg/schema"
 )
 
 var (

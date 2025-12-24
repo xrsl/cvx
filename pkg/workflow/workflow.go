@@ -4,7 +4,7 @@ import (
 	_ "embed"
 	"os"
 
-	"cvx/pkg/schema"
+	"github.com/xrsl/cvx/pkg/schema"
 )
 
 //go:embed defaults/add.md

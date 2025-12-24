@@ -1,4 +1,4 @@
-module cvx
+module github.com/xrsl/cvx
 
 go 1.25
 

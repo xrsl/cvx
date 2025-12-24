@@ -9,7 +9,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"cvx/pkg/config"
+	"github.com/xrsl/cvx/pkg/config"
 )
 
 var (

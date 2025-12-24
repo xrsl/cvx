@@ -1,6 +1,6 @@
 package main
 
-import "cvx/cmd"
+import "github.com/xrsl/cvx/cmd"
 
 func main() {
 	cmd.Execute()

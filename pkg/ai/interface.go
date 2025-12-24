@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"strings"
 
-	"cvx/pkg/claude"
-	"cvx/pkg/gemini"
+	"github.com/xrsl/cvx/pkg/claude"
+	"github.com/xrsl/cvx/pkg/gemini"
 )
 
 // Client is the common interface for AI providers

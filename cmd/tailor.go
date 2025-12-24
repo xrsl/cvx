@@ -11,9 +11,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"cvx/pkg/ai"
-	"cvx/pkg/config"
-	"cvx/pkg/workflow"
+	"github.com/xrsl/cvx/pkg/ai"
+	"github.com/xrsl/cvx/pkg/config"
+	"github.com/xrsl/cvx/pkg/workflow"
 )
 
 var tailorCmd = &cobra.Command{
