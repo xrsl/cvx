@@ -1,4 +1,3 @@
-## Build Commands to be used by Claude
+## Rules for Claude Code
 
-- To build the cli, run `make`.
-- To ensure files are committable and CI lint will pass, run `prek run --all-files`.
+- Follow rules @CONTRIBUTING.md
