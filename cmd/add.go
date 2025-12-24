@@ -161,7 +161,7 @@ func getJobText(url, bodyPath string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("invalid URL: %w", err)
 	}
-	req.Header.Set("User-Agent", "cvx/"+Version)
+	req.Header.Set("User-Agent", "cvx/"+getVersion())
 
 	resp, err := client.Do(req)
 	if err != nil {
