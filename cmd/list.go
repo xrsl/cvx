@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"cvx/pkg/config"
 	"encoding/json"
 	"fmt"
 	"os/exec"
@@ -11,6 +10,8 @@ import (
 	"unicode/utf8"
 
 	"github.com/spf13/cobra"
+
+	"cvx/pkg/config"
 )
 
 const (

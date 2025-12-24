@@ -2,9 +2,6 @@ package cmd
 
 import (
 	"bytes"
-	"cvx/pkg/ai"
-	"cvx/pkg/config"
-	"cvx/pkg/workflow"
 	"fmt"
 	"os"
 	"os/exec"
@@ -12,6 +9,10 @@ import (
 	"text/template"
 
 	"github.com/spf13/cobra"
+
+	"cvx/pkg/ai"
+	"cvx/pkg/config"
+	"cvx/pkg/workflow"
 )
 
 var tailorCmd = &cobra.Command{

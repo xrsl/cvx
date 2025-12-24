@@ -1,11 +1,12 @@
 package cmd
 
 import (
-	"cvx/pkg/config"
 	"fmt"
 	"os/exec"
 
 	"github.com/spf13/cobra"
+
+	"cvx/pkg/config"
 )
 
 const (
