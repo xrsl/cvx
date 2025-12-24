@@ -9,6 +9,7 @@ go install github.com/xrsl/cvx@latest
 ```
 
 **Requirements:**
+
 - [GitHub CLI](https://cli.github.com/) (`gh`) - installed and authenticated
 - One of: [Claude CLI](https://github.com/anthropics/claude-code), [Gemini CLI](https://github.com/google-gemini/gemini-cli), or API key
 
@@ -19,6 +20,7 @@ cvx init
 ```
 
 This runs the setup wizard:
+
 - Links your GitHub repo
 - Selects AI agent
 - Sets CV and reference paths
@@ -99,28 +101,30 @@ cvx init -d             # delete .cvx/ and config
 
 Priority order (first available is default):
 
-| Agent | Notes |
-|-------|-------|
-| `claude` | Uses Claude Code CLI |
-| `gemini` | Uses Gemini CLI |
-| `claude-sonnet-4` | Requires `ANTHROPIC_API_KEY` |
+| Agent               | Notes                        |
+| ------------------- | ---------------------------- |
+| `claude`            | Uses Claude Code CLI         |
+| `gemini`            | Uses Gemini CLI              |
+| `claude-sonnet-4`   | Requires `ANTHROPIC_API_KEY` |
 | `claude-sonnet-4-5` | Requires `ANTHROPIC_API_KEY` |
-| `claude-opus-4` | Requires `ANTHROPIC_API_KEY` |
-| `claude-opus-4-5` | Requires `ANTHROPIC_API_KEY` |
-| `gemini-2.5-flash` | Requires `GEMINI_API_KEY` |
-| `gemini-2.5-pro` | Requires `GEMINI_API_KEY` |
+| `claude-opus-4`     | Requires `ANTHROPIC_API_KEY` |
+| `claude-opus-4-5`   | Requires `ANTHROPIC_API_KEY` |
+| `gemini-2.5-flash`  | Requires `GEMINI_API_KEY`    |
+| `gemini-2.5-pro`    | Requires `GEMINI_API_KEY`    |
 
 ## GitHub Project
 
 cvx automatically creates a GitHub Project with:
 
 **Fields:**
+
 - Application Status (single-select)
 - Company (text)
 - Deadline (date)
 - AppliedDate (date)
 
 **Statuses:**
+
 - To be Applied
 - Applied
 - Interview
@@ -151,11 +155,11 @@ Internal project IDs are cached in `.cvx/cache.yaml` (auto-managed).
 
 AI prompts are stored in `.cvx/workflows/` and can be customized:
 
-| File | Used by |
-|------|---------|
-| `add.md` | `cvx add` - job extraction prompt |
+| File        | Used by                              |
+| ----------- | ------------------------------------ |
+| `add.md`    | `cvx add` - job extraction prompt    |
 | `advise.md` | `cvx advise` - match analysis prompt |
-| `tailor.md` | `cvx tailor` - CV tailoring prompt |
+| `tailor.md` | `cvx tailor` - CV tailoring prompt   |
 
 Template variables available: `{{.CVPath}}`, `{{.ReferencePath}}`
 

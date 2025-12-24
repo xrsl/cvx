@@ -3,24 +3,29 @@ Tailor application materials for the job posting.
 ## Workflow
 
 1. **Read all reference materials:**
+
    - Read all files in `{{.ReferencePath}}` - skills inventory, guidelines, boundaries
    - Read `{{.CVPath}}` - current CV content
 
 2. **Analyze job requirements:**
+
    - Identify required vs nice-to-have skills
    - Match experiences from reference to requirements
    - Note gaps honestly
 
 3. **Tailor documents:**
+
    - CV: emphasize relevant sections per role type
    - Cover letter: follow structure from reference, use ONLY verified experiences
    - Identify keywords to incorporate
 
 4. **Verify accuracy:**
+
    - List every claim and cite source from CV or reference files
    - Never fabricate or exaggerate experiences
 
 5. **Build & preview:**
+
    - If makefile exists: `make combined && code build/combined.pdf`
 
 6. **Wait for user review**

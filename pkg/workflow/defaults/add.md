@@ -3,6 +3,7 @@ Fetch job posting details from the provided URL and extract structured informati
 ## Workflow
 
 1. **Get job details**:
+
    - If user provided full job text: Use that directly (skip WebFetch)
    - If only URL provided:
      - Use WebFetch with prompt that requests:
@@ -11,6 +12,7 @@ Fetch job posting details from the provided URL and extract structured informati
      - If WebFetch fails: Inform user to provide the job text directly with --text flag
 
 2. **Extract key information**:
+
    - Job title (use only the job title, not company name)
    - Company name
    - Location (remote/city/hybrid)
@@ -35,6 +37,7 @@ Fetch job posting details from the provided URL and extract structured informati
    ```
 
    **Field Rules**:
+
    - Use `null` for fields that are not found/specified
    - `deadline`: If mentioned, use YYYY-MM-DD format. If not mentioned, use `null`
 

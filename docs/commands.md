@@ -8,12 +8,12 @@ Initialize cvx for the current repository.
 cvx init [flags]
 ```
 
-| Flag | Short | Description |
-|------|-------|-------------|
-| `--quiet` | `-q` | Non-interactive with defaults |
-| `--reset-workflows` | `-r` | Reset workflows to defaults |
-| `--check` | `-c` | Validate config resources exist |
-| `--delete` | `-d` | Remove .cvx/ and config file |
+| Flag                | Short | Description                     |
+| ------------------- | ----- | ------------------------------- |
+| `--quiet`           | `-q`  | Non-interactive with defaults   |
+| `--reset-workflows` | `-r`  | Reset workflows to defaults     |
+| `--check`           | `-c`  | Validate config resources exist |
+| `--delete`          | `-d`  | Remove .cvx/ and config file    |
 
 Creates `.cvx-config.yaml` and `.cvx/` directory structure.
 
@@ -27,12 +27,12 @@ Add a job application from a URL.
 cvx add <url> [flags]
 ```
 
-| Flag | Short | Description |
-|------|-------|-------------|
-| `--agent` | `-a` | AI agent (overrides config) |
-| `--repo` | `-r` | GitHub repo (overrides config) |
-| `--schema` | `-s` | Schema file path |
-| `--dry-run` | | Extract only, don't create issue |
+| Flag        | Short | Description                      |
+| ----------- | ----- | -------------------------------- |
+| `--agent`   | `-a`  | AI agent (overrides config)      |
+| `--repo`    | `-r`  | GitHub repo (overrides config)   |
+| `--schema`  | `-s`  | Schema file path                 |
+| `--dry-run` |       | Extract only, don't create issue |
 
 If `.cvx/body.md` exists with content, uses that instead of fetching URL.
 
@@ -54,12 +54,12 @@ List all job applications.
 cvx list [flags]
 ```
 
-| Flag | Short | Description |
-|------|-------|-------------|
-| `--state` | | Issue state (open\|closed\|all) |
-| `--limit` | | Max issues to list (default 50) |
-| `--company` | | Filter by company name |
-| `--repo` | `-r` | GitHub repo (overrides config) |
+| Flag        | Short | Description                     |
+| ----------- | ----- | ------------------------------- |
+| `--state`   |       | Issue state (open\|closed\|all) |
+| `--limit`   |       | Max issues to list (default 50) |
+| `--company` |       | Filter by company name          |
+| `--repo`    | `-r`  | GitHub repo (overrides config)  |
 
 **Examples:**
 
@@ -79,11 +79,11 @@ Get career advice on job match quality.
 cvx advise <issue-or-url> [flags]
 ```
 
-| Flag | Short | Description |
-|------|-------|-------------|
-| `--context` | `-c` | Additional context |
-| `--interactive` | `-i` | Interactive session |
-| `--push` | `-p` | Post analysis to issue |
+| Flag            | Short | Description            |
+| --------------- | ----- | ---------------------- |
+| `--context`     | `-c`  | Additional context     |
+| `--interactive` | `-i`  | Interactive session    |
+| `--push`        | `-p`  | Post analysis to issue |
 
 **Examples:**
 
@@ -104,9 +104,9 @@ Tailor CV and cover letter interactively.
 cvx tailor <issue> [flags]
 ```
 
-| Flag | Short | Description |
-|------|-------|-------------|
-| `--context` | `-c` | Additional context |
+| Flag        | Short | Description        |
+| ----------- | ----- | ------------------ |
+| `--context` | `-c`  | Additional context |
 
 Sessions are shared per issue - `advise` and `tailor` continue the same conversation.
 
@@ -127,9 +127,9 @@ Remove a job application.
 cvx rm <issue> [flags]
 ```
 
-| Flag | Short | Description |
-|------|-------|-------------|
-| `--repo` | `-r` | GitHub repo (overrides config) |
+| Flag     | Short | Description                    |
+| -------- | ----- | ------------------------------ |
+| `--repo` | `-r`  | GitHub repo (overrides config) |
 
 **Examples:**
 

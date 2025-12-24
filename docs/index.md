@@ -29,6 +29,6 @@ cvx tailor 42
 
 - [GitHub CLI](https://cli.github.com/) (`gh`) - installed and authenticated
 - One of:
-    - [Claude CLI](https://github.com/anthropics/claude-code)
-    - [Gemini CLI](https://github.com/google-gemini/gemini-cli)
-    - API key (`ANTHROPIC_API_KEY` or `GEMINI_API_KEY`)
+  - [Claude CLI](https://github.com/anthropics/claude-code)
+  - [Gemini CLI](https://github.com/google-gemini/gemini-cli)
+  - API key (`ANTHROPIC_API_KEY` or `GEMINI_API_KEY`)

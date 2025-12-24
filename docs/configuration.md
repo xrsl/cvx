@@ -14,37 +14,37 @@ project: owner/1
 
 ## Settings
 
-| Key | Description | Default |
-|-----|-------------|---------|
-| `repo` | GitHub repository (owner/repo) | Auto-detected |
-| `agent` | AI agent to use | `claude` |
-| `schema` | Job schema file path | Built-in |
-| `cv_path` | CV file for advise/tailor | `src/cv.tex` |
-| `reference_path` | Reference materials directory | `reference/` |
-| `project` | GitHub Project (owner/number) | - |
+| Key              | Description                    | Default       |
+| ---------------- | ------------------------------ | ------------- |
+| `repo`           | GitHub repository (owner/repo) | Auto-detected |
+| `agent`          | AI agent to use                | `claude`      |
+| `schema`         | Job schema file path           | Built-in      |
+| `cv_path`        | CV file for advise/tailor      | `src/cv.tex`  |
+| `reference_path` | Reference materials directory  | `reference/`  |
+| `project`        | GitHub Project (owner/number)  | -             |
 
 ## AI Agents
 
 Priority order (first available is default):
 
-| Agent | Notes |
-|-------|-------|
-| `claude` | Uses Claude Code CLI |
-| `gemini` | Uses Gemini CLI |
-| `claude-sonnet-4` | Requires `ANTHROPIC_API_KEY` |
+| Agent               | Notes                        |
+| ------------------- | ---------------------------- |
+| `claude`            | Uses Claude Code CLI         |
+| `gemini`            | Uses Gemini CLI              |
+| `claude-sonnet-4`   | Requires `ANTHROPIC_API_KEY` |
 | `claude-sonnet-4-5` | Requires `ANTHROPIC_API_KEY` |
-| `claude-opus-4` | Requires `ANTHROPIC_API_KEY` |
-| `claude-opus-4-5` | Requires `ANTHROPIC_API_KEY` |
-| `gemini-2.5-flash` | Requires `GEMINI_API_KEY` |
-| `gemini-2.5-pro` | Requires `GEMINI_API_KEY` |
+| `claude-opus-4`     | Requires `ANTHROPIC_API_KEY` |
+| `claude-opus-4-5`   | Requires `ANTHROPIC_API_KEY` |
+| `gemini-2.5-flash`  | Requires `GEMINI_API_KEY`    |
+| `gemini-2.5-pro`    | Requires `GEMINI_API_KEY`    |
 
 ## Environment Variables
 
-| Variable | Description |
-|----------|-------------|
-| `ANTHROPIC_API_KEY` | For Claude API agents |
-| `GEMINI_API_KEY` | For Gemini API agents |
-| `CVX_*` | Override any config (e.g., `CVX_AGENT`) |
+| Variable            | Description                             |
+| ------------------- | --------------------------------------- |
+| `ANTHROPIC_API_KEY` | For Claude API agents                   |
+| `GEMINI_API_KEY`    | For Gemini API agents                   |
+| `CVX_*`             | Override any config (e.g., `CVX_AGENT`) |
 
 ## GitHub Project
 
@@ -82,11 +82,11 @@ cvx creates a project with:
 
 AI prompts in `.cvx/workflows/` can be edited:
 
-| File | Command | Purpose |
-|------|---------|---------|
-| `add.md` | `cvx add` | Job extraction prompt |
+| File        | Command      | Purpose               |
+| ----------- | ------------ | --------------------- |
+| `add.md`    | `cvx add`    | Job extraction prompt |
 | `advise.md` | `cvx advise` | Match analysis prompt |
-| `tailor.md` | `cvx tailor` | CV tailoring prompt |
+| `tailor.md` | `cvx tailor` | CV tailoring prompt   |
 
 **Template variables:**
 
