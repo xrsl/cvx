@@ -73,10 +73,9 @@ func TestSaveProject(t *testing.T) {
 	tmpDir := t.TempDir()
 	ResetForTest(tmpDir)
 
-	proj := ProjectConfig{
+	cache := ProjectCache{
 		ID:     "PVT_test123",
 		Number: 1,
-		Owner:  "testowner",
 		Title:  "Test Project",
 		Statuses: map[string]string{
 			"todo":    "abc123",
@@ -84,7 +83,7 @@ func TestSaveProject(t *testing.T) {
 		},
 	}
 
-	if err := SaveProject(proj); err != nil {
+	if err := SaveProject("testowner", 1, cache); err != nil {
 		t.Fatalf("SaveProject error: %v", err)
 	}
 
@@ -93,26 +92,29 @@ func TestSaveProject(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Load error: %v", err)
 	}
-	if c.Project.Number != 1 {
-		t.Errorf("Expected project number 1, got %d", c.Project.Number)
+	if c.ProjectNumber() != 1 {
+		t.Errorf("Expected project number 1, got %d", c.ProjectNumber())
 	}
-	if c.Project.Owner != "testowner" {
-		t.Errorf("Expected project owner 'testowner', got '%s'", c.Project.Owner)
+	if c.ProjectOwner() != "testowner" {
+		t.Errorf("Expected project owner 'testowner', got '%s'", c.ProjectOwner())
 	}
 
 	// Check full config with cache (includes internal IDs)
-	cFull, err := LoadWithCache()
+	_, projectCache, err := LoadWithCache()
 	if err != nil {
 		t.Fatalf("LoadWithCache error: %v", err)
 	}
-	if cFull.Project.ID != "PVT_test123" {
-		t.Errorf("Expected project ID 'PVT_test123', got '%s'", cFull.Project.ID)
+	if projectCache == nil {
+		t.Fatal("Expected project cache to be loaded, got nil")
 	}
-	if cFull.Project.Title != "Test Project" {
-		t.Errorf("Expected project title 'Test Project', got '%s'", cFull.Project.Title)
+	if projectCache.ID != "PVT_test123" {
+		t.Errorf("Expected project ID 'PVT_test123', got '%s'", projectCache.ID)
 	}
-	if len(cFull.Project.Statuses) != 2 {
-		t.Errorf("Expected 2 statuses, got %d", len(cFull.Project.Statuses))
+	if projectCache.Title != "Test Project" {
+		t.Errorf("Expected project title 'Test Project', got '%s'", projectCache.Title)
+	}
+	if len(projectCache.Statuses) != 2 {
+		t.Errorf("Expected 2 statuses, got %d", len(projectCache.Statuses))
 	}
 }
 
