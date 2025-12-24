@@ -65,7 +65,7 @@ cvx advise https://example.com/job
 
 ### `cvx tailor <issue>`
 
-Tailor CV and cover letter interactively. The AI edits your LaTeX source files directly, then you can build PDFs with your TeX distribution.
+Tailor CV and cover letter interactively. Automatically creates/switches to the issue branch (`42-company-role`), then starts an AI session to edit your LaTeX source files.
 
 ```bash
 cvx tailor 42                    # Start/resume tailoring session
@@ -85,7 +85,7 @@ cvx view 42 -l                   # Open cover letter
 cvx view 42 -c                   # Open CV only
 ```
 
-Opens the PDF from the git tag created when the application was submitted.
+Opens the PDF from the git tag. Tag format: `{issue}-{company}-{role}-{date}` (e.g., `42-saxo-bank-senior-data-scientist-2025-12-18`)
 
 ### `cvx rm <issue>`
 

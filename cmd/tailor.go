@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -74,6 +75,11 @@ func runTailor(cmd *cobra.Command, args []string) error {
 	// Override config agent for this run
 	cfg.Agent = agentSetting
 	agent := cfg.AgentCLI()
+
+	// Ensure we're on the correct branch
+	if err := ensureIssueBranch(cfg.Repo, issueNum); err != nil {
+		return err
+	}
 
 	// Use issue number as unified session key
 	sessionID, hasSession := getSession(issueNum)
@@ -157,4 +163,103 @@ func buildTailorPrompt(cfg *config.Config, issueBody string) (string, error) {
 	}
 
 	return fmt.Sprintf("%s\n\n## Job Posting\n%s", buf.String(), issueBody), nil
+}
+
+// ensureIssueBranch checks if we're on the correct branch for the issue,
+// and creates/switches to it if not
+func ensureIssueBranch(repo, issueNumber string) error {
+	// Get expected branch name
+	branchName, company, title, err := getIssueBranchName(repo, issueNumber)
+	if err != nil {
+		return err
+	}
+
+	// Check current branch
+	currentCmd := exec.Command("git", "branch", "--show-current")
+	output, err := currentCmd.Output()
+	if err != nil {
+		return fmt.Errorf("error getting current branch: %w", err)
+	}
+	currentBranch := strings.TrimSpace(string(output))
+
+	// Already on correct branch
+	if currentBranch == branchName {
+		fmt.Printf("On branch %s\n", branchName)
+		return nil
+	}
+
+	// Check if branch exists
+	checkCmd := exec.Command("git", "rev-parse", "--verify", branchName)
+	if err := checkCmd.Run(); err == nil {
+		// Branch exists, switch to it
+		gitCmd := exec.Command("git", "checkout", branchName)
+		if output, err := gitCmd.CombinedOutput(); err != nil {
+			return fmt.Errorf("error switching to branch: %w\n%s", err, string(output))
+		}
+		fmt.Printf("%sSwitched to branch '%s'%s\n", cGreen, branchName, cReset)
+	} else {
+		// Create new branch from main
+		gitCmd := exec.Command("git", "checkout", "-b", branchName, "main")
+		if output, err := gitCmd.CombinedOutput(); err != nil {
+			return fmt.Errorf("error creating branch: %w\n%s", err, string(output))
+		}
+		fmt.Printf("%sCreated branch '%s'%s\n", cGreen, branchName, cReset)
+	}
+
+	fmt.Printf("Issue #%s: %s at %s\n", issueNumber, title, company)
+	return nil
+}
+
+// getIssueBranchName fetches issue details and creates branch name
+func getIssueBranchName(repo, issueNumber string) (branchName, company, title string, err error) {
+	// Fetch issue details
+	ghCmd := exec.Command("gh", "issue", "view", issueNumber, "--repo", repo, "--json", "title,body")
+	output, execErr := ghCmd.Output()
+	if execErr != nil {
+		err = fmt.Errorf("error fetching issue #%s: %w", issueNumber, execErr)
+		return
+	}
+
+	var issue struct {
+		Title string `json:"title"`
+		Body  string `json:"body"`
+	}
+
+	if err = json.Unmarshal(output, &issue); err != nil {
+		err = fmt.Errorf("error parsing issue: %w", err)
+		return
+	}
+
+	// Extract company from body
+	company = extractCompany(issue.Body)
+	if company == "" {
+		err = fmt.Errorf("could not extract company name from issue")
+		return
+	}
+
+	// Create branch name: issue-number-company-role
+	branchName = fmt.Sprintf("%s-%s-%s",
+		issueNumber,
+		sanitizeBranchName(company),
+		sanitizeBranchName(issue.Title))
+
+	title = issue.Title
+	return
+}
+
+// sanitizeBranchName converts a string to a valid git branch name component
+func sanitizeBranchName(s string) string {
+	s = strings.ToLower(s)
+	s = strings.ReplaceAll(s, " ", "-")
+	s = strings.ReplaceAll(s, "/", "-")
+	s = strings.ReplaceAll(s, "\\", "-")
+	s = strings.ReplaceAll(s, ":", "-")
+	s = strings.ReplaceAll(s, ".", "-")
+
+	// Remove multiple consecutive hyphens
+	for strings.Contains(s, "--") {
+		s = strings.ReplaceAll(s, "--", "-")
+	}
+
+	return strings.Trim(s, "-")
 }

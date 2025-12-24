@@ -1,13 +1,14 @@
 # cvx
 
-CLI tool for tracking job applications using AI and GitHub.
+`cvx` uses AI to extract job details from any job posting URL, tracks your applications in GitHub Issues + Projects, and helps you tailor your CV and cover letter using LaTeX — all from your terminal.
 
 ## What it does
 
-- **Extract job details** from URLs using AI (Claude or Gemini)
-- **Create GitHub Issues** with structured job information
-- **Track in GitHub Projects** with status, company, and deadlines
-- **Analyze job-CV match** quality with AI agents
+- **Extracts job details** from URLs using AI agents (Claude Code or Gemini CLI)
+- **Creates GitHub Issues** with structured job information using a custimizable template (default `job-ad-schema.yaml`).
+- **Tracks applications in a GitHub Project** with status, company, and deadlines
+- **Analyzes job-CV match** quality with AI agents
+- **Tailors CV and cover letter** with AI agents by editing your LaTeX source files
 
 ## Quick Example
 
@@ -19,7 +20,7 @@ cvx init
 cvx add https://company.com/careers/software-engineer
 
 # Analyze match quality
-cvx advise 42
+cvx advise 42 -a gemini
 
 # Tailor CV for the job
 cvx tailor 42
@@ -28,10 +29,29 @@ cvx tailor 42
 cvx view 42
 ```
 
+## Branching and Tagging strategy
+
+`cvx` uses git branches for tailoring and git tags for archiving submitted applications:
+
+```bash
+# Tailor CV/letter (auto-creates branch 42-company-role)
+cvx tailor 42
+
+# Once user approves and tailor workflow creates git tag in the following format:
+git tag 42-company-role-2025-12-18
+
+# Later, view what you submitted (uses git tag 42-company-role-2025-12-18)
+cvx view 42
+```
+
+**Branch format**: `{issue}-{company}-{role}`
+
+**Tag format**: `{issue}-{company}-{role}-{application-date}`
+
+This keeps a permanent record of exactly what you sent to each company.
+
 ## Requirements
 
-- [GitHub CLI](https://cli.github.com/) (`gh`) - installed and authenticated
-- One of:
-  - [Claude CLI](https://github.com/anthropics/claude-code)
-  - [Gemini CLI](https://github.com/google-gemini/gemini-cli)
-  - API key (`ANTHROPIC_API_KEY` or `GEMINI_API_KEY`)
+- `git` and [GitHub CLI](https://cli.github.com/) (`gh`) - installed and authenticated
+- One of: [Claude Code CLI](https://github.com/anthropics/claude-code), [Gemini CLI](https://github.com/google-gemini/gemini-cli), or an API key (`ANTROPIC_API_KEY` or `GEMINI_API_KEY`).
+- LaTeX: [BasicTeX](https://tug.org/mactex/morepackages.html) (light, recommended for Mac), [MacTeX](https://tug.org/mactex/), or [TeX Live](https://tug.org/texlive/) - for building PDFs
