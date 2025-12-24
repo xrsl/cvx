@@ -25,14 +25,19 @@ based on the job posting. Resumes existing session if available.
 
 Examples:
   cvx tailor 42                    # Tailor for issue #42
+  cvx tailor 42 -a gemini          # Use Gemini CLI
   cvx tailor 42 -c "Emphasize Python"`,
 	Args: cobra.ExactArgs(1),
 	RunE: runTailor,
 }
 
-var tailorContextFlag string
+var (
+	tailorAgentFlag   string
+	tailorContextFlag string
+)
 
 func init() {
+	tailorCmd.Flags().StringVarP(&tailorAgentFlag, "agent", "a", "", "AI agent (overrides config)")
 	tailorCmd.Flags().StringVarP(&tailorContextFlag, "context", "c", "", "Additional context")
 	rootCmd.AddCommand(tailorCmd)
 }
@@ -45,13 +50,29 @@ func runTailor(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("config error: %w", err)
 	}
 
-	// Tailor requires CLI for interactive feedback loop
-	if !ai.IsAgentCLI(cfg.Agent) {
-		fmt.Printf("Note: tailor requires CLI agent for interactive feedback.\n")
-		fmt.Printf("Configure claude or gemini with 'cvx config set agent claude'\n")
-		return fmt.Errorf("tailor requires CLI agent")
+	// Resolve agent (flag > config > default)
+	agentSetting := tailorAgentFlag
+	if agentSetting == "" {
+		agentSetting = cfg.Agent
+	}
+	if agentSetting == "" {
+		agentSetting = ai.DefaultAgent()
 	}
 
+	// Validate agent
+	if !ai.IsAgentSupported(agentSetting) {
+		return fmt.Errorf("unsupported agent: %s (supported: %v)", agentSetting, ai.SupportedAgents())
+	}
+
+	// Tailor requires CLI for interactive feedback loop
+	if !ai.IsAgentCLI(agentSetting) {
+		fmt.Printf("Note: tailor requires CLI agent for interactive feedback.\n")
+		fmt.Printf("Use -a claude or -a gemini, or configure in .cvx-config.yaml\n")
+		return fmt.Errorf("tailor requires CLI agent (claude or gemini)")
+	}
+
+	// Override config agent for this run
+	cfg.Agent = agentSetting
 	agent := cfg.AgentCLI()
 
 	// Use issue number as unified session key

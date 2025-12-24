@@ -20,6 +20,7 @@ import (
 )
 
 var (
+	adviseAgentFlag       string
 	adviseContextFlag     string
 	adviseInteractiveFlag bool
 	advisePushFlag        bool
@@ -36,6 +37,7 @@ how well your CV matches the position.
 Examples:
   cvx advise 42                    # Analyze issue #42
   cvx advise 42 --push             # Analyze and post as comment
+  cvx advise 42 -a gemini          # Use Gemini CLI
   cvx advise https://example.com/job
   cvx advise 42 -c "Focus on backend"
   cvx advise 42 -i                 # Interactive session`,
@@ -44,6 +46,7 @@ Examples:
 }
 
 func init() {
+	adviseCmd.Flags().StringVarP(&adviseAgentFlag, "agent", "a", "", "AI agent (overrides config)")
 	adviseCmd.Flags().StringVarP(&adviseContextFlag, "context", "c", "", "Additional context for analysis")
 	adviseCmd.Flags().BoolVarP(&adviseInteractiveFlag, "interactive", "i", false, "Join session interactively")
 	adviseCmd.Flags().BoolVarP(&advisePushFlag, "push", "p", false, "Post analysis to GitHub issue")
@@ -58,6 +61,23 @@ func runAdvise(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("config error: %w", err)
 	}
+
+	// Resolve agent (flag > config > default)
+	agentSetting := adviseAgentFlag
+	if agentSetting == "" {
+		agentSetting = cfg.Agent
+	}
+	if agentSetting == "" {
+		agentSetting = ai.DefaultAgent()
+	}
+
+	// Validate agent
+	if !ai.IsAgentSupported(agentSetting) {
+		return fmt.Errorf("unsupported agent: %s (supported: %v)", agentSetting, ai.SupportedAgents())
+	}
+
+	// Override config agent for this run
+	cfg.Agent = agentSetting
 
 	// Get CLI agent name from agent setting
 	agent := cfg.AgentCLI()

@@ -1,6 +1,8 @@
 # cvx
 
-CLI tool for tracking job applications. Uses AI to extract job details and GitHub Issues + Projects for tracking.
+**Stop copying job descriptions into spreadsheets.** cvx uses AI to extract job details from any URL, tracks applications in GitHub Issues + Projects, and helps you tailor your CV and cover letter using LaTeX—all from the terminal.
+
+**Why cvx?** Job hunting is tedious. You find a posting, copy details, track it somewhere, customize your resume, write a cover letter... cvx automates the boring parts so you can focus on what matters: landing the interview.
 
 ## Install
 
@@ -56,16 +58,18 @@ Get career advice on job match quality.
 ```bash
 cvx advise 42                    # Analyze issue #42
 cvx advise 42 --push             # Post analysis as comment
+cvx advise 42 -a gemini          # Use Gemini CLI
 cvx advise 42 -i                 # Interactive session
 cvx advise https://example.com/job
 ```
 
 ### `cvx tailor <issue>`
 
-Tailor CV and cover letter interactively.
+Tailor CV and cover letter interactively. The AI edits your LaTeX source files directly, then you can build PDFs with your TeX distribution.
 
 ```bash
 cvx tailor 42                    # Start/resume tailoring session
+cvx tailor 42 -a gemini          # Use Gemini CLI
 cvx tailor 42 -c "Emphasize Python"
 ```
 
