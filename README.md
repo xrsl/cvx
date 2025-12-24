@@ -32,8 +32,10 @@ Fetches job posting, extracts details with AI, creates GitHub issue.
 
 ```bash
 cvx add https://company.com/job
-cvx add https://company.com/job --dry-run    # extract only
+cvx add https://company.com/job --dry-run     # extract only
 cvx add https://company.com/job -a gemini
+cvx add https://company.com/job --body        # use .cvx/body.md
+cvx add https://company.com/job -b job.md     # use custom file
 ```
 
 ### `cvx list`

@@ -55,6 +55,7 @@ Software engineer with 7+ years of experience building scalable web applications
 ## Career Goals
 
 Looking for opportunities to:
+
 - Lead technical projects with high impact
 - Work on challenging distributed systems problems
 - Contribute to engineering culture and best practices

@@ -24,6 +24,7 @@ var (
 	agentFlag  string
 	repoFlag   string
 	schemaFlag string
+	bodyFlag   string
 	dryRunFlag bool
 )
 
@@ -33,12 +34,14 @@ var addCmd = &cobra.Command{
 	Long: `Fetch job posting, extract details with AI, and create a GitHub issue.
 
 Fields are extracted based on schema (GitHub issue template YAML).
-If .cvx/body.md exists with content, uses that instead of fetching URL.
+Use --body to read job posting from a file instead of fetching URL.
 
 Examples:
   cvx add https://company.com/job
   cvx add https://company.com/job --dry-run
-  cvx add https://company.com/job -a gemini`,
+  cvx add https://company.com/job -a gemini
+  cvx add https://company.com/job --body        # use .cvx/body.md
+  cvx add https://company.com/job --body job.md # use custom file`,
 	Args: cobra.ExactArgs(1),
 	RunE: runAdd,
 }
@@ -47,6 +50,7 @@ func init() {
 	addCmd.Flags().StringVarP(&agentFlag, "agent", "a", "", "AI agent (overrides config)")
 	addCmd.Flags().StringVarP(&repoFlag, "repo", "r", "", "GitHub repo (overrides config)")
 	addCmd.Flags().StringVarP(&schemaFlag, "schema", "s", "", "Schema file (overrides config)")
+	addCmd.Flags().StringVarP(&bodyFlag, "body", "b", "", "Read job posting from file (default: .cvx/body.md)")
 	addCmd.Flags().BoolVar(&dryRunFlag, "dry-run", false, "Extract only, don't create issue")
 	rootCmd.AddCommand(addCmd)
 }
@@ -102,8 +106,17 @@ func runAdd(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("schema error: %w", err)
 	}
 
+	// Resolve body file path if flag was used
+	var bodyPath string
+	if cmd.Flags().Changed("body") {
+		bodyPath = bodyFlag
+		if bodyPath == "" {
+			bodyPath = ".cvx/body.md"
+		}
+	}
+
 	// Get job text
-	jobText, err := getJobText(url)
+	jobText, err := getJobText(url, bodyPath)
 	if err != nil {
 		return err
 	}
@@ -128,13 +141,17 @@ func runAdd(cmd *cobra.Command, args []string) error {
 	return createDynamicIssue(repo, sch, title, data)
 }
 
-func getJobText(url string) (string, error) {
-	// Check for .cvx/body.md fallback
-	bodyPath := ".cvx/body.md"
-	if content, err := os.ReadFile(bodyPath); err == nil && len(strings.TrimSpace(string(content))) > 0 {
+func getJobText(url, bodyPath string) (string, error) {
+	// Use body file if specified
+	if bodyPath != "" {
+		content, err := os.ReadFile(bodyPath)
+		if err != nil {
+			return "", fmt.Errorf("failed to read %s: %w", bodyPath, err)
+		}
+		if len(strings.TrimSpace(string(content))) == 0 {
+			return "", fmt.Errorf("%s is empty", bodyPath)
+		}
 		log("Using job posting from %s", bodyPath)
-		// Clear body.md to prevent stale data reuse
-		_ = os.WriteFile(bodyPath, []byte(""), 0644)
 		return string(content), nil
 	}
 
@@ -270,19 +287,23 @@ func addToProject(proj *config.ProjectCache, repo, issueURL string, data map[str
 		return fmt.Errorf("failed to add to project: %w", err)
 	}
 
+	fmt.Printf("%sAdded to project:%s %s\n", cGreen, cReset, proj.Title)
+
 	// Set Company field
-	if company, ok := data["company"].(string); ok && company != "" && proj.Fields.Company != "" {
+	company := ""
+	if c, ok := data["company"].(string); ok && c != "" && proj.Fields.Company != "" {
+		company = c
 		if err := client.SetTextField(proj.ID, itemID, proj.Fields.Company, company); err != nil {
 			log("Warning: Could not set company field: %v", err)
 		}
 	}
 
-	// Set Deadline field (default +7 days)
+	// Set Deadline field (default +7 days if not provided)
+	deadline := time.Now().AddDate(0, 0, 7).Format("2006-01-02")
+	if d, ok := data["deadline"].(string); ok && d != "" {
+		deadline = d
+	}
 	if proj.Fields.Deadline != "" {
-		deadline := time.Now().AddDate(0, 0, 7).Format("2006-01-02")
-		if d, ok := data["deadline"].(string); ok && d != "" {
-			deadline = d
-		}
 		if err := client.SetDateField(proj.ID, itemID, proj.Fields.Deadline, deadline); err != nil {
 			log("Warning: Could not set deadline field: %v", err)
 		}
@@ -297,6 +318,8 @@ func addToProject(proj *config.ProjectCache, repo, issueURL string, data map[str
 		}
 	}
 
-	log("Added to project")
+	// Print fields that were set
+	fmt.Printf("%sSet fields:%s company, deadline: %s\n", cGreen, cReset, deadline)
+
 	return nil
 }
