@@ -15,7 +15,6 @@ import (
 	"github.com/xrsl/cvx/pkg/style"
 )
 
-
 var (
 	listState    string
 	listLimit    int

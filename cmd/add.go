@@ -219,7 +219,6 @@ func extractWithSchema(ctx context.Context, agent string, sch *schema.Schema, ur
 	return data, nil
 }
 
-
 func printDynamicResult(title string, data map[string]any) {
 	company := data["company"]
 	location := data["location"]
