@@ -129,7 +129,9 @@ func runAdviseURL(cfg *config.Config, agent, url string) error {
 	// Save to file
 	filename := sanitizeFilename(url) + ".md"
 	matchPath := filepath.Join(".cvx", "matches", filename)
-	os.MkdirAll(filepath.Dir(matchPath), 0755)
+	if err := os.MkdirAll(filepath.Dir(matchPath), 0755); err != nil {
+		return fmt.Errorf("failed to create matches directory: %w", err)
+	}
 	if err := os.WriteFile(matchPath, []byte(result), 0644); err != nil {
 		fmt.Printf("Warning: Could not save analysis: %v\n", err)
 	} else {
@@ -336,7 +338,7 @@ func runAdviseInteractive(cfg *config.Config, agent, issueNum, sessionKey string
 	// Save session if new
 	if !hasSession {
 		if newSessionID := getMostRecentAgentSession(agent); newSessionID != "" {
-			saveSession(sessionKey, newSessionID)
+			_ = saveSession(sessionKey, newSessionID)
 		}
 	}
 
@@ -518,14 +520,14 @@ func cleanupSession(agent, sessionID string) {
 				continue
 			}
 			sessionFile := filepath.Join(historyDir, entry.Name(), sessionID+".json")
-			os.Remove(sessionFile)
+			_ = os.Remove(sessionFile)
 		}
 	} else {
 		// Claude session cleanup
 		wd, _ := os.Getwd()
 		slug := strings.ReplaceAll(wd, "/", "-")
 		sessionFile := filepath.Join(home, ".claude", "projects", slug, sessionID+".jsonl")
-		os.Remove(sessionFile)
+		_ = os.Remove(sessionFile)
 	}
 }
 

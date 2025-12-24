@@ -89,5 +89,5 @@ func (c *Client) GenerateContentWithSystem(ctx context.Context, systemPrompt, us
 }
 
 func (c *Client) Close() {
-	c.client.Close()
+	_ = c.client.Close()
 }

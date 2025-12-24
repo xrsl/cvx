@@ -196,7 +196,9 @@ var cacheFile = ".cvx/cache.yaml"
 
 func saveProjectCache(cache ProjectCache) error {
 	cacheDir := filepath.Dir(cacheFile)
-	os.MkdirAll(cacheDir, 0755)
+	if err := os.MkdirAll(cacheDir, 0755); err != nil {
+		return err
+	}
 	var buf bytes.Buffer
 	enc := yaml.NewEncoder(&buf)
 	enc.SetIndent(2)

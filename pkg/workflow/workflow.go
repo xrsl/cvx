@@ -97,7 +97,9 @@ func LoadAdd() (string, error) {
 
 // ResetWorkflows overwrites workflow files with defaults
 func ResetWorkflows() error {
-	os.MkdirAll(".cvx/workflows", 0755)
+	if err := os.MkdirAll(".cvx/workflows", 0755); err != nil {
+		return err
+	}
 	if err := os.WriteFile(AddPath, []byte(DefaultAdd), 0644); err != nil {
 		return err
 	}

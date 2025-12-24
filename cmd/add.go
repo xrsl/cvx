@@ -133,7 +133,7 @@ func getJobText(url string) (string, error) {
 	if content, err := os.ReadFile(bodyPath); err == nil && len(strings.TrimSpace(string(content))) > 0 {
 		log("Using job posting from %s", bodyPath)
 		// Clear body.md to prevent stale data reuse
-		os.WriteFile(bodyPath, []byte(""), 0644)
+		_ = os.WriteFile(bodyPath, []byte(""), 0644)
 		return string(content), nil
 	}
 
@@ -149,7 +149,7 @@ func getJobText(url string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("fetch failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("fetch failed: HTTP %d", resp.StatusCode)
@@ -251,7 +251,9 @@ func addToProject(proj *config.ProjectCache, repo, issueURL string, data map[str
 		return fmt.Errorf("could not extract issue number from URL")
 	}
 	issueNum := 0
-	fmt.Sscanf(matches[1], "%d", &issueNum)
+	if _, err := fmt.Sscanf(matches[1], "%d", &issueNum); err != nil {
+		return fmt.Errorf("failed to parse issue number: %w", err)
+	}
 
 	client := project.New(repo)
 

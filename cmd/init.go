@@ -57,8 +57,8 @@ func init() {
 func runInit(cmd *cobra.Command, args []string) error {
 	// Handle --delete flag
 	if initDeleteFlag {
-		os.RemoveAll(".cvx")
-		os.Remove(config.Path())
+		_ = os.RemoveAll(".cvx")
+		_ = os.Remove(config.Path())
 		fmt.Printf("%s✓%s Deleted\n", initGreen, initReset)
 		return nil
 	}
