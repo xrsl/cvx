@@ -17,7 +17,7 @@ builds:
       - amd64
       - arm64
     ldflags:
-      - -s -w -X cvx/cmd.Version={{.Version}}
+      - -s -w -X github.com/xrsl/cvx/cmd.Version={{.Version}}
 
 archives:
   - name_template: "{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}"
