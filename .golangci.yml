@@ -1,0 +1,17 @@
+linters:
+  enable:
+    - gofmt
+    - goimports
+    - govet
+    - errcheck
+    - staticcheck
+    - ineffassign
+    - unused
+    - misspell
+
+linters-settings:
+  goimports:
+    local-prefixes: cvx
+
+issues:
+  exclude-use-default: false

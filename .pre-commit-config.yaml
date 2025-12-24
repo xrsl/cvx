@@ -17,3 +17,9 @@ repos:
     - id: codespell
       args: ['--ignore-words-list=crate,resul,lene', '--skip=*.aux,*.log,*.out,*.fls,*.fdb_latexmk,build/*']
       files: \.(tex|md)$
+
+- repo: https://github.com/golangci/golangci-lint
+  rev: v1.62.2
+  hooks:
+    - id: golangci-lint
+      args: [--fast]
