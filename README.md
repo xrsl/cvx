@@ -7,23 +7,29 @@
 
 # cvx
 
-**Stop copying job descriptions into spreadsheets.** cvx uses AI to extract job details from any URL, tracks applications in GitHub Issues + Projects, and helps you tailor your CV and cover letter using LaTeX—all from the terminal.
+`cvx` uses AI to extract job details from any job posting URL, tracks your applications in GitHub Issues + Projects, and helps you tailor your CV and cover letter using LaTeX — all from your terminal.
 
-**Why cvx?** Job hunting is tedious. You find a posting, copy details, track it somewhere, customize your resume, write a cover letter... cvx automates the boring parts so you can focus on what matters: landing the interview.
+## What it does
 
-## Install
+- **Extracts job details** from URLs using AI agents (Claude Code or Gemini CLI)
+- **Creates GitHub Issues** with structured job information using a custimizable template (default `job-ad-schema.yaml`).
+- **Tracks applications in a GitHub Project** with status, company, and deadlines
+- **Analyzes job-CV match** quality with AI agents
+- **Tailors CV and cover letter** with AI agents by editing your LaTeX source files
+
+## Installation
 
 ```bash
 go install github.com/xrsl/cvx@latest
 ```
 
-**Requirements:**
+## Requirements
 
-- [GitHub CLI](https://cli.github.com/) (`gh`) - installed and authenticated
-- One of: [Claude CLI](https://github.com/anthropics/claude-code), [Gemini CLI](https://github.com/google-gemini/gemini-cli), or API key
+- `git` and [GitHub CLI](https://cli.github.com/) (`gh`) - installed and authenticated
+- One of: [Claude Code CLI](https://github.com/anthropics/claude-code), [Gemini CLI](https://github.com/google-gemini/gemini-cli), or an API key (`ANTROPIC_API_KEY` or `GEMINI_API_KEY`).
 - LaTeX: [BasicTeX](https://tug.org/mactex/morepackages.html) (light, recommended for Mac), [MacTeX](https://tug.org/mactex/), or [TeX Live](https://tug.org/texlive/) - for building PDFs
 
-## Quick Start
+## Quickstart
 
 ```bash
 cvx init                              # Setup wizard
