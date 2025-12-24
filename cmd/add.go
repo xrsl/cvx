@@ -207,8 +207,8 @@ const (
 )
 
 func printDynamicResult(title string, data map[string]any) {
-	company, _ := data["company"]
-	location, _ := data["location"]
+	company := data["company"]
+	location := data["location"]
 
 	fmt.Printf("\n%s%s%s", cGreen, title, cReset)
 	if company != nil {

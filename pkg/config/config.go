@@ -137,14 +137,6 @@ func Set(key, value string) error {
 	return writeConfig(cfg)
 }
 
-func save() error {
-	cfg, err := Load()
-	if err != nil {
-		cfg = &Config{}
-	}
-	return writeConfig(cfg)
-}
-
 func writeConfig(cfg *Config) error {
 	var buf bytes.Buffer
 	enc := yaml.NewEncoder(&buf)

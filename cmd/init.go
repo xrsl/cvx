@@ -180,7 +180,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 		fmt.Printf("%s✓%s\n\n", initGreen, initReset)
 		break
 	}
-	config.Set("repo", repo)
+	_ = config.Set("repo", repo)
 
 	// Step 2: AI Agent
 	agents := buildAgentList()
@@ -222,7 +222,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	config.Set("agent", selectedAgent)
+	_ = config.Set("agent", selectedAgent)
 	fmt.Printf("  Using %s%s%s\n\n", initCyan, selectedAgent, initReset)
 
 	// Step 3: CV path (for match command)
@@ -236,7 +236,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 	if input != "" {
 		cvPath = input
 	}
-	config.Set("cv_path", cvPath)
+	_ = config.Set("cv_path", cvPath)
 	fmt.Println()
 
 	// Step 4: Reference directory path
@@ -371,7 +371,7 @@ func saveProjectConfig(proj *project.ProjectInfo, fields map[string]project.Fiel
 		cache.Fields.AppliedDate = f.ID
 	}
 
-	config.SaveProject(owner, proj.Number, cache)
+	_ = config.SaveProject(owner, proj.Number, cache)
 }
 
 func inferRepo() string {

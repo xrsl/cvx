@@ -102,7 +102,7 @@ func runTailor(cmd *cobra.Command, args []string) error {
 	// Save session if new
 	if !hasSession {
 		if newSessionID := getMostRecentAgentSession(agent); newSessionID != "" {
-			saveSession(issueNum, newSessionID)
+			_ = saveSession(issueNum, newSessionID)
 			fmt.Printf("%sSession saved for issue #%s%s\n", cGreen, issueNum, cReset)
 		}
 	}
