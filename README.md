@@ -1,3 +1,10 @@
+[![Go](https://img.shields.io/badge/Go-1.23+-00ADD8?style=flat&logo=go&logoColor=white)](https://go.dev/)
+[![prek](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/j178/prek/master/docs/assets/badge-v0.json)](https://github.com/j178/prek)
+[![GitHub release](https://img.shields.io/github/v/release/xrsl/cvx?style=flat&color=blue)](https://github.com/xrsl/cvx/releases)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Claude](https://img.shields.io/badge/Claude-Powered-cc785c?style=flat&logo=anthropic&logoColor=white)](https://claude.ai)
+[![Gemini](https://img.shields.io/badge/Gemini-Powered-4285F4?style=flat&logo=google&logoColor=white)](https://gemini.google.com)
+
 # cvx
 
 **Stop copying job descriptions into spreadsheets.** cvx uses AI to extract job details from any URL, tracks applications in GitHub Issues + Projects, and helps you tailor your CV and cover letter using LaTeX—all from the terminal.

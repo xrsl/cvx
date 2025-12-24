@@ -1,3 +1,4 @@
 ## Rules for Claude Code
 
-- Follow rules @CONTRIBUTING.md
+- Run `make` to build and install the cli.
+- Run `prek run --all-files` to ensure linting passes.

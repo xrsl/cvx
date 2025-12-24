@@ -1,8 +1,4 @@
-# CVX CLI
-.cvx/
-.cvx-config.yaml
 .env
-ccusage.md
 
 # Go
 *.exe
