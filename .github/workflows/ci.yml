@@ -16,18 +16,11 @@ jobs:
         with:
           go-version: stable
 
-      # - name: Lint
-      #   uses: golangci/golangci-lint-action@v6
-      #   with:
-      #     install-mode: goinstall
-      #     version: v1.64.8
-      - name: golangci-lint
+      - name: Lint
         uses: golangci/golangci-lint-action@v6
         with:
-          # Explicitly pin the linter version
           version: v1.62
-          # Ensure it doesn't upgrade itself automatically
-          install-mode: binary
+          install-mode: goinstall
 
       - name: Build
         run: go build -v ./...
