@@ -46,9 +46,16 @@ cvx list
 ## Workflow
 
 ```
+cvx init                # Initialize project
 cvx add <url>           # Add job posting
-cvx list                # View all applications
 cvx advise <issue>      # Analyze job-CV match
 cvx tailor <issue>      # Tailor CV/cover letter
+cvx view <issue>        # View submitted documents
+```
+
+## Other Commands
+
+```
+cvx list                # View all applications
 cvx rm <issue>          # Remove application
 ```

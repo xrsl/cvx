@@ -2,6 +2,7 @@
 .cvx/
 .cvx-config.yaml
 .env
+ccusage.md
 
 # Go
 *.exe
@@ -27,3 +28,15 @@ Thumbs.db
 .venv/
 site/
 __pycache__/
+
+# LaTeX
+build/
+*.aux
+*.log
+*.out
+*.toc
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+*.bbl
+*.blg

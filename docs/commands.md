@@ -119,6 +119,31 @@ cvx tailor 42 -c "Emphasize Python"
 
 ---
 
+## cvx view
+
+View submitted application documents.
+
+```bash
+cvx view <issue> [flags]
+```
+
+| Flag       | Short | Description       |
+| ---------- | ----- | ----------------- |
+| `--letter` | `-l`  | Open cover letter |
+| `--cv`     | `-c`  | Open CV only      |
+
+Opens the PDF from the git tag created when the application was submitted. By default, opens the combined PDF (CV + letter) if available, otherwise falls back to CV.
+
+**Examples:**
+
+```bash
+cvx view 42                      # Open combined or CV
+cvx view 42 -l                   # Open cover letter
+cvx view 42 -c                   # Open CV only
+```
+
+---
+
 ## cvx rm
 
 Remove a job application.

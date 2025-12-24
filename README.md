@@ -12,24 +12,16 @@ go install github.com/xrsl/cvx@latest
 
 - [GitHub CLI](https://cli.github.com/) (`gh`) - installed and authenticated
 - One of: [Claude CLI](https://github.com/anthropics/claude-code), [Gemini CLI](https://github.com/google-gemini/gemini-cli), or API key
+- LaTeX: [BasicTeX](https://tug.org/mactex/morepackages.html) (light, recommended for Mac), [MacTeX](https://tug.org/mactex/), or [TeX Live](https://tug.org/texlive/) - for building PDFs
 
 ## Quick Start
 
 ```bash
-cvx init
-```
-
-This runs the setup wizard:
-
-- Links your GitHub repo
-- Selects AI agent
-- Sets CV and reference paths
-- Creates/links a GitHub Project with job-tracking statuses
-
-Then add jobs:
-
-```bash
-cvx add https://company.com/careers/role
+cvx init                              # Setup wizard
+cvx add https://company.com/job       # Add job posting
+cvx advise 42                         # Analyze job-CV match
+cvx tailor 42                         # Tailor CV/cover letter
+cvx view 42                           # View submitted documents
 ```
 
 ## Commands
@@ -76,6 +68,18 @@ cvx tailor 42 -c "Emphasize Python"
 ```
 
 Sessions are shared per issue - `advise` and `tailor` continue the same conversation.
+
+### `cvx view <issue>`
+
+View submitted application documents.
+
+```bash
+cvx view 42                      # Open combined or CV PDF
+cvx view 42 -l                   # Open cover letter
+cvx view 42 -c                   # Open CV only
+```
+
+Opens the PDF from the git tag created when the application was submitted.
 
 ### `cvx rm <issue>`
 

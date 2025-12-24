@@ -1,0 +1,48 @@
+\documentclass[11pt]{letter}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[sfdefault,light]{FiraSans}
+\usepackage{geometry}
+\usepackage{hyperref}
+\usepackage{xcolor}
+
+\geometry{
+  left=1in,
+  right=1in,
+  top=1in,
+  bottom=1in
+}
+
+\definecolor{links}{HTML}{1565C0}
+\hypersetup{
+  colorlinks=true,
+  urlcolor=links,
+}
+
+% Left-align signature
+\longindentation=0pt
+
+\signature{John Doe}
+\address{123 Main Street\\San Francisco, CA 94102\\john.doe@email.com\\+1 555 123 4567}
+
+\begin{document}
+
+\begin{letter}{Hiring Manager\\Company Name\\456 Business Ave\\City, State 12345}
+
+\opening{Dear Hiring Manager,}
+
+I am writing to express my strong interest in the Software Engineer position at your company. With over seven years of experience building scalable web applications and distributed systems, I am excited about the opportunity to contribute to your team.
+
+In my current role as Senior Software Engineer at Acme Tech Inc., I have led the development of microservices architecture serving over 2 million daily users. I have a proven track record of reducing API response times by 40\% through strategic caching and query optimization, and I have mentored a team of four junior developers through code reviews and pair programming sessions.
+
+My technical expertise spans both backend and frontend development. I am proficient in Go, Python, and TypeScript, and have extensive experience with cloud infrastructure on AWS. I am particularly passionate about system design, clean code practices, and building engineering teams that deliver high-quality software.
+
+I am drawn to your company's mission and the technical challenges you are solving. I believe my experience in building scalable systems and leading technical initiatives would make me a valuable addition to your team.
+
+Thank you for considering my application. I would welcome the opportunity to discuss how my skills and experience align with your needs. I am available for an interview at your convenience.
+
+\closing{Sincerely,}
+
+\end{letter}
+
+\end{document}

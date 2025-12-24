@@ -23,6 +23,9 @@ cvx advise 42
 
 # Tailor CV for the job
 cvx tailor 42
+
+# View submitted documents
+cvx view 42
 ```
 
 ## Requirements

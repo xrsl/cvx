@@ -1,0 +1,130 @@
+\documentclass[letterpaper,12pt]{article}
+
+% Import custom style
+\usepackage{cv-style}
+
+\begin{document}
+
+%================================================================================================================
+% HEADER
+%================================================================================================================
+
+\begin{paracol}{2}
+
+% Left column - Sidebar
+\begin{leftcolumn}
+\vspace{20pt}
+
+% Name
+{\fontsize{24pt}{28pt}\selectfont\textbf{\fullname}}
+
+\vspace{15pt}
+
+% Contact info
+\sidebarSection{Contact}
+
+\sidebarItem{Email}{\email}
+\sidebarItem{Phone}{\phone}
+\sidebarItem{LinkedIn}{\linkedin}
+\sidebarItem{GitHub}{\github}
+
+% Skills
+\sidebarSection{Skills}
+
+\sidebarItem{Languages}{Python, Go, JavaScript, TypeScript, SQL}
+\sidebarItem{Frameworks}{React, Node.js, FastAPI, Django}
+\sidebarItem{Cloud}{AWS, GCP, Docker, Kubernetes}
+\sidebarItem{Data}{PostgreSQL, Redis, MongoDB}
+\sidebarItem{Tools}{Git, CI/CD, Terraform}
+
+% Languages
+\sidebarSection{Languages}
+
+\sidebarItem{English}{Native}
+\sidebarItem{Spanish}{Professional}
+
+\end{leftcolumn}
+
+% Right column - Main content
+\begin{rightcolumn}
+\vspace{20pt}
+
+%================================================================================================================
+% EXPERIENCE
+%================================================================================================================
+
+\mainSection{\faBriefcase}{Experience}
+
+\resumeEntryStart
+  \resumeEntryTSDL
+    {Acme Tech Inc.}{Jan. 2022 -- Present}
+    {Senior Software Engineer}{San Francisco, CA}
+  \resumeItemListStart
+    \resumeItem{Led development of microservices architecture serving 2M+ daily users}
+    \resumeItem{Reduced API response times by 40\% through caching and query optimization}
+    \resumeItem{Mentored team of 4 junior developers, conducting code reviews and pair programming}
+    \resumeItem{Implemented CI/CD pipelines reducing deployment time from hours to minutes}
+  \resumeItemListEnd
+\resumeEntryEnd
+
+\resumeEntryStart
+  \resumeEntryTSDL
+    {StartupCo}{Jun. 2019 -- Dec. 2021}
+    {Software Engineer}{New York, NY}
+  \resumeItemListStart
+    \resumeItem{Built real-time data processing pipeline handling 100K+ events/second}
+    \resumeItem{Developed React frontend with TypeScript, improving test coverage to 85\%}
+    \resumeItem{Designed RESTful APIs and GraphQL endpoints for mobile and web clients}
+    \resumeItem{Collaborated with product team to define technical requirements and roadmap}
+  \resumeItemListEnd
+\resumeEntryEnd
+
+\resumeEntryStart
+  \resumeEntryTSDL
+    {Tech Solutions Ltd.}{Aug. 2017 -- May 2019}
+    {Junior Developer}{Boston, MA}
+  \resumeItemListStart
+    \resumeItem{Developed and maintained Python automation scripts for data processing}
+    \resumeItem{Created internal dashboards using Django and PostgreSQL}
+    \resumeItem{Participated in agile ceremonies and contributed to sprint planning}
+  \resumeItemListEnd
+\resumeEntryEnd
+
+%================================================================================================================
+% EDUCATION
+%================================================================================================================
+
+\mainSection{\faGraduationCap}{Education}
+
+\resumeEntryStart
+  \resumeEntryTSDL
+    {Massachusetts Institute of Technology}{Sep. 2013 -- May 2017}
+    {B.S. Computer Science}{Cambridge, MA}
+  \resumeItemListStart
+    \resumeItem{GPA: 3.8/4.0, Dean's List}
+    \resumeItem{Relevant coursework: Algorithms, Distributed Systems, Machine Learning}
+    \resumeItem{Senior thesis: Scalable real-time recommendation systems}
+  \resumeItemListEnd
+\resumeEntryEnd
+
+%================================================================================================================
+% PROJECTS
+%================================================================================================================
+
+\mainSection{\faCode}{Projects}
+
+\entry{Open Source Contributions}{2020 -- Present}{
+  \resumeItem{Core contributor to popular Python web framework (500+ GitHub stars)}
+  \resumeItem{Authored technical blog posts on system design and best practices}
+}
+
+\entry{Personal Finance App}{2021}{
+  \resumeItem{Built full-stack budgeting application with React Native and Node.js}
+  \resumeItem{Integrated with banking APIs for automatic transaction categorization}
+}
+
+\end{rightcolumn}
+
+\end{paracol}
+
+\end{document}
