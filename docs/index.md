@@ -19,10 +19,10 @@ cvx init
 cvx add https://company.com/careers/software-engineer
 
 # Analyze match quality
-cvx match 42
+cvx advise 42
 
-# Update status
-cvx status 42 applied
+# Tailor CV for the job
+cvx tailor 42
 ```
 
 ## Requirements

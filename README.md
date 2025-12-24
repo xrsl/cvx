@@ -15,13 +15,14 @@ go install github.com/xrsl/cvx@latest
 ## Quick Start
 
 ```bash
-cvx config
+cvx init
 ```
 
 This runs the setup wizard:
 - Links your GitHub repo
 - Selects AI agent
-- Creates a GitHub Project with job-tracking statuses
+- Sets CV and reference paths
+- Creates/links a GitHub Project with job-tracking statuses
 
 Then add jobs:
 
@@ -47,6 +48,8 @@ Lists all job applications with status, company, and deadline.
 
 ```bash
 cvx list
+cvx list --state closed   # show closed issues
+cvx list --company google # filter by company
 cvx list -r owner/repo    # specific repo
 ```
 
@@ -80,15 +83,16 @@ Deletes an issue.
 cvx rm 42
 ```
 
-### `cvx config`
+### `cvx init`
 
-Interactive setup wizard. Also supports direct access:
+Interactive setup wizard.
 
 ```bash
-cvx config              # wizard
-cvx config list         # show all settings
-cvx config get agent    # get value
-cvx config set agent gemini
+cvx init                # interactive wizard
+cvx init -q             # quiet mode with defaults
+cvx init -r             # reset workflows to defaults
+cvx init -c             # validate config resources
+cvx init -d             # delete .cvx/ and config
 ```
 
 ## AI Agents
@@ -142,3 +146,17 @@ project: owner/1
 The `reference_path` directory should contain your experience documentation, guidelines, and other reference materials used by `advise` and `tailor` commands.
 
 Internal project IDs are cached in `.cvx/cache.yaml` (auto-managed).
+
+## Customizing Workflows
+
+AI prompts are stored in `.cvx/workflows/` and can be customized:
+
+| File | Used by |
+|------|---------|
+| `add.md` | `cvx add` - job extraction prompt |
+| `advise.md` | `cvx advise` - match analysis prompt |
+| `tailor.md` | `cvx tailor` - CV tailoring prompt |
+
+Template variables available: `{{.CVPath}}`, `{{.ReferencePath}}`
+
+Reset to defaults with `cvx init -r`.

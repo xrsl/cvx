@@ -73,7 +73,24 @@ cvx creates a project with:
 .cvx-config.yaml      # User config
 .cvx/
   cache.yaml          # Internal IDs (auto-managed)
-  workflows/          # Workflow definitions
+  workflows/          # Workflow definitions (customizable)
   sessions/           # Agent session files
   matches/            # Match analysis outputs
 ```
+
+## Customizing Workflows
+
+AI prompts in `.cvx/workflows/` can be edited:
+
+| File | Command | Purpose |
+|------|---------|---------|
+| `add.md` | `cvx add` | Job extraction prompt |
+| `advise.md` | `cvx advise` | Match analysis prompt |
+| `tailor.md` | `cvx tailor` | CV tailoring prompt |
+
+**Template variables:**
+
+- `{{.CVPath}}` - Path to CV file
+- `{{.ReferencePath}}` - Path to reference directory
+
+Reset to defaults: `cvx init -r`

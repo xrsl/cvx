@@ -5,8 +5,15 @@
 Initialize cvx for the current repository.
 
 ```bash
-cvx init
+cvx init [flags]
 ```
+
+| Flag | Short | Description |
+|------|-------|-------------|
+| `--quiet` | `-q` | Non-interactive with defaults |
+| `--reset-workflows` | `-r` | Reset workflows to defaults |
+| `--check` | `-c` | Validate config resources exist |
+| `--delete` | `-d` | Remove .cvx/ and config file |
 
 Creates `.cvx-config.yaml` and `.cvx/` directory structure.
 
@@ -49,7 +56,18 @@ cvx list [flags]
 
 | Flag | Short | Description |
 |------|-------|-------------|
+| `--state` | | Issue state (open\|closed\|all) |
+| `--limit` | | Max issues to list (default 50) |
+| `--company` | | Filter by company name |
 | `--repo` | `-r` | GitHub repo (overrides config) |
+
+**Examples:**
+
+```bash
+cvx list
+cvx list --state closed
+cvx list --company google
+```
 
 ---
 
@@ -106,5 +124,16 @@ cvx tailor 42 -c "Emphasize Python"
 Remove a job application.
 
 ```bash
-cvx rm <issue>
+cvx rm <issue> [flags]
+```
+
+| Flag | Short | Description |
+|------|-------|-------------|
+| `--repo` | `-r` | GitHub repo (overrides config) |
+
+**Examples:**
+
+```bash
+cvx rm 123
+cvx rm 123 -r owner/repo
 ```

@@ -48,7 +48,7 @@ cvx list
 ```
 cvx add <url>           # Add job posting
 cvx list                # View all applications
-cvx match <issue>       # Analyze job-CV match
-cvx status <issue> applied  # Update status
+cvx advise <issue>      # Analyze job-CV match
+cvx tailor <issue>      # Tailor CV/cover letter
 cvx rm <issue>          # Remove application
 ```

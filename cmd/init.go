@@ -324,7 +324,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 
 	fmt.Printf("%s%sReady!%s\n", initBold, initGreen, initReset)
 	fmt.Printf("  %scvx add <job-url>%s    Add a job posting\n", initCyan, initReset)
-	fmt.Printf("  %scvx match <issue>%s    Analyze job match\n\n", initCyan, initReset)
+	fmt.Printf("  %scvx advise <issue>%s   Analyze job match\n\n", initCyan, initReset)
 	return nil
 }
 
