@@ -12,16 +12,9 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/xrsl/cvx/pkg/config"
+	"github.com/xrsl/cvx/pkg/style"
 )
 
-const (
-	colorReset  = "\033[0m"
-	colorRed    = "\033[0;31m"
-	colorYellow = "\033[1;33m"
-	colorGreen  = "\033[0;32m"
-	colorCyan   = "\033[0;36m"
-	colorBold   = "\033[1m"
-)
 
 var (
 	listState    string
@@ -237,10 +230,10 @@ func runList(cmd *cobra.Command, args []string) error {
 	})
 
 	// Print table header
-	fmt.Printf("%s%sIssue | %-35s | %-25s | %-12s | Days%s\n", colorBold, colorCyan, "Role", "Company", "Deadline", colorReset)
-	fmt.Printf("%s", colorCyan)
+	fmt.Printf("%s%sIssue | %-35s | %-25s | %-12s | Days%s\n", style.Bold, style.Cyan, "Role", "Company", "Deadline", style.Reset)
+	fmt.Printf("%s", style.Cyan)
 	fmt.Printf("------+-------------------------------------+---------------------------+--------------+-----\n")
-	fmt.Printf("%s", colorReset)
+	fmt.Printf("%s", style.Reset)
 
 	// Print table rows
 	for _, issue := range issues {
@@ -262,27 +255,27 @@ func runList(cmd *cobra.Command, args []string) error {
 		daysStr := fmt.Sprintf("%d", issue.Days)
 		if issue.Deadline == "No deadline" {
 			daysStr = "-"
-			daysColor = colorReset
+			daysColor = style.Reset
 		} else if issue.Days < 0 {
-			daysColor = colorRed
+			daysColor = style.Red
 		} else if issue.Days <= 3 {
-			daysColor = colorRed
+			daysColor = style.Red
 		} else if issue.Days <= 7 {
-			daysColor = colorYellow
+			daysColor = style.Yellow
 		} else {
-			daysColor = colorGreen
+			daysColor = style.Green
 		}
 
 		// Make issue number clickable
 		issueNumStr := fmt.Sprintf("#%d", issue.Number)
-		clickableIssueNum := fmt.Sprintf("\x1b]8;;%s\x1b\\%s%s%s\x1b]8;;\x1b\\", issueURL, colorCyan, issueNumStr, colorReset)
+		clickableIssueNum := fmt.Sprintf("\x1b]8;;%s\x1b\\%s%s%s\x1b]8;;\x1b\\", issueURL, style.Cyan, issueNumStr, style.Reset)
 		padding := 5 - len(issueNumStr)
 
 		fmt.Printf("%s%s | %-35s | %-25s | %s%-12s | %4s%s\n",
 			clickableIssueNum, strings.Repeat(" ", padding),
 			title,
 			company,
-			daysColor, issue.Deadline, daysStr, colorReset)
+			daysColor, issue.Deadline, daysStr, style.Reset)
 	}
 
 	return nil

@@ -10,6 +10,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/xrsl/cvx/pkg/config"
+	"github.com/xrsl/cvx/pkg/style"
 )
 
 var (
@@ -137,14 +138,14 @@ func runView(cmd *cobra.Command, args []string) error {
 
 	// Print formatted message
 	if company != "" {
-		fmt.Printf("Opened %s submitted to %s%s%s for %s%s%s\n",
+		fmt.Printf("Opened %s submitted to %s for %s\n",
 			docType,
-			cCyan, company, cReset,
-			cGreen, issue.Title, cReset)
+			style.C(style.Cyan, company),
+			style.C(style.Green, issue.Title))
 	} else {
-		fmt.Printf("Opened %s submitted for %s%s%s\n",
+		fmt.Printf("Opened %s submitted for %s\n",
 			docType,
-			cGreen, issue.Title, cReset)
+			style.C(style.Green, issue.Title))
 	}
 
 	return nil

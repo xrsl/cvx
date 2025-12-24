@@ -16,6 +16,7 @@ import (
 
 	"github.com/xrsl/cvx/pkg/ai"
 	"github.com/xrsl/cvx/pkg/config"
+	"github.com/xrsl/cvx/pkg/style"
 	"github.com/xrsl/cvx/pkg/workflow"
 )
 
@@ -156,7 +157,7 @@ func runAdviseURL(cfg *config.Config, agent, url string) error {
 	if err := os.WriteFile(matchPath, []byte(result), 0644); err != nil {
 		fmt.Printf("Warning: Could not save analysis: %v\n", err)
 	} else {
-		fmt.Printf("\n%sAnalysis saved to %s%s\n", cGreen, matchPath, cReset)
+		fmt.Printf("\n%s%s\n", style.Success("Analysis saved to"), matchPath)
 	}
 
 	return nil
@@ -215,7 +216,7 @@ func runAdviseIssue(cfg *config.Config, agent, issueNum string) error {
 		if output, err := ghCmd.CombinedOutput(); err != nil {
 			return fmt.Errorf("error posting comment: %w\nOutput: %s", err, string(output))
 		}
-		fmt.Printf("%sAnalysis posted as comment to issue #%s%s\n", cGreen, issueNum, cReset)
+		fmt.Printf("%sissue #%s\n", style.Success("Analysis posted as comment to"), issueNum)
 		return nil
 	}
 
@@ -288,8 +289,8 @@ func runAdviseAnalysis(cfg *config.Config, agent, issueNum, sessionKey string, h
 			if err := saveSession(sessionKey, newSessionID); err != nil {
 				fmt.Printf("Warning: Could not save session: %v\n", err)
 			} else {
-				fmt.Printf("%sSession saved. Use 'cvx advise %s -c \"context\"' or 'cvx advise %s -i' to continue.%s\n",
-					cGreen, issueNum, issueNum, cReset)
+				fmt.Printf("%sUse 'cvx advise %s -c \"context\"' or 'cvx advise %s -i' to continue.\n",
+					style.Success("Session saved."), issueNum, issueNum)
 			}
 		}
 	}
@@ -300,7 +301,7 @@ func runAdviseAnalysis(cfg *config.Config, agent, issueNum, sessionKey string, h
 	if err := os.WriteFile(matchPath, []byte(result), 0644); err != nil {
 		fmt.Printf("Warning: Could not save analysis: %v\n", err)
 	} else {
-		fmt.Printf("%sAnalysis saved to %s%s\n", cGreen, matchPath, cReset)
+		fmt.Printf("%s%s\n", style.Success("Analysis saved to"), matchPath)
 	}
 
 	fmt.Println("\nMatch Analysis:")
@@ -590,7 +591,7 @@ func runAgentWithSpinner(agent string, args []string, message string) ([]byte, e
 				fmt.Fprintf(os.Stderr, "\r\033[K")
 				return
 			default:
-				fmt.Fprintf(os.Stderr, "\r%s%s%s %s", cCyan, spinnerFrames[i%len(spinnerFrames)], cReset, message)
+				fmt.Fprintf(os.Stderr, "\r%s %s", style.C(style.Cyan, spinnerFrames[i%len(spinnerFrames)]), message)
 				time.Sleep(80 * time.Millisecond)
 				i++
 			}

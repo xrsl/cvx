@@ -14,15 +14,8 @@ import (
 	"github.com/xrsl/cvx/pkg/ai"
 	"github.com/xrsl/cvx/pkg/config"
 	"github.com/xrsl/cvx/pkg/project"
+	"github.com/xrsl/cvx/pkg/style"
 	"github.com/xrsl/cvx/pkg/workflow"
-)
-
-const (
-	initReset = "\033[0m"
-	initGreen = "\033[0;32m"
-	initCyan  = "\033[0;36m"
-	initGray  = "\033[90m"
-	initBold  = "\033[1m"
 )
 
 var initCmd = &cobra.Command{
@@ -60,7 +53,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 	if initDeleteFlag {
 		_ = os.RemoveAll(".cvx")
 		_ = os.Remove(config.Path())
-		fmt.Printf("%s✓%s Deleted\n", initGreen, initReset)
+		fmt.Printf("%s Deleted\n", style.C(style.Green, "✓"))
 		return nil
 	}
 
@@ -81,7 +74,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 		if err := workflow.ResetWorkflows(); err != nil {
 			return fmt.Errorf("failed to reset workflows: %w", err)
 		}
-		fmt.Printf("%s✓%s Workflows reset to defaults\n", initGreen, initReset)
+		fmt.Printf("%s Workflows reset to defaults\n", style.C(style.Green, "✓"))
 		return nil
 	}
 
@@ -110,7 +103,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 		if err := workflow.Init(workflow.DefaultSchemaPath); err != nil {
 			return fmt.Errorf("failed to init workflows: %w", err)
 		}
-		fmt.Printf("%s✓%s Initialized with defaults\n", initGreen, initReset)
+		fmt.Printf("%s Initialized with defaults\n", style.C(style.Green, "✓"))
 		return nil
 	}
 
@@ -119,8 +112,8 @@ func runInit(cmd *cobra.Command, args []string) error {
 	_, cvxDirExists := os.Stat(".cvx")
 
 	if configExists == nil && cvxDirExists == nil {
-		fmt.Printf("%s✓%s Already initialized\n", initGreen, initReset)
-		fmt.Printf("  Config: %s%s%s\n\n", initGray, config.Path(), initReset)
+		fmt.Printf("%s Already initialized\n", style.C(style.Green, "✓"))
+		fmt.Printf("  Config: %s\n\n", style.C(style.Gray, config.Path()))
 
 		// Ensure workflow files are up to date
 		cfg, _ := config.Load()
@@ -136,7 +129,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 
 	cfg, _ := config.Load()
 
-	fmt.Printf("\n%sPress Enter to accept defaults shown in brackets.%s\n\n", initGray, initReset)
+	fmt.Printf("\n%s\n\n", style.C(style.Gray, "Press Enter to accept defaults shown in brackets."))
 
 	// Step 1: Repository
 	repo := cfg.Repo
@@ -144,11 +137,11 @@ func runInit(cmd *cobra.Command, args []string) error {
 		repo = inferRepo()
 	}
 	for {
-		fmt.Printf("%s?%s Repository ", initGreen, initReset)
+		fmt.Printf("%s Repository ", style.C(style.Green, "?"))
 		if repo != "" {
-			fmt.Printf("%s[%s]%s: ", initCyan, repo, initReset)
+			fmt.Printf("%s: ", style.C(style.Cyan, "["+repo+"]"))
 		} else {
-			fmt.Printf("%s[owner/repo]%s: ", initCyan, initReset)
+			fmt.Printf("%s: ", style.C(style.Cyan, "[owner/repo]"))
 		}
 
 		input, _ := reader.ReadString('\n')
@@ -178,7 +171,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 			repo = cfg.Repo
 			continue
 		}
-		fmt.Printf("%s✓%s\n\n", initGreen, initReset)
+		fmt.Printf("%s\n\n", style.C(style.Green, "✓"))
 		break
 	}
 	_ = config.Set("repo", repo)
@@ -199,19 +192,19 @@ func runInit(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	fmt.Printf("%s?%s AI Agent\n", initGreen, initReset)
+	fmt.Printf("%s AI Agent\n", style.C(style.Green, "?"))
 	for i, a := range agents {
 		marker := "   "
 		if i == currentIdx {
-			marker = fmt.Sprintf("  %s→%s", initGreen, initReset)
+			marker = "  " + style.C(style.Green, "→")
 		}
-		fmt.Printf("%s%s%d)%s %s", marker, initCyan, i+1, initReset, a.name)
+		fmt.Printf("%s%s %s", marker, style.C(style.Cyan, fmt.Sprintf("%d)", i+1)), a.name)
 		if a.note != "" {
-			fmt.Printf(" %s(%s)%s", initGray, a.note, initReset)
+			fmt.Printf(" %s", style.C(style.Gray, "("+a.note+")"))
 		}
 		fmt.Println()
 	}
-	fmt.Printf("\n  Choice %s[%d]%s: ", initCyan, currentIdx+1, initReset)
+	fmt.Printf("\n  Choice %s: ", style.C(style.Cyan, fmt.Sprintf("[%d]", currentIdx+1)))
 
 	input, _ := reader.ReadString('\n')
 	input = strings.TrimSpace(input)
@@ -224,14 +217,14 @@ func runInit(cmd *cobra.Command, args []string) error {
 	}
 
 	_ = config.Set("agent", selectedAgent)
-	fmt.Printf("  Using %s%s%s\n\n", initCyan, selectedAgent, initReset)
+	fmt.Printf("  Using %s\n\n", style.C(style.Cyan, selectedAgent))
 
 	// Step 3: CV path (for match command)
 	cvPath := cfg.CVPath
 	if cvPath == "" {
 		cvPath = "src/cv.tex"
 	}
-	fmt.Printf("%s?%s CV file path %s[%s]%s: ", initGreen, initReset, initCyan, cvPath, initReset)
+	fmt.Printf("%s CV file path %s: ", style.C(style.Green, "?"), style.C(style.Cyan, "["+cvPath+"]"))
 	input, _ = reader.ReadString('\n')
 	input = strings.TrimSpace(input)
 	if input != "" {
@@ -245,7 +238,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 	if refPath == "" {
 		refPath = "reference/"
 	}
-	fmt.Printf("%s?%s Reference directory %s[%s]%s: ", initGreen, initReset, initCyan, refPath, initReset)
+	fmt.Printf("%s Reference directory %s: ", style.C(style.Green, "?"), style.C(style.Cyan, "["+refPath+"]"))
 	input, _ = reader.ReadString('\n')
 	input = strings.TrimSpace(input)
 	if input != "" {
@@ -259,7 +252,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 	if schemaPath == "" {
 		schemaPath = workflow.DefaultSchemaPath
 	}
-	fmt.Printf("%s?%s Job ad schema (i.e., issue template) path %s[%s]%s: ", initGreen, initReset, initCyan, schemaPath, initReset)
+	fmt.Printf("%s Job ad schema (issue template) path %s: ", style.C(style.Green, "?"), style.C(style.Cyan, "["+schemaPath+"]"))
 	input, _ = reader.ReadString('\n')
 	input = strings.TrimSpace(input)
 	if input != "" {
@@ -270,7 +263,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 
 	// Step 6: GitHub Project
 	if cfg.Project == "" {
-		fmt.Printf("%s?%s GitHub Project %s(number to use existing, 'new' to create, enter to skip)%s: ", initGreen, initReset, initCyan, initReset)
+		fmt.Printf("%s GitHub Project %s: ", style.C(style.Green, "?"), style.C(style.Cyan, "(number to use existing, 'new' to create, enter to skip)"))
 		input, _ := reader.ReadString('\n')
 		input = strings.TrimSpace(strings.ToLower(input))
 
@@ -280,9 +273,9 @@ func runInit(cmd *cobra.Command, args []string) error {
 			fmt.Printf("Creating project... ")
 			proj, fields, err := client.Create("Job Applications", nil)
 			if err != nil {
-				fmt.Printf("\n  %sFailed:%s %v\n", initCyan, initReset, err)
+				fmt.Printf("\n  %s %v\n", style.C(style.Cyan, "Failed:"), err)
 			} else {
-				fmt.Printf("%s✓%s\n", initGreen, initReset)
+				fmt.Printf("%s\n", style.C(style.Green, "✓"))
 				saveProjectConfig(proj, fields, repo)
 				fmt.Printf("  Project #%d created\n", proj.Number)
 			}
@@ -290,7 +283,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 			fmt.Printf("Linking project #%d... ", projNum)
 			projects, err := client.ListProjects()
 			if err != nil {
-				fmt.Printf("\n  %sFailed:%s %v\n", initCyan, initReset, err)
+				fmt.Printf("\n  %s %v\n", style.C(style.Cyan, "Failed:"), err)
 			} else {
 				var found *project.ProjectInfo
 				for _, p := range projects {
@@ -300,13 +293,13 @@ func runInit(cmd *cobra.Command, args []string) error {
 					}
 				}
 				if found == nil {
-					fmt.Printf("\n  %sNot found:%s Project #%d doesn't exist\n", initCyan, initReset, projNum)
+					fmt.Printf("\n  %s Project #%d doesn't exist\n", style.C(style.Cyan, "Not found:"), projNum)
 				} else {
 					fields, err := client.DiscoverFields(found.ID)
 					if err != nil {
-						fmt.Printf("\n  %sFailed:%s %v\n", initCyan, initReset, err)
+						fmt.Printf("\n  %s %v\n", style.C(style.Cyan, "Failed:"), err)
 					} else {
-						fmt.Printf("%s✓%s\n", initGreen, initReset)
+						fmt.Printf("%s\n", style.C(style.Green, "✓"))
 						saveProjectConfig(found, fields, repo)
 						fmt.Printf("  Linked to \"%s\"\n", found.Title)
 					}
@@ -315,7 +308,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 		}
 		fmt.Println()
 	} else {
-		fmt.Printf("%s✓%s GitHub Project %s linked\n\n", initGreen, initReset, cfg.Project)
+		fmt.Printf("%s GitHub Project %s linked\n\n", style.C(style.Green, "✓"), cfg.Project)
 	}
 
 	// Initialize .cvx directory structure
@@ -323,9 +316,9 @@ func runInit(cmd *cobra.Command, args []string) error {
 		fmt.Printf("  Warning: Could not initialize .cvx/ directory: %v\n", err)
 	}
 
-	fmt.Printf("%s%sReady!%s\n", initBold, initGreen, initReset)
-	fmt.Printf("  %scvx add <job-url>%s    Add a job posting\n", initCyan, initReset)
-	fmt.Printf("  %scvx advise <issue>%s   Analyze job match\n\n", initCyan, initReset)
+	fmt.Printf("%s\n", style.C(style.Green, style.Bold+"Ready!"))
+	fmt.Printf("  %s    Add a job posting\n", style.C(style.Cyan, "cvx add <job-url>"))
+	fmt.Printf("  %s   Analyze job match\n\n", style.C(style.Cyan, "cvx advise <issue>"))
 	return nil
 }
 
@@ -443,7 +436,7 @@ func buildAgentList() []agentOption {
 
 func validateConfig(cfg *config.Config) {
 	warn := func(msg string) {
-		fmt.Printf("  %sWarning:%s %s\n", initCyan, initReset, msg)
+		fmt.Printf("  %s %s\n", style.C(style.Yellow, "Warning:"), msg)
 	}
 
 	// Check repo access

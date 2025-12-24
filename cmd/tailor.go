@@ -13,6 +13,7 @@ import (
 
 	"github.com/xrsl/cvx/pkg/ai"
 	"github.com/xrsl/cvx/pkg/config"
+	"github.com/xrsl/cvx/pkg/style"
 	"github.com/xrsl/cvx/pkg/workflow"
 )
 
@@ -131,7 +132,7 @@ func runTailor(cmd *cobra.Command, args []string) error {
 	if !hasSession {
 		if newSessionID := getMostRecentAgentSession(agent); newSessionID != "" {
 			_ = saveSession(issueNum, newSessionID)
-			fmt.Printf("%sSession saved for issue #%s%s\n", cGreen, issueNum, cReset)
+			fmt.Printf("%sissue #%s\n", style.Success("Session saved for"), issueNum)
 		}
 	}
 
@@ -196,14 +197,14 @@ func ensureIssueBranch(repo, issueNumber string) error {
 		if output, err := gitCmd.CombinedOutput(); err != nil {
 			return fmt.Errorf("error switching to branch: %w\n%s", err, string(output))
 		}
-		fmt.Printf("%sSwitched to branch '%s'%s\n", cGreen, branchName, cReset)
+		fmt.Printf("%s'%s'\n", style.Success("Switched to branch"), branchName)
 	} else {
 		// Create new branch from main
 		gitCmd := exec.Command("git", "checkout", "-b", branchName, "main")
 		if output, err := gitCmd.CombinedOutput(); err != nil {
 			return fmt.Errorf("error creating branch: %w\n%s", err, string(output))
 		}
-		fmt.Printf("%sCreated branch '%s'%s\n", cGreen, branchName, cReset)
+		fmt.Printf("%s'%s'\n", style.Success("Created branch"), branchName)
 	}
 
 	fmt.Printf("Issue #%s: %s at %s\n", issueNumber, title, company)

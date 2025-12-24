@@ -7,12 +7,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/xrsl/cvx/pkg/config"
-)
-
-const (
-	rmReset = "\033[0m"
-	rmGreen = "\033[0;32m"
-	rmCyan  = "\033[0;36m"
+	"github.com/xrsl/cvx/pkg/style"
 )
 
 var rmRepoFlag string
@@ -65,6 +60,6 @@ func runRm(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("gh issue delete failed: %w", err)
 	}
 
-	fmt.Printf("%sDeleted:%s %s#%s%s %s", rmGreen, rmReset, rmCyan, issueNumber, rmReset, title)
+	fmt.Printf("%s%s %s\n", style.Success("Deleted"), style.C(style.Cyan, "#"+issueNumber), title)
 	return nil
 }

@@ -18,6 +18,7 @@ import (
 	"github.com/xrsl/cvx/pkg/config"
 	"github.com/xrsl/cvx/pkg/project"
 	"github.com/xrsl/cvx/pkg/schema"
+	"github.com/xrsl/cvx/pkg/style"
 )
 
 var (
@@ -218,19 +219,14 @@ func extractWithSchema(ctx context.Context, agent string, sch *schema.Schema, ur
 	return data, nil
 }
 
-const (
-	cReset = "\033[0m"
-	cGreen = "\033[0;32m"
-	cCyan  = "\033[0;36m"
-)
 
 func printDynamicResult(title string, data map[string]any) {
 	company := data["company"]
 	location := data["location"]
 
-	fmt.Printf("\n%s%s%s", cGreen, title, cReset)
+	fmt.Printf("\n%s", style.C(style.Green, title))
 	if company != nil {
-		fmt.Printf(" @ %s%v%s", cCyan, company, cReset)
+		fmt.Printf(" @ %s", style.C(style.Cyan, fmt.Sprintf("%v", company)))
 	}
 	if location != nil {
 		fmt.Printf(" (%v)", location)
@@ -248,7 +244,7 @@ func createDynamicIssue(repo string, sch *schema.Schema, title string, data map[
 	}
 
 	issueURL := strings.TrimSpace(string(output))
-	fmt.Printf("%sCreated:%s %s\n", cGreen, cReset, issueURL)
+	fmt.Printf("%s%s\n", style.Success("Created"), issueURL)
 
 	// Add to project if configured
 	_, projectCache, _ := config.LoadWithCache()
@@ -287,7 +283,7 @@ func addToProject(proj *config.ProjectCache, repo, issueURL string, data map[str
 		return fmt.Errorf("failed to add to project: %w", err)
 	}
 
-	fmt.Printf("%sAdded to project:%s %s\n", cGreen, cReset, proj.Title)
+	fmt.Printf("%s%s\n", style.Success("Added to project"), proj.Title)
 
 	// Set Company field
 	company := ""
@@ -319,7 +315,7 @@ func addToProject(proj *config.ProjectCache, repo, issueURL string, data map[str
 	}
 
 	// Print fields that were set
-	fmt.Printf("%sSet fields:%s company, deadline: %s\n", cGreen, cReset, deadline)
+	fmt.Printf("%scompany, deadline: %s\n", style.Success("Set fields"), deadline)
 
 	return nil
 }
