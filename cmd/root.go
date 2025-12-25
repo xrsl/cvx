@@ -1,6 +1,8 @@
 package cmd
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"os"
 
@@ -8,6 +10,7 @@ import (
 	"github.com/spf13/cobra"
 
 	clog "github.com/xrsl/cvx/pkg/log"
+	"github.com/xrsl/cvx/pkg/signal"
 	"github.com/xrsl/cvx/pkg/style"
 )
 
@@ -28,13 +31,24 @@ tailor your CV and cover letters, and track everything in GitHub Issues.`,
 		clog.SetVerbose(verbose)
 		clog.SetQuiet(quiet)
 	},
+	SilenceErrors: true, // We handle errors ourselves
 }
 
 func Execute() {
 	// Load .env file if it exists
 	_ = godotenv.Load()
 
-	if err := rootCmd.Execute(); err != nil {
+	// Create context with signal handling for graceful shutdown
+	ctx, cancel := signal.NotifyContext()
+
+	err := rootCmd.ExecuteContext(ctx)
+	cancel() // Clean up signal handlers before exit
+
+	if err != nil {
+		if errors.Is(err, context.Canceled) {
+			fmt.Fprintln(os.Stderr, "interrupted")
+			os.Exit(130) // Standard exit code for SIGINT
+		}
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}

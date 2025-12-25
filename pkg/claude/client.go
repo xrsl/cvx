@@ -14,6 +14,9 @@ import (
 
 const DefaultAgent = "claude-sonnet-4"
 
+// Rate limiter for API calls (1 request per second, conservative default)
+var rateLimiter = retry.NewRateLimiter(1.0)
+
 var SupportedAgents = []string{
 	"claude-sonnet-4",
 	"claude-sonnet-4-5",
@@ -74,6 +77,11 @@ func isRetryableError(err error) bool {
 // GenerateContentWithSystem sends a prompt with a cached system message
 // The system prompt is marked for caching (5-min TTL, 90% cost reduction on cache hit)
 func (c *Client) GenerateContentWithSystem(ctx context.Context, systemPrompt, userPrompt string) (string, error) {
+	// Apply rate limiting before making request
+	if err := rateLimiter.Wait(ctx); err != nil {
+		return "", fmt.Errorf("rate limiter: %w", err)
+	}
+
 	cfg := retry.DefaultConfig()
 
 	return retry.Do(ctx, cfg, func() (string, error) {

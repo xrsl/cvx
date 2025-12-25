@@ -5,6 +5,7 @@ import (
 	"errors"
 	"math"
 	"math/rand"
+	"sync"
 	"time"
 
 	clog "github.com/xrsl/cvx/pkg/log"
@@ -123,4 +124,60 @@ func (c Config) calculateDelay(attempt int) time.Duration {
 	}
 
 	return time.Duration(delay)
+}
+
+// RateLimiter controls the rate of API calls using a token bucket algorithm
+type RateLimiter struct {
+	mu         sync.Mutex
+	tokens     float64
+	maxTokens  float64
+	refillRate float64 // tokens per second
+	lastRefill time.Time
+}
+
+// NewRateLimiter creates a rate limiter with the given requests per second
+func NewRateLimiter(requestsPerSecond float64) *RateLimiter {
+	return &RateLimiter{
+		tokens:     requestsPerSecond, // Start with full bucket
+		maxTokens:  requestsPerSecond,
+		refillRate: requestsPerSecond,
+		lastRefill: time.Now(),
+	}
+}
+
+// Wait blocks until a token is available or context is cancelled
+func (r *RateLimiter) Wait(ctx context.Context) error {
+	for {
+		r.mu.Lock()
+		r.refill()
+
+		if r.tokens >= 1 {
+			r.tokens--
+			r.mu.Unlock()
+			return nil
+		}
+
+		// Calculate wait time for next token
+		waitTime := time.Duration(float64(time.Second) / r.refillRate)
+		r.mu.Unlock()
+
+		clog.Debug("rate limiter waiting", "duration", waitTime)
+
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(waitTime):
+		}
+	}
+}
+
+// refill adds tokens based on elapsed time (must be called with lock held)
+func (r *RateLimiter) refill() {
+	now := time.Now()
+	elapsed := now.Sub(r.lastRefill).Seconds()
+	r.tokens += elapsed * r.refillRate
+	if r.tokens > r.maxTokens {
+		r.tokens = r.maxTokens
+	}
+	r.lastRefill = now
 }

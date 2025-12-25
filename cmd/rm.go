@@ -1,12 +1,13 @@
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
-	"os/exec"
 
 	"github.com/spf13/cobra"
 
 	"github.com/xrsl/cvx/pkg/config"
+	"github.com/xrsl/cvx/pkg/gh"
 	"github.com/xrsl/cvx/pkg/style"
 )
 
@@ -47,19 +48,25 @@ func runRm(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("no repo configured. Run: cvx config set repo owner/name")
 	}
 
+	cli := gh.New()
+
 	// Check if issue exists and get title
-	check := exec.Command("gh", "issue", "view", issueNumber, "-R", repo, "--json", "number,title", "-q", ".title")
-	titleOut, err := check.Output()
+	data, err := cli.IssueViewByStr(repo, issueNumber, []string{"number", "title"})
 	if err != nil {
 		return fmt.Errorf("issue #%s not found in %s", issueNumber, repo)
 	}
-	title := string(titleOut)
 
-	gh := exec.Command("gh", "issue", "delete", issueNumber, "-R", repo, "--yes")
-	if err := gh.Run(); err != nil {
+	var issue struct {
+		Title string `json:"title"`
+	}
+	if err := json.Unmarshal(data, &issue); err != nil {
+		return fmt.Errorf("failed to parse issue: %w", err)
+	}
+
+	if err := cli.IssueDeleteByStr(repo, issueNumber); err != nil {
 		return fmt.Errorf("gh issue delete failed: %w", err)
 	}
 
-	fmt.Printf("%s%s %s\n", style.Success("Deleted"), style.C(style.Cyan, "#"+issueNumber), title)
+	fmt.Printf("%s%s %s\n", style.Success("Deleted"), style.C(style.Cyan, "#"+issueNumber), issue.Title)
 	return nil
 }

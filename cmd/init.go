@@ -13,6 +13,7 @@ import (
 
 	"github.com/xrsl/cvx/pkg/ai"
 	"github.com/xrsl/cvx/pkg/config"
+	"github.com/xrsl/cvx/pkg/gh"
 	"github.com/xrsl/cvx/pkg/project"
 	"github.com/xrsl/cvx/pkg/style"
 	"github.com/xrsl/cvx/pkg/workflow"
@@ -165,8 +166,8 @@ func runInit(cmd *cobra.Command, args []string) error {
 		}
 
 		fmt.Print("  Checking... ")
-		check := exec.Command("gh", "repo", "view", repo, "--json", "name")
-		if err := check.Run(); err != nil {
+		cli := gh.New()
+		if _, err := cli.RepoView(repo, []string{"name"}); err != nil {
 			fmt.Println("repository not found or no access")
 			repo = cfg.Repo
 			continue
@@ -392,11 +393,12 @@ func inferRepo() string {
 	}
 
 	// Fallback: gh user + current directory name
-	user, err := exec.Command("gh", "api", "user", "-q", ".login").Output()
+	cli := gh.New()
+	user, err := cli.APIUser()
 	if err != nil {
 		return ""
 	}
-	username := strings.TrimSpace(string(user))
+	username := strings.TrimSpace(user)
 
 	wd, err := os.Getwd()
 	if err != nil {
@@ -439,10 +441,11 @@ func validateConfig(cfg *config.Config) {
 		fmt.Printf("  %s %s\n", style.C(style.Yellow, "Warning:"), msg)
 	}
 
+	cli := gh.New()
+
 	// Check repo access
 	if cfg.Repo != "" {
-		cmd := exec.Command("gh", "repo", "view", cfg.Repo, "--json", "name")
-		if err := cmd.Run(); err != nil {
+		if _, err := cli.RepoView(cfg.Repo, []string{"name"}); err != nil {
 			warn(fmt.Sprintf("repo %s not accessible", cfg.Repo))
 		}
 	}
@@ -467,13 +470,11 @@ func validateConfig(cfg *config.Config) {
 		number := cfg.ProjectNumber()
 		if number > 0 {
 			query := fmt.Sprintf(`query { user(login: "%s") { projectV2(number: %d) { id } } }`, owner, number)
-			cmd := exec.Command("gh", "api", "graphql", "-f", "query="+query, "--jq", ".data.user.projectV2.id")
-			out, err := cmd.Output()
+			out, err := cli.GraphQLWithJQ(query, ".data.user.projectV2.id")
 			if err != nil || strings.TrimSpace(string(out)) == "" || strings.TrimSpace(string(out)) == "null" {
 				// Try org project
 				query = fmt.Sprintf(`query { organization(login: "%s") { projectV2(number: %d) { id } } }`, owner, number)
-				cmd = exec.Command("gh", "api", "graphql", "-f", "query="+query, "--jq", ".data.organization.projectV2.id")
-				out, err = cmd.Output()
+				out, err = cli.GraphQLWithJQ(query, ".data.organization.projectV2.id")
 				if err != nil || strings.TrimSpace(string(out)) == "" || strings.TrimSpace(string(out)) == "null" {
 					warn(fmt.Sprintf("project %s not found", cfg.Project))
 				}

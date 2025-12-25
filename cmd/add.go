@@ -7,7 +7,6 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"os/exec"
 	"regexp"
 	"strings"
 	"time"
@@ -16,6 +15,7 @@ import (
 
 	"github.com/xrsl/cvx/pkg/ai"
 	"github.com/xrsl/cvx/pkg/config"
+	"github.com/xrsl/cvx/pkg/gh"
 	"github.com/xrsl/cvx/pkg/project"
 	"github.com/xrsl/cvx/pkg/schema"
 	"github.com/xrsl/cvx/pkg/style"
@@ -63,7 +63,7 @@ func log(format string, args ...any) {
 }
 
 func runAdd(cmd *cobra.Command, args []string) error {
-	ctx := context.Background()
+	ctx := cmd.Context()
 	url := args[0]
 
 	// Load config
@@ -236,13 +236,13 @@ func printDynamicResult(title string, data map[string]any) {
 func createDynamicIssue(repo string, sch *schema.Schema, title string, data map[string]any) error {
 	body := sch.BuildIssueBody(data)
 
-	gh := exec.Command("gh", "issue", "create", "-R", repo, "--title", title, "--body", body)
-	output, err := gh.Output()
+	cli := gh.New()
+	output, err := cli.IssueCreate(repo, title, body)
 	if err != nil {
-		return fmt.Errorf("gh issue create failed: %w", err)
+		return err
 	}
 
-	issueURL := strings.TrimSpace(string(output))
+	issueURL := strings.TrimSpace(output)
 	fmt.Printf("%s%s\n", style.Success("Created"), issueURL)
 
 	// Add to project if configured

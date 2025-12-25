@@ -14,6 +14,9 @@ import (
 
 const DefaultAgent = "gemini-2.5-flash"
 
+// Rate limiter for API calls (1 request per second, conservative default)
+var rateLimiter = retry.NewRateLimiter(1.0)
+
 var SupportedAgents = []string{
 	"gemini-2.5-flash",
 	"gemini-2.5-pro",
@@ -82,6 +85,11 @@ func isRetryableError(err error) bool {
 // GenerateContentWithSystem uses system instruction for the prompt
 // Note: Gemini's context caching requires separate cache creation, so this just uses system instruction
 func (c *Client) GenerateContentWithSystem(ctx context.Context, systemPrompt, userPrompt string) (string, error) {
+	// Apply rate limiting before making request
+	if err := rateLimiter.Wait(ctx); err != nil {
+		return "", fmt.Errorf("rate limiter: %w", err)
+	}
+
 	if systemPrompt != "" {
 		c.model.SystemInstruction = &genai.Content{
 			Parts: []genai.Part{genai.Text(systemPrompt)},

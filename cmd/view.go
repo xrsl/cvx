@@ -5,11 +5,13 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 
 	"github.com/spf13/cobra"
 
 	"github.com/xrsl/cvx/pkg/config"
+	"github.com/xrsl/cvx/pkg/gh"
 	"github.com/xrsl/cvx/pkg/style"
 )
 
@@ -74,8 +76,9 @@ func runView(cmd *cobra.Command, args []string) error {
 	}
 
 	// Fetch issue details
-	ghCmd := exec.Command("gh", "issue", "view", issueNum, "--repo", cfg.Repo, "--json", "title,body")
-	output, err = ghCmd.Output()
+	cli := gh.New()
+	issueNumInt, _ := strconv.Atoi(issueNum)
+	issueData, err := cli.IssueView(cfg.Repo, issueNumInt, []string{"title", "body"})
 	if err != nil {
 		return fmt.Errorf("error fetching issue #%s: %w", issueNum, err)
 	}
@@ -85,7 +88,7 @@ func runView(cmd *cobra.Command, args []string) error {
 		Body  string `json:"body"`
 	}
 
-	if err := json.Unmarshal(output, &issue); err != nil {
+	if err := json.Unmarshal(issueData, &issue); err != nil {
 		return fmt.Errorf("error parsing issue: %w", err)
 	}
 

@@ -13,6 +13,7 @@ import (
 
 	"github.com/xrsl/cvx/pkg/ai"
 	"github.com/xrsl/cvx/pkg/config"
+	"github.com/xrsl/cvx/pkg/gh"
 	"github.com/xrsl/cvx/pkg/style"
 	"github.com/xrsl/cvx/pkg/workflow"
 )
@@ -214,8 +215,8 @@ func ensureIssueBranch(repo, issueNumber string) error {
 // getIssueBranchName fetches issue details and creates branch name
 func getIssueBranchName(repo, issueNumber string) (branchName, company, title string, err error) {
 	// Fetch issue details
-	ghCmd := exec.Command("gh", "issue", "view", issueNumber, "--repo", repo, "--json", "title,body")
-	output, execErr := ghCmd.Output()
+	cli := gh.New()
+	output, execErr := cli.IssueViewByStr(repo, issueNumber, []string{"title", "body"})
 	if execErr != nil {
 		err = fmt.Errorf("error fetching issue #%s: %w", issueNumber, execErr)
 		return

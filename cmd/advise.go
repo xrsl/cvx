@@ -16,6 +16,7 @@ import (
 
 	"github.com/xrsl/cvx/pkg/ai"
 	"github.com/xrsl/cvx/pkg/config"
+	"github.com/xrsl/cvx/pkg/gh"
 	"github.com/xrsl/cvx/pkg/style"
 	"github.com/xrsl/cvx/pkg/workflow"
 )
@@ -86,13 +87,15 @@ func runAdvise(cmd *cobra.Command, args []string) error {
 	// Check if target is URL or issue number
 	isURL := strings.HasPrefix(target, "http://") || strings.HasPrefix(target, "https://")
 
+	ctx := cmd.Context()
+
 	if isURL {
-		return runAdviseURL(cfg, agent, target)
+		return runAdviseURL(ctx, cfg, agent, target)
 	}
-	return runAdviseIssue(cfg, agent, target)
+	return runAdviseIssue(ctx, cfg, agent, target)
 }
 
-func runAdviseURL(cfg *config.Config, agent, url string) error {
+func runAdviseURL(ctx context.Context, cfg *config.Config, agent, url string) error {
 	if advisePushFlag {
 		fmt.Println("Warning: --push flag is not supported for URL-based analysis")
 		fmt.Println("Create an issue first, then run 'cvx advise <issue-number> --push'")
@@ -115,7 +118,7 @@ func runAdviseURL(cfg *config.Config, agent, url string) error {
 			userPrompt = fmt.Sprintf("%s\n\nAdditional context: %s", userPrompt, adviseContextFlag)
 		}
 
-		result, err = runAdviseWithAPI(cfg.Agent, systemPrompt, userPrompt)
+		result, err = runAdviseWithAPI(ctx, cfg.Agent, systemPrompt, userPrompt)
 		if err != nil {
 			return err
 		}
@@ -164,14 +167,12 @@ func runAdviseURL(cfg *config.Config, agent, url string) error {
 }
 
 // runAdviseWithAPI runs analysis using API client with caching
-func runAdviseWithAPI(agent, systemPrompt, userPrompt string) (string, error) {
+func runAdviseWithAPI(ctx context.Context, agent, systemPrompt, userPrompt string) (string, error) {
 	client, err := ai.NewClient(agent)
 	if err != nil {
 		return "", fmt.Errorf("error creating AI client: %w", err)
 	}
 	defer client.Close()
-
-	ctx := context.Background()
 
 	// Use caching if supported
 	if cachingClient, ok := client.(ai.CachingClient); ok {
@@ -183,7 +184,7 @@ func runAdviseWithAPI(agent, systemPrompt, userPrompt string) (string, error) {
 	return client.GenerateContent(ctx, prompt)
 }
 
-func runAdviseIssue(cfg *config.Config, agent, issueNum string) error {
+func runAdviseIssue(ctx context.Context, cfg *config.Config, agent, issueNum string) error {
 	sessionKey := issueNum
 	matchPath := filepath.Join(".cvx", "matches", issueNum+".md")
 
@@ -197,7 +198,7 @@ func runAdviseIssue(cfg *config.Config, agent, issueNum string) error {
 		if err != nil && os.IsNotExist(err) {
 			// Create analysis first
 			fmt.Printf("No existing analysis found, creating new analysis for issue #%s...\n", issueNum)
-			if err := runAdviseAnalysis(cfg, agent, issueNum, sessionKey, hasSession, sessionID); err != nil {
+			if err := runAdviseAnalysis(ctx, cfg, agent, issueNum, sessionKey, hasSession, sessionID); err != nil {
 				return err
 			}
 			content, err = os.ReadFile(matchPath)
@@ -210,11 +211,9 @@ func runAdviseIssue(cfg *config.Config, agent, issueNum string) error {
 
 		// Post as comment
 		fmt.Printf("Posting analysis to issue #%s...\n", issueNum)
-		ghCmd := exec.Command("gh", "issue", "comment", issueNum,
-			"--repo", cfg.Repo,
-			"--body", string(content))
-		if output, err := ghCmd.CombinedOutput(); err != nil {
-			return fmt.Errorf("error posting comment: %w\nOutput: %s", err, string(output))
+		cli := gh.New()
+		if err := cli.IssueComment(cfg.Repo, issueNum, string(content)); err != nil {
+			return fmt.Errorf("error posting comment: %w", err)
 		}
 		fmt.Printf("%sissue #%s\n", style.Success("Analysis posted as comment to"), issueNum)
 		return nil
@@ -222,14 +221,14 @@ func runAdviseIssue(cfg *config.Config, agent, issueNum string) error {
 
 	// Interactive mode
 	if adviseInteractiveFlag {
-		return runAdviseInteractive(cfg, agent, issueNum, sessionKey, hasSession, sessionID)
+		return runAdviseInteractive(ctx, cfg, agent, issueNum, sessionKey, hasSession, sessionID)
 	}
 
 	// Normal analysis
-	return runAdviseAnalysis(cfg, agent, issueNum, sessionKey, hasSession, sessionID)
+	return runAdviseAnalysis(ctx, cfg, agent, issueNum, sessionKey, hasSession, sessionID)
 }
 
-func runAdviseAnalysis(cfg *config.Config, agent, issueNum, sessionKey string, hasSession bool, sessionID string) error {
+func runAdviseAnalysis(ctx context.Context, cfg *config.Config, agent, issueNum, sessionKey string, hasSession bool, sessionID string) error {
 	// Fetch issue body for context
 	issueBody, err := fetchIssueBody(cfg.Repo, issueNum)
 	if err != nil {
@@ -250,7 +249,7 @@ func runAdviseAnalysis(cfg *config.Config, agent, issueNum, sessionKey string, h
 			userPrompt = fmt.Sprintf("%s\n\nAdditional context: %s", userPrompt, adviseContextFlag)
 		}
 
-		result, err = runAdviseWithAPI(cfg.Agent, systemPrompt, userPrompt)
+		result, err = runAdviseWithAPI(ctx, cfg.Agent, systemPrompt, userPrompt)
 		if err != nil {
 			return err
 		}
@@ -310,12 +309,12 @@ func runAdviseAnalysis(cfg *config.Config, agent, issueNum, sessionKey string, h
 	return nil
 }
 
-func runAdviseInteractive(cfg *config.Config, agent, issueNum, sessionKey string, hasSession bool, sessionID string) error {
+func runAdviseInteractive(ctx context.Context, cfg *config.Config, agent, issueNum, sessionKey string, hasSession bool, sessionID string) error {
 	// Interactive mode requires CLI agent
 	if !ai.IsAgentCLI(cfg.Agent) {
 		fmt.Printf("Note: Interactive mode requires CLI agent (claude-cli or gemini-cli).\n")
 		fmt.Printf("Running single analysis instead.\n\n")
-		return runAdviseAnalysis(cfg, agent, issueNum, sessionKey, hasSession, sessionID)
+		return runAdviseAnalysis(ctx, cfg, agent, issueNum, sessionKey, hasSession, sessionID)
 	}
 
 	var cmd *exec.Cmd
@@ -417,8 +416,8 @@ func buildAdvisePromptParts(cfg *config.Config, url, issueBody string) (system, 
 }
 
 func fetchIssueBody(repo, issueNum string) (string, error) {
-	cmd := exec.Command("gh", "issue", "view", issueNum, "--repo", repo, "--json", "body")
-	output, err := cmd.Output()
+	cli := gh.New()
+	output, err := cli.IssueViewByStr(repo, issueNum, []string{"body"})
 	if err != nil {
 		return "", err
 	}

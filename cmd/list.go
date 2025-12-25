@@ -3,7 +3,6 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
-	"os/exec"
 	"sort"
 	"strings"
 	"time"
@@ -12,6 +11,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/xrsl/cvx/pkg/config"
+	"github.com/xrsl/cvx/pkg/gh"
 	"github.com/xrsl/cvx/pkg/style"
 )
 
@@ -161,8 +161,8 @@ func runList(cmd *cobra.Command, args []string) error {
 }`, owner, name, listLimit, stateFilter)
 	}
 
-	gh := exec.Command("gh", "api", "graphql", "-f", fmt.Sprintf("query=%s", query))
-	output, err := gh.Output()
+	cli := gh.New()
+	output, err := cli.GraphQL(query)
 	if err != nil {
 		return fmt.Errorf("gh api failed: %w", err)
 	}

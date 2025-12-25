@@ -213,3 +213,81 @@ func TestDefaultConfig(t *testing.T) {
 		t.Errorf("expected MaxDelay 30s, got %v", cfg.MaxDelay)
 	}
 }
+
+func TestNewRateLimiter(t *testing.T) {
+	rl := NewRateLimiter(10.0)
+	if rl == nil {
+		t.Fatal("expected non-nil rate limiter")
+	}
+	if rl.maxTokens != 10.0 {
+		t.Errorf("expected maxTokens 10, got %f", rl.maxTokens)
+	}
+	if rl.refillRate != 10.0 {
+		t.Errorf("expected refillRate 10, got %f", rl.refillRate)
+	}
+}
+
+func TestRateLimiterWait(t *testing.T) {
+	// Create a rate limiter with 10 tokens/second (starts full)
+	rl := NewRateLimiter(10.0)
+	ctx := context.Background()
+
+	// First 10 waits should be instant (using initial tokens)
+	start := time.Now()
+	for i := 0; i < 10; i++ {
+		if err := rl.Wait(ctx); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	}
+	elapsed := time.Since(start)
+
+	// Should be nearly instant (< 50ms for all 10)
+	if elapsed > 50*time.Millisecond {
+		t.Errorf("first 10 waits took too long: %v", elapsed)
+	}
+}
+
+func TestRateLimiterWaitContextCancelled(t *testing.T) {
+	// Create a rate limiter with very low rate
+	rl := NewRateLimiter(0.1) // 1 token per 10 seconds
+
+	// Drain the initial token
+	ctx := context.Background()
+	if err := rl.Wait(ctx); err != nil {
+		t.Fatalf("unexpected error draining token: %v", err)
+	}
+
+	// Now try with cancelled context
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // Cancel immediately
+
+	err := rl.Wait(ctx)
+	if !errors.Is(err, context.Canceled) {
+		t.Errorf("expected context.Canceled, got %v", err)
+	}
+}
+
+func TestRateLimiterRefill(t *testing.T) {
+	// Create a rate limiter with 10 tokens/second
+	rl := NewRateLimiter(10.0)
+	ctx := context.Background()
+
+	// Drain all tokens
+	for i := 0; i < 10; i++ {
+		_ = rl.Wait(ctx)
+	}
+
+	// Wait a bit for refill (100ms = 1 token)
+	time.Sleep(150 * time.Millisecond)
+
+	// Should be able to get at least 1 token instantly
+	start := time.Now()
+	if err := rl.Wait(ctx); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	elapsed := time.Since(start)
+
+	if elapsed > 50*time.Millisecond {
+		t.Errorf("refill wait took too long: %v", elapsed)
+	}
+}
