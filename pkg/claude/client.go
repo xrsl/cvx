@@ -24,6 +24,14 @@ var SupportedAgents = []string{
 	"claude-opus-4-5",
 }
 
+// Map friendly agent names to Anthropic model IDs
+var modelMapping = map[string]string{
+	"claude-sonnet-4":   "claude-sonnet-4-20250514",
+	"claude-sonnet-4-5": "claude-sonnet-4-5-20250514",
+	"claude-opus-4":     "claude-opus-4-20250514",
+	"claude-opus-4-5":   "claude-opus-4-5-20250514",
+}
+
 func IsAgentSupported(agent string) bool {
 	for _, a := range SupportedAgents {
 		if a == agent {
@@ -48,11 +56,17 @@ func NewClient(model string) (*Client, error) {
 		model = DefaultAgent
 	}
 
+	// Map agent name to Anthropic model ID
+	modelID, ok := modelMapping[model]
+	if !ok {
+		modelID = model // fallback to raw value if not in mapping
+	}
+
 	client := anthropic.NewClient(option.WithAPIKey(apiKey))
 
 	return &Client{
 		client: client,
-		model:  model,
+		model:  modelID,
 	}, nil
 }
 
