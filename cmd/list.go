@@ -3,6 +3,7 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
+	"os/exec"
 	"sort"
 	"strings"
 	"time"
@@ -20,6 +21,7 @@ var (
 	listLimit    int
 	listRepoFlag string
 	listCompany  string
+	listApps     bool
 )
 
 type Issue struct {
@@ -67,6 +69,7 @@ func init() {
 	listCmd.Flags().IntVar(&listLimit, "limit", 50, "Max issues to list")
 	listCmd.Flags().StringVarP(&listRepoFlag, "repo", "r", "", "GitHub repo (overrides config)")
 	listCmd.Flags().StringVar(&listCompany, "company", "", "Filter by company name")
+	listCmd.Flags().BoolVar(&listApps, "apps", false, "List submitted applications (from git tags)")
 	rootCmd.AddCommand(listCmd)
 }
 
@@ -77,13 +80,18 @@ func runList(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("config error: %w", err)
 	}
 
+	// Handle --apps flag
+	if listApps {
+		return runListApps(cfg)
+	}
+
 	// Resolve repo (flag > config)
 	repo := listRepoFlag
 	if repo == "" {
 		repo = cfg.Repo
 	}
 	if repo == "" {
-		return fmt.Errorf("no repo configured. Run: cvx config set repo owner/name")
+		return fmt.Errorf("no repo configured. Run: cvx init")
 	}
 
 	// Parse owner/name
@@ -294,4 +302,177 @@ func extractCompany(body string) string {
 		}
 	}
 	return ""
+}
+
+type TagInfo struct {
+	Tag         string
+	IssueNumber string
+	Company     string
+	Role        string
+	AppliedDate string
+}
+
+func runListApps(cfg *config.Config) error {
+	// Resolve repo (flag > config)
+	repo := listRepoFlag
+	if repo == "" {
+		repo = cfg.Repo
+	}
+	if repo == "" {
+		return fmt.Errorf("no repo configured. Run: cvx init")
+	}
+
+	// Get all tags from git
+	cmd := exec.Command("git", "tag")
+	output, err := cmd.Output()
+	if err != nil {
+		return fmt.Errorf("error listing tags: %w", err)
+	}
+
+	tags := strings.Split(strings.TrimSpace(string(output)), "\n")
+	if len(tags) == 0 || (len(tags) == 1 && tags[0] == "") {
+		fmt.Println("No applications found")
+		return nil
+	}
+
+	// Get issue numbers from tags
+	issueNumbers := make([]string, 0)
+	tagByIssue := make(map[string]string)
+
+	for _, tag := range tags {
+		if tag == "" {
+			continue
+		}
+
+		parts := strings.Split(tag, "-")
+		if len(parts) < 4 {
+			continue
+		}
+
+		issueNumber := parts[0]
+		issueNumbers = append(issueNumbers, issueNumber)
+		tagByIssue[issueNumber] = tag
+	}
+
+	if len(issueNumbers) == 0 {
+		fmt.Println("No applications found")
+		return nil
+	}
+
+	// Fetch all issues
+	cli := gh.New()
+	issueOutput, err := cli.IssueList(repo, "all", 100)
+	if err != nil {
+		return fmt.Errorf("error fetching issues: %w", err)
+	}
+
+	var issues []struct {
+		Number int    `json:"number"`
+		Title  string `json:"title"`
+		Body   string `json:"body"`
+	}
+
+	if err := json.Unmarshal(issueOutput, &issues); err != nil {
+		return fmt.Errorf("error parsing issues: %w", err)
+	}
+
+	// Build a map of issue data
+	issueData := make(map[string]struct {
+		Title   string
+		Company string
+	})
+
+	for _, issue := range issues {
+		issueNumStr := fmt.Sprintf("%d", issue.Number)
+		if _, exists := tagByIssue[issueNumStr]; !exists {
+			continue
+		}
+
+		company := extractCompany(issue.Body)
+
+		issueData[issueNumStr] = struct {
+			Title   string
+			Company string
+		}{
+			Title:   issue.Title,
+			Company: company,
+		}
+	}
+
+	// Build tag infos with actual issue data
+	tagInfos := make([]TagInfo, 0)
+
+	for issueNum, tag := range tagByIssue {
+		data, exists := issueData[issueNum]
+		if !exists {
+			continue
+		}
+
+		// Parse applied date from tag (format: {issueNum}-...-YYYY-MM-DD)
+		parts := strings.Split(tag, "-")
+		appliedDate := parts[len(parts)-3] + "-" + parts[len(parts)-2] + "-" + parts[len(parts)-1]
+
+		// Apply company filter if specified
+		if listCompany != "" && !strings.Contains(strings.ToLower(data.Company), strings.ToLower(listCompany)) {
+			continue
+		}
+
+		tagInfos = append(tagInfos, TagInfo{
+			Tag:         tag,
+			IssueNumber: issueNum,
+			Company:     data.Company,
+			Role:        data.Title,
+			AppliedDate: appliedDate,
+		})
+	}
+
+	if len(tagInfos) == 0 {
+		if listCompany != "" {
+			fmt.Printf("No applications found for company: %s\n", listCompany)
+		} else {
+			fmt.Println("No applications found")
+		}
+		return nil
+	}
+
+	// Sort by applied date (most recent first)
+	sort.Slice(tagInfos, func(i, j int) bool {
+		return tagInfos[i].AppliedDate > tagInfos[j].AppliedDate
+	})
+
+	// Print table header
+	fmt.Printf("%s%sIssue | %-35s | %-25s | Applied%s\n", style.Bold, style.Cyan, "Role", "Company", style.Reset)
+	fmt.Printf("%s", style.Cyan)
+	fmt.Printf("------+-------------------------------------+---------------------------+----------\n")
+	fmt.Printf("%s", style.Reset)
+
+	// Print table rows
+	for _, info := range tagInfos {
+		role := info.Role
+		issueURL := fmt.Sprintf("https://github.com/%s/issues/%s", repo, info.IssueNumber)
+
+		// Truncate role if needed
+		if utf8.RuneCountInString(role) > 35 {
+			runes := []rune(role)
+			role = string(runes[:35])
+		}
+
+		company := info.Company
+		if len(company) > 25 {
+			company = company[:25]
+		}
+
+		// Make issue number clickable
+		issueNumStr := fmt.Sprintf("#%s", info.IssueNumber)
+		clickableIssueNum := fmt.Sprintf("\x1b]8;;%s\x1b\\%s%s%s\x1b]8;;\x1b\\", issueURL, style.Cyan, issueNumStr, style.Reset)
+		padding := 5 - len(issueNumStr)
+
+		fmt.Printf("%s%s | %-35s | %-25s | %s%s%s\n",
+			clickableIssueNum, strings.Repeat(" ", padding),
+			role,
+			company,
+			style.Green, info.AppliedDate, style.Reset)
+	}
+
+	return nil
 }

@@ -78,7 +78,7 @@ func runAdd(cmd *cobra.Command, args []string) error {
 		repo = cfg.Repo
 	}
 	if repo == "" && !dryRunFlag {
-		return fmt.Errorf("no repo configured. Run: cvx config")
+		return fmt.Errorf("no repo configured. Run: cvx init")
 	}
 
 	// Resolve agent (flag > config > default)

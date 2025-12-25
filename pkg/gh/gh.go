@@ -72,7 +72,7 @@ func (c *DefaultCLI) IssueView(repo string, number int, fields []string) ([]byte
 
 // IssueList lists issues
 func (c *DefaultCLI) IssueList(repo, state string, limit int) ([]byte, error) {
-	args := []string{"issue", "list", "--repo", repo, "--json", "number,title,state,labels"}
+	args := []string{"issue", "list", "--repo", repo, "--json", "number,title,state,labels,body"}
 	if state != "" {
 		args = append(args, "--state", state)
 	}

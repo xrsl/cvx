@@ -45,7 +45,7 @@ func runRm(cmd *cobra.Command, args []string) error {
 		repo = cfg.Repo
 	}
 	if repo == "" {
-		return fmt.Errorf("no repo configured. Run: cvx config set repo owner/name")
+		return fmt.Errorf("no repo configured. Run: cvx init")
 	}
 
 	cli := gh.New()
