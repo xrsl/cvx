@@ -13,14 +13,14 @@ var DefaultAdd string
 //go:embed defaults/advise.md
 var DefaultAdvise string
 
-//go:embed defaults/tailor.md
-var DefaultTailor string
+//go:embed defaults/build.md
+var DefaultBuild string
 
 const (
 	DefaultSchemaPath = ".github/ISSUE_TEMPLATE/job-ad-schema.yaml"
 	AddPath           = ".cvx/workflows/add.md"
 	AdvisePath        = ".cvx/workflows/advise.md"
-	TailorPath        = ".cvx/workflows/tailor.md"
+	BuildPath         = ".cvx/workflows/build.md"
 )
 
 // Init creates .cvx/ directory structure with default workflow files.
@@ -59,9 +59,9 @@ func Init(schemaPath string) error {
 		}
 	}
 
-	// Create default tailor.md if it doesn't exist
-	if _, err := os.Stat(TailorPath); os.IsNotExist(err) {
-		if err := os.WriteFile(TailorPath, []byte(DefaultTailor), 0o644); err != nil {
+	// Create default build.md if it doesn't exist
+	if _, err := os.Stat(BuildPath); os.IsNotExist(err) {
+		if err := os.WriteFile(BuildPath, []byte(DefaultBuild), 0o644); err != nil {
 			return err
 		}
 	}
@@ -69,28 +69,37 @@ func Init(schemaPath string) error {
 	return nil
 }
 
-// LoadAdvise loads the advise workflow from .cvx/workflows/advise.md
+// LoadAdvise loads the advise workflow, falling back to embedded default
 func LoadAdvise() (string, error) {
 	content, err := os.ReadFile(AdvisePath)
 	if err != nil {
+		if os.IsNotExist(err) {
+			return DefaultAdvise, nil
+		}
 		return "", err
 	}
 	return string(content), nil
 }
 
-// LoadTailor loads the tailor workflow from .cvx/workflows/tailor.md
-func LoadTailor() (string, error) {
-	content, err := os.ReadFile(TailorPath)
+// LoadBuild loads the build workflow, falling back to embedded default
+func LoadBuild() (string, error) {
+	content, err := os.ReadFile(BuildPath)
 	if err != nil {
+		if os.IsNotExist(err) {
+			return DefaultBuild, nil
+		}
 		return "", err
 	}
 	return string(content), nil
 }
 
-// LoadAdd loads the add workflow from .cvx/workflows/add.md
+// LoadAdd loads the add workflow, falling back to embedded default
 func LoadAdd() (string, error) {
 	content, err := os.ReadFile(AddPath)
 	if err != nil {
+		if os.IsNotExist(err) {
+			return DefaultAdd, nil
+		}
 		return "", err
 	}
 	return string(content), nil
@@ -107,7 +116,7 @@ func ResetWorkflows() error {
 	if err := os.WriteFile(AdvisePath, []byte(DefaultAdvise), 0o644); err != nil {
 		return err
 	}
-	if err := os.WriteFile(TailorPath, []byte(DefaultTailor), 0o644); err != nil {
+	if err := os.WriteFile(BuildPath, []byte(DefaultBuild), 0o644); err != nil {
 		return err
 	}
 	return nil

@@ -1,4 +1,4 @@
-Tailor application materials for the job posting.
+Build tailored application materials for the job posting.
 
 ## Workflow
 
@@ -19,34 +19,25 @@ Tailor application materials for the job posting.
    - Cover letter: follow structure from reference, use ONLY verified experiences
    - Identify keywords to incorporate
 
-4. **Verify accuracy:**
+4. **Write files:**
+
+   - Update the CV file with tailored content
+   - Write the cover letter to the appropriate location
+   - Ensure all changes are saved to disk
+
+5. **Verify accuracy:**
 
    - List every claim and cite source from CV or reference files
    - Never fabricate or exaggerate experiences
 
-5. **Build & preview:**
+6. **Build & preview:**
 
    - If makefile exists: `make combined && code build/combined.pdf`
 
-6. **Wait for user review**
-
 7. **Apply feedback iterations:**
-   - When user provides feedback, apply changes
+   - When user provides feedback via `-c` flag, apply changes
    - Rebuild and reopen preview
-   - Repeat until user says "approved" or "looks good"
-
-## After Approval
-
-When user says "approved", "looks good", "submit", or similar:
-
-1. **Commit changes:** Format as "Tailored application for [Company] [Role]"
-2. **Create tag:** `git tag <issue>-<company>-<role>-YYYY-MM-DD && git push origin <tag>`
-3. **Update project status to "Applied" and set AppliedDate to today:**
-   ```bash
-   # Get project item ID for the issue
-   gh api graphql -f query='{ repository(owner:"OWNER", name:"REPO") { issue(number:ISSUE) { projectItems(first:1) { nodes { id } } } } }'
-   # Update status field to "Applied" and AppliedDate to today's date
-   ```
+   - Repeat until user is satisfied
 
 ## Critical Rules
 
