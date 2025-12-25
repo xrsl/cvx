@@ -19,7 +19,7 @@ repos:
       files: \.(tex|md)$
 
 - repo: https://github.com/golangci/golangci-lint
-  rev: v1.62.2
+  rev: v2.4.0
   hooks:
     - id: golangci-lint
 

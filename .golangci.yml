@@ -1,3 +1,5 @@
+version: "2"
+
 linters:
   enable:
     # Default
@@ -6,9 +8,7 @@ linters:
     - staticcheck
     - ineffassign
     - unused
-    # Formatting
-    - gofmt
-    - goimports
+    # Formatting (now in formatters section)
     - misspell
     # Security
     - gosec
@@ -21,77 +21,85 @@ linters:
     - dupl
     - unconvert
     - unparam
-    # - prealloc  # Disabled: minor optimization, noisy
 
-linters-settings:
-  goimports:
-    local-prefixes: github.com/xrsl/cvx
+  settings:
+    gocyclo:
+      min-complexity: 20
 
-  gocyclo:
-    min-complexity: 20
+    dupl:
+      threshold: 150
 
-  dupl:
-    threshold: 150
+    gocritic:
+      enabled-tags:
+        - diagnostic
+        - style
+        - performance
+      disabled-checks:
+        - whyNoLint
+        - hugeParam
+        - ifElseChain
+        - paramTypeCombine
+        - sprintfQuotedString
+        - rangeValCopy
 
-  gocritic:
-    enabled-tags:
-      - diagnostic
-      - style
-      - performance
-    disabled-checks:
-      - whyNoLint
-      - hugeParam
-      - ifElseChain        # Subjective - if/else often clearer than switch
-      - paramTypeCombine   # Minor style preference
-      - sprintfQuotedString # False positive in GraphQL queries
-      - rangeValCopy       # Handled case-by-case
+    revive:
+      rules:
+        - name: blank-imports
+        - name: context-as-argument
+        - name: context-keys-type
+        - name: error-return
+        - name: error-strings
+        - name: error-naming
+        - name: exported
+          disabled: true
+        - name: increment-decrement
+        - name: var-naming
+        - name: package-comments
+          disabled: true
+        - name: range
+        - name: receiver-naming
+        - name: time-naming
+        - name: unexported-return
+        - name: indent-error-flow
+        - name: errorf
 
-  revive:
+    gosec:
+      excludes:
+        - G104
+        - G204
+        - G301  # Directory permissions 0755 is fine for .cvx dirs
+        - G304
+        - G306
+        - G404
+
+  exclusions:
     rules:
-      - name: blank-imports
-      - name: context-as-argument
-      - name: context-keys-type
-      - name: error-return
-      - name: error-strings
-      - name: error-naming
-      - name: exported
-      - name: increment-decrement
-      - name: var-naming
-      - name: package-comments
-        disabled: true
-      - name: range
-      - name: receiver-naming
-      - name: time-naming
-      - name: unexported-return
-      - name: indent-error-flow
-      - name: errorf
+      - path: _test\.go
+        linters:
+          - dupl
+          - gocritic
+          - gocyclo
+          - gosec
+      - path: cmd/(init|list)\.go
+        linters:
+          - gocyclo
+      - linters:
+          - revive
+        text: "stutters"
+      - linters:
+          - revive
+        text: "AddProjectV2ItemById"
+      - path: pkg/utils/
+        linters:
+          - revive
+        text: "var-naming"
 
-  gosec:
-    excludes:
-      - G104 # Duplicates errcheck
-      - G204 # Subprocess with variable args - we use gh CLI intentionally
-      - G304 # File path from variable (we validate inputs)
-      - G306 # WriteFile permissions - 0644 is fine for config files
-      - G404 # Weak random - used only for jitter, not security
+formatters:
+  enable:
+    - gofmt
+    - goimports
 
-issues:
-  exclude-rules:
-    # Exclude some linters from tests
-    - path: _test\.go
-      linters:
-        - dupl
-        - gocritic
-        - gocyclo
-        - gosec
-    # Allow high cyclomatic complexity in init/list commands (wizard/display flow)
-    - path: cmd/(init|list)\.go
-      linters:
-        - gocyclo
-    # Allow stutter in exported type names for clarity
-    - linters:
-        - revive
-      text: "stutters"
-    # Allow long param lists for GraphQL response parsing
-    - linters:
-        - revive
-      text: "AddProjectV2ItemById"
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/xrsl/cvx
