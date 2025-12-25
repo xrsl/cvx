@@ -19,7 +19,7 @@ project: owner/1
 | `repo`           | GitHub repository (owner/repo) | Auto-detected |
 | `agent`          | AI agent to use                | `claude`      |
 | `schema`         | Job schema file path           | Built-in      |
-| `cv_path`        | CV file for advise/tailor      | `src/cv.tex`  |
+| `cv_path`        | CV file for advise/build       | `src/cv.tex`  |
 | `reference_path` | Reference materials directory  | `reference/`  |
 | `project`        | GitHub Project (owner/number)  | -             |
 
@@ -97,7 +97,7 @@ AI prompts in `.cvx/workflows/` can be edited:
 | ----------- | ------------ | --------------------- |
 | `add.md`    | `cvx add`    | Job extraction prompt |
 | `advise.md` | `cvx advise` | Match analysis prompt |
-| `tailor.md` | `cvx tailor` | CV tailoring prompt   |
+| `build.md`  | `cvx build`  | CV tailoring prompt   |
 
 **Template variables:**
 

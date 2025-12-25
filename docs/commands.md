@@ -105,31 +105,60 @@ cvx advise 42 -i                      # Interactive mode
 
 ---
 
-## cvx tailor
+## cvx build
 
-Tailor CV and cover letter for a job posting.
+Build tailored CV and cover letter for a job posting.
 
 ```bash
-cvx tailor <issue> [flags]
+cvx build [issue-number] [flags]
 ```
 
 | Flag            | Short | Description                                      |
 | --------------- | ----- | ------------------------------------------------ |
 | `--agent`       | `-a`  | CLI agent: claude, gemini                        |
 | `--model`       | `-m`  | API model: claude-sonnet-4, gemini-2.5-flash etc |
-| `--context`     | `-c`  | Additional context                               |
+| `--context`     | `-c`  | Feedback or additional context                   |
 | `--interactive` | `-i`  | Interactive session (requires CLI agent)         |
+| `--open`        | `-o`  | Open combined.pdf in VSCode after build          |
+| `--no-build`    |       | Skip build, use with -o to just open PDF         |
 
-`--agent` and `--model` are mutually exclusive. Interactive mode (`-i`) requires a CLI agent.
+If issue-number is omitted, it's inferred from the current branch name.
 
 **Examples:**
 
 ```bash
-cvx tailor 42                        # Prep tailored application
-cvx tailor 42 -m claude-sonnet-4     # Use Claude API
-cvx tailor 42 -i                     # Interactive session
-cvx tailor 42 -a gemini -i           # Interactive with Gemini CLI
-cvx tailor 42 -c "Emphasize Python"
+cvx build                            # Infer issue from branch
+cvx build 42                         # Build for issue #42
+cvx build -o                         # Build and open PDF
+cvx build -o --no-build              # Just open PDF (skip build)
+cvx build -c "emphasize Python"      # Continue with feedback
+cvx build -i                         # Interactive session
+```
+
+---
+
+## cvx approve
+
+Approve and finalize the tailored application.
+
+```bash
+cvx approve [issue-number]
+```
+
+This command:
+
+1. Commits changes with message "Tailored application for [Company] [Role]"
+2. Creates a git tag: `<issue>-<company>-<role>-YYYY-MM-DD`
+3. Pushes the tag to origin
+4. Updates GitHub project status to "Applied"
+
+If issue-number is omitted, it's inferred from the current branch name.
+
+**Examples:**
+
+```bash
+cvx approve                          # Infer issue from branch
+cvx approve 42                       # Approve issue #42
 ```
 
 ---

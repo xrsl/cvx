@@ -49,7 +49,8 @@ cvx list
 cvx init                # Initialize project
 cvx add <url>           # Add job posting
 cvx advise <issue>      # Analyze job-CV match
-cvx tailor <issue>      # Tailor CV/cover letter
+cvx build [issue]       # Build tailored CV/cover letter
+cvx approve [issue]     # Commit, tag, push
 cvx view <issue>        # View submitted documents
 ```
 

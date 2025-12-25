@@ -22,8 +22,11 @@ cvx add https://company.com/careers/software-engineer
 # Analyze match quality
 cvx advise 42 -a gemini
 
-# Tailor CV for the job
-cvx tailor 42
+# Build tailored CV/cover letter
+cvx build 42
+
+# Approve and finalize
+cvx approve 42
 
 # View submitted documents
 cvx view 42
@@ -31,16 +34,19 @@ cvx view 42
 
 ## Branching and Tagging strategy
 
-`cvx` uses git branches for tailoring and git tags for archiving submitted applications:
+`cvx` uses git branches for building and git tags for archiving submitted applications:
 
 ```bash
-# Tailor CV/letter (auto-creates branch 42-company-role)
-cvx tailor 42
+# Build CV/letter (auto-creates branch 42-company-role)
+cvx build 42
 
-# Once user approves and tailor workflow creates git tag in the following format:
-git tag 42-company-role-2025-12-18
+# Once satisfied, approve to commit, tag, and push
+cvx approve 42
 
-# Later, view what you submitted (uses git tag 42-company-role-2025-12-18)
+# This creates git tag in the following format:
+# 42-company-role-2025-12-18
+
+# Later, view what you submitted
 cvx view 42
 ```
 

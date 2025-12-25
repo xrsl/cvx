@@ -38,7 +38,8 @@ go install github.com/xrsl/cvx@latest
 cvx init                              # Setup wizard
 cvx add https://company.com/job       # Add job posting
 cvx advise 42                         # Analyze job-CV match
-cvx tailor 42                         # Tailor CV/cover letter
+cvx build 42                          # Build tailored CV/cover letter
+cvx approve 42                        # Commit, tag, push, update status
 cvx view 42                           # View submitted documents
 ```
 
@@ -80,19 +81,29 @@ cvx advise 42 -i                      # Interactive session
 cvx advise https://example.com/job
 ```
 
-### `cvx tailor <issue>`
+### `cvx build [issue]`
 
-Tailor CV and cover letter for a job. Automatically creates/switches to the issue branch (`42-company-role`).
+Build tailored CV and cover letter. Automatically creates/switches to the issue branch (`42-company-role`).
 
 ```bash
-cvx tailor 42                        # Prep tailored application
-cvx tailor 42 -m claude-sonnet-4     # Use Claude API
-cvx tailor 42 -i                     # Interactive session
-cvx tailor 42 -a gemini -i           # Interactive with Gemini CLI
-cvx tailor 42 -c "Emphasize Python"
+cvx build                            # Infer issue from branch
+cvx build 42                         # Build for issue #42
+cvx build -o                         # Build and open PDF
+cvx build -o --no-build              # Just open PDF
+cvx build -c "emphasize Python"      # Continue with feedback
+cvx build -i                         # Interactive session
 ```
 
-Use `-i` for interactive mode with CLI agents. Sessions are shared per issue.
+Sessions are shared per issue. Use `-c` to continue with feedback.
+
+### `cvx approve [issue]`
+
+Approve and finalize the tailored application: commits, tags, pushes, updates project status.
+
+```bash
+cvx approve                          # Infer issue from branch
+cvx approve 42                       # Approve issue #42
+```
 
 ### `cvx view <issue>`
 
@@ -194,7 +205,7 @@ reference_path: reference/
 project: owner/1
 ```
 
-The `reference_path` directory should contain your experience documentation, guidelines, and other reference materials used by `advise` and `tailor` commands.
+The `reference_path` directory should contain your experience documentation, guidelines, and other reference materials used by `advise` and `build` commands.
 
 Internal project IDs are cached in `.cvx/cache.yaml` (auto-managed).
 
@@ -206,7 +217,7 @@ AI prompts are stored in `.cvx/workflows/` and can be customized:
 | ----------- | ------------------------------------ |
 | `add.md`    | `cvx add` - job extraction prompt    |
 | `advise.md` | `cvx advise` - match analysis prompt |
-| `tailor.md` | `cvx tailor` - CV tailoring prompt   |
+| `build.md`  | `cvx build` - CV tailoring prompt    |
 
 Template variables available: `{{.CVPath}}`, `{{.ReferencePath}}`
 

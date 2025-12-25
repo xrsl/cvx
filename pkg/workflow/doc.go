@@ -5,7 +5,7 @@
 // Default workflow prompts are embedded at compile time from the defaults/ directory:
 //   - defaults/add.md    - Job extraction prompt for 'cvx add'
 //   - defaults/advise.md - Match analysis prompt for 'cvx advise'
-//   - defaults/tailor.md - CV tailoring prompt for 'cvx tailor'
+//   - defaults/build.md  - CV tailoring prompt for 'cvx build'
 //
 // These files are embedded using //go:embed directives in workflow.go.
 //
@@ -22,7 +22,7 @@
 // Users can customize prompts by creating files in .cvx/workflows/:
 //   - .cvx/workflows/add.md
 //   - .cvx/workflows/advise.md
-//   - .cvx/workflows/tailor.md
+//   - .cvx/workflows/build.md
 //
 // Run 'cvx init -r' to reset workflows to the embedded defaults.
 package workflow
