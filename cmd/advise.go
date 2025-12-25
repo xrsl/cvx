@@ -23,6 +23,7 @@ import (
 
 var (
 	adviseAgentFlag       string
+	adviseModelFlag       string
 	adviseContextFlag     string
 	adviseInteractiveFlag bool
 	advisePushFlag        bool
@@ -37,21 +38,23 @@ Takes a GitHub issue number or job posting URL and analyzes
 how well your CV matches the position.
 
 Examples:
-  cvx advise 42                    # Analyze issue #42
-  cvx advise 42 --push             # Analyze and post as comment
-  cvx advise 42 -a gemini          # Use Gemini CLI
-  cvx advise https://example.com/job
+  cvx advise 42                        # Analyze issue #42
+  cvx advise 42 --push                 # Analyze and post as comment
+  cvx advise 42 -a gemini              # Gemini CLI
+  cvx advise 42 -m gemini-2.5-flash    # Gemini API
   cvx advise 42 -c "Focus on backend"
-  cvx advise 42 -i                 # Interactive session`,
+  cvx advise 42 -i                     # Interactive session`,
 	Args: cobra.ExactArgs(1),
 	RunE: runAdvise,
 }
 
 func init() {
-	adviseCmd.Flags().StringVarP(&adviseAgentFlag, "agent", "a", "", "AI agent (overrides config)")
+	adviseCmd.Flags().StringVarP(&adviseAgentFlag, "agent", "a", "", "CLI agent: claude, gemini")
+	adviseCmd.Flags().StringVarP(&adviseModelFlag, "model", "m", "", "API model: claude-sonnet-4, gemini-2.5-flash, etc.")
 	adviseCmd.Flags().StringVarP(&adviseContextFlag, "context", "c", "", "Additional context for analysis")
 	adviseCmd.Flags().BoolVarP(&adviseInteractiveFlag, "interactive", "i", false, "Join session interactively")
 	adviseCmd.Flags().BoolVarP(&advisePushFlag, "push", "p", false, "Post analysis to GitHub issue")
+	adviseCmd.MarkFlagsMutuallyExclusive("agent", "model")
 	rootCmd.AddCommand(adviseCmd)
 }
 
@@ -64,18 +67,30 @@ func runAdvise(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("config error: %w", err)
 	}
 
-	// Resolve agent (flag > config > default)
-	agentSetting := adviseAgentFlag
-	if agentSetting == "" {
+	// Resolve agent/model (flags > config > default)
+	var agentSetting string
+	switch {
+	case adviseAgentFlag != "":
+		// --agent flag: must be CLI agent
+		if !ai.IsCLIAgentSupported(adviseAgentFlag) {
+			return fmt.Errorf("unsupported CLI agent: %s (supported: %v)", adviseAgentFlag, ai.SupportedCLIAgents())
+		}
+		agentSetting = adviseAgentFlag
+	case adviseModelFlag != "":
+		// --model flag: must be API model
+		if !ai.IsModelSupported(adviseModelFlag) {
+			return fmt.Errorf("unsupported model: %s (supported: %v)", adviseModelFlag, ai.SupportedModels())
+		}
+		agentSetting = adviseModelFlag
+	case cfg.Agent != "":
 		agentSetting = cfg.Agent
-	}
-	if agentSetting == "" {
+	default:
 		agentSetting = ai.DefaultAgent()
 	}
 
-	// Validate agent
+	// Validate final setting
 	if !ai.IsAgentSupported(agentSetting) {
-		return fmt.Errorf("unsupported agent: %s (supported: %v)", agentSetting, ai.SupportedAgents())
+		return fmt.Errorf("unsupported agent/model: %s (supported: %v)", agentSetting, ai.SupportedAgents())
 	}
 
 	// Override config agent for this run
@@ -133,7 +148,7 @@ func runAdviseURL(ctx context.Context, cfg *config.Config, agent, url string) er
 		}
 
 		args := buildCLIArgs(agent, prompt, "", false)
-		output, err := runAgentWithSpinner(agent, args, "Analyzing job posting...")
+		output, err := runAgentWithSpinner(agent, args, "Analyzing job posting using 🤖 "+agent+"...")
 		if err != nil {
 			return fmt.Errorf("agent error: %w", err)
 		}
@@ -174,14 +189,38 @@ func runAdviseWithAPI(ctx context.Context, agent, systemPrompt, userPrompt strin
 	}
 	defer client.Close()
 
+	// Start spinner
+	done := make(chan bool)
+	go func() {
+		i := 0
+		for {
+			select {
+			case <-done:
+				fmt.Fprintf(os.Stderr, "\r\033[K")
+				return
+			default:
+				fmt.Fprintf(os.Stderr, "\r%s %s", style.C(style.Cyan, spinnerFrames[i%len(spinnerFrames)]), "Analyzing job match using 🤖 "+agent+"...")
+				time.Sleep(80 * time.Millisecond)
+				i++
+			}
+		}
+	}()
+
+	var result string
+
 	// Use caching if supported
 	if cachingClient, ok := client.(ai.CachingClient); ok {
-		return cachingClient.GenerateContentWithSystem(ctx, systemPrompt, userPrompt)
+		result, err = cachingClient.GenerateContentWithSystem(ctx, systemPrompt, userPrompt)
+	} else {
+		// Fall back to regular prompt
+		prompt := systemPrompt + "\n\n" + userPrompt
+		result, err = client.GenerateContent(ctx, prompt)
 	}
 
-	// Fall back to regular prompt
-	prompt := systemPrompt + "\n\n" + userPrompt
-	return client.GenerateContent(ctx, prompt)
+	done <- true
+	close(done)
+
+	return result, err
 }
 
 func runAdviseIssue(ctx context.Context, cfg *config.Config, agent, issueNum string) error {
@@ -275,7 +314,7 @@ func runAdviseAnalysis(ctx context.Context, cfg *config.Config, agent, issueNum,
 			fmt.Printf("Running analysis for issue #%s...\n", issueNum)
 		}
 
-		output, err := runAgentWithSpinner(agent, args, "Analyzing job match...")
+		output, err := runAgentWithSpinner(agent, args, "Analyzing job match using 🤖 "+agent+"...")
 		if err != nil {
 			return fmt.Errorf("agent error: %w", err)
 		}

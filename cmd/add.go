@@ -23,6 +23,7 @@ import (
 
 var (
 	agentFlag  string
+	modelFlag  string
 	repoFlag   string
 	schemaFlag string
 	bodyFlag   string
@@ -40,19 +41,21 @@ Use --body to read job posting from a file instead of fetching URL.
 Examples:
   cvx add https://company.com/job
   cvx add https://company.com/job --dry-run
-  cvx add https://company.com/job -a gemini
-  cvx add https://company.com/job --body        # use .cvx/body.md
-  cvx add https://company.com/job --body job.md # use custom file`,
+  cvx add https://company.com/job -a gemini          # Gemini CLI
+  cvx add https://company.com/job -m claude-sonnet-4 # Claude API
+  cvx add https://company.com/job --body             # use .cvx/body.md`,
 	Args: cobra.ExactArgs(1),
 	RunE: runAdd,
 }
 
 func init() {
-	addCmd.Flags().StringVarP(&agentFlag, "agent", "a", "", "AI agent (overrides config)")
+	addCmd.Flags().StringVarP(&agentFlag, "agent", "a", "", "CLI agent: claude, gemini")
+	addCmd.Flags().StringVarP(&modelFlag, "model", "m", "", "API model: claude-sonnet-4, gemini-2.5-flash, etc.")
 	addCmd.Flags().StringVarP(&repoFlag, "repo", "r", "", "GitHub repo (overrides config)")
 	addCmd.Flags().StringVarP(&schemaFlag, "schema", "s", "", "Schema file (overrides config)")
 	addCmd.Flags().StringVarP(&bodyFlag, "body", "b", "", "Read job posting from file (default: .cvx/body.md)")
 	addCmd.Flags().BoolVar(&dryRunFlag, "dry-run", false, "Extract only, don't create issue")
+	addCmd.MarkFlagsMutuallyExclusive("agent", "model")
 	rootCmd.AddCommand(addCmd)
 }
 
@@ -81,18 +84,30 @@ func runAdd(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("no repo configured. Run: cvx init")
 	}
 
-	// Resolve agent (flag > config > default)
-	agent := agentFlag
-	if agent == "" {
+	// Resolve agent/model (flags > config > default)
+	var agent string
+	switch {
+	case agentFlag != "":
+		// --agent flag: must be CLI agent
+		if !ai.IsCLIAgentSupported(agentFlag) {
+			return fmt.Errorf("unsupported CLI agent: %s (supported: %v)", agentFlag, ai.SupportedCLIAgents())
+		}
+		agent = agentFlag
+	case modelFlag != "":
+		// --model flag: must be API model
+		if !ai.IsModelSupported(modelFlag) {
+			return fmt.Errorf("unsupported model: %s (supported: %v)", modelFlag, ai.SupportedModels())
+		}
+		agent = modelFlag
+	case cfg.Agent != "":
 		agent = cfg.Agent
-	}
-	if agent == "" {
+	default:
 		agent = ai.DefaultAgent()
 	}
 
-	// Validate agent
+	// Validate final setting
 	if !ai.IsAgentSupported(agent) {
-		return fmt.Errorf("unsupported agent: %s (supported: %v)", agent, ai.SupportedAgents())
+		return fmt.Errorf("unsupported agent/model: %s (supported: %v)", agent, ai.SupportedAgents())
 	}
 
 	// Resolve schema (flag > config > default)
@@ -189,6 +204,23 @@ func extractWithSchema(ctx context.Context, agent string, sch *schema.Schema, ur
 	}
 	defer client.Close()
 
+	// Start spinner
+	done := make(chan bool)
+	go func() {
+		i := 0
+		for {
+			select {
+			case <-done:
+				fmt.Fprintf(os.Stderr, "\r\033[K")
+				return
+			default:
+				fmt.Fprintf(os.Stderr, "\r%s %s", style.C(style.Cyan, spinnerFrames[i%len(spinnerFrames)]), "Extracting job details using 🤖 "+agent+"...")
+				time.Sleep(80 * time.Millisecond)
+				i++
+			}
+		}
+	}()
+
 	var resp string
 
 	// Use prompt caching if client supports it (Claude API)
@@ -199,6 +231,10 @@ func extractWithSchema(ctx context.Context, agent string, sch *schema.Schema, ur
 		prompt := sch.GeneratePrompt(url, jobText)
 		resp, err = client.GenerateContent(ctx, prompt)
 	}
+
+	done <- true
+	close(done)
+
 	if err != nil {
 		return nil, fmt.Errorf("extraction failed: %w", err)
 	}

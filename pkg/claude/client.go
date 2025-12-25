@@ -27,9 +27,9 @@ var SupportedAgents = []string{
 // Map friendly agent names to Anthropic model IDs
 var modelMapping = map[string]string{
 	"claude-sonnet-4":   "claude-sonnet-4-20250514",
-	"claude-sonnet-4-5": "claude-sonnet-4-5-20250514",
+	"claude-sonnet-4-5": "claude-sonnet-4-5-20250929",
 	"claude-opus-4":     "claude-opus-4-20250514",
-	"claude-opus-4-5":   "claude-opus-4-5-20250514",
+	"claude-opus-4-5":   "claude-opus-4-5-20251101",
 }
 
 func IsAgentSupported(agent string) bool {
@@ -88,6 +88,29 @@ func isRetryableError(err error) bool {
 		strings.Contains(errStr, "timeout")
 }
 
+// formatAPIError converts API errors to user-friendly messages
+func formatAPIError(err error, model string) error {
+	if err == nil {
+		return nil
+	}
+	errStr := err.Error()
+
+	switch {
+	case strings.Contains(errStr, "401") || strings.Contains(errStr, "authentication_error"):
+		return fmt.Errorf("claude API error: invalid API key. Check ANTHROPIC_API_KEY environment variable")
+	case strings.Contains(errStr, "403") || strings.Contains(errStr, "permission_denied"):
+		return fmt.Errorf("claude API error: key does not have access to model %q. Check your Anthropic account permissions", model)
+	case strings.Contains(errStr, "404") || strings.Contains(errStr, "not_found"):
+		return fmt.Errorf("claude API error: model %q not found. Verify the model name is correct", model)
+	case strings.Contains(errStr, "rate_limit"):
+		return fmt.Errorf("claude API error: rate limit exceeded for model %q. Please wait and try again", model)
+	case strings.Contains(errStr, "overloaded") || strings.Contains(errStr, "529"):
+		return fmt.Errorf("claude API error: service overloaded. Please try again later")
+	default:
+		return fmt.Errorf("claude API error: %w", err)
+	}
+}
+
 // GenerateContentWithSystem sends a prompt with a cached system message
 // The system prompt is marked for caching (5-min TTL, 90% cost reduction on cache hit)
 func (c *Client) GenerateContentWithSystem(ctx context.Context, systemPrompt, userPrompt string) (string, error) {
@@ -123,9 +146,9 @@ func (c *Client) GenerateContentWithSystem(ctx context.Context, systemPrompt, us
 		message, err := c.client.Messages.New(ctx, params)
 		if err != nil {
 			if isRetryableError(err) {
-				return "", retry.Retryable(fmt.Errorf("claude API error: %w", err))
+				return "", retry.Retryable(formatAPIError(err, c.model))
 			}
-			return "", fmt.Errorf("claude API error: %w", err)
+			return "", formatAPIError(err, c.model)
 		}
 
 		if len(message.Content) == 0 {

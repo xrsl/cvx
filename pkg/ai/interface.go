@@ -87,7 +87,31 @@ func IsAgentCLI(agent string) bool {
 		agent == "gemini" || strings.HasPrefix(agent, "gemini:")
 }
 
-// SupportedAgents returns all supported agents
+// IsCLIAgentSupported checks if a CLI agent is available
+func IsCLIAgentSupported(agent string) bool {
+	switch {
+	case agent == "claude" || strings.HasPrefix(agent, "claude:"):
+		return IsClaudeCLIAvailable()
+	case agent == "gemini" || strings.HasPrefix(agent, "gemini:"):
+		return IsGeminiCLIAvailable()
+	default:
+		return false
+	}
+}
+
+// IsModelSupported checks if an API model is supported
+func IsModelSupported(model string) bool {
+	switch {
+	case strings.HasPrefix(model, "gemini-"):
+		return gemini.IsAgentSupported(model)
+	case strings.HasPrefix(model, "claude-"):
+		return claude.IsAgentSupported(model)
+	default:
+		return false
+	}
+}
+
+// SupportedAgents returns all supported agents (CLI + API)
 func SupportedAgents() []string {
 	agents := []string{}
 	if IsClaudeCLIAvailable() {
@@ -99,4 +123,24 @@ func SupportedAgents() []string {
 	agents = append(agents, gemini.SupportedAgents...)
 	agents = append(agents, claude.SupportedAgents...)
 	return agents
+}
+
+// SupportedCLIAgents returns supported CLI agents
+func SupportedCLIAgents() []string {
+	agents := []string{}
+	if IsClaudeCLIAvailable() {
+		agents = append(agents, "claude")
+	}
+	if IsGeminiCLIAvailable() {
+		agents = append(agents, "gemini")
+	}
+	return agents
+}
+
+// SupportedModels returns supported API models
+func SupportedModels() []string {
+	models := []string{}
+	models = append(models, claude.SupportedAgents...)
+	models = append(models, gemini.SupportedAgents...)
+	return models
 }

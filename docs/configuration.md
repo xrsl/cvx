@@ -23,20 +23,31 @@ project: owner/1
 | `reference_path` | Reference materials directory  | `reference/`  |
 | `project`        | GitHub Project (owner/number)  | -             |
 
-## AI Agents
+## AI Agents and Models
 
-Priority order (first available is default):
+Use `--agent/-a` for CLI tools or `--model/-m` for API access. These flags are mutually exclusive.
 
-| Agent               | Notes                        |
-| ------------------- | ---------------------------- |
-| `claude`            | Uses Claude Code CLI         |
-| `gemini`            | Uses Gemini CLI              |
-| `claude-sonnet-4`   | Requires `ANTHROPIC_API_KEY` |
-| `claude-sonnet-4-5` | Requires `ANTHROPIC_API_KEY` |
-| `claude-opus-4`     | Requires `ANTHROPIC_API_KEY` |
-| `claude-opus-4-5`   | Requires `ANTHROPIC_API_KEY` |
-| `gemini-2.5-flash`  | Requires `GEMINI_API_KEY`    |
-| `gemini-2.5-pro`    | Requires `GEMINI_API_KEY`    |
+### CLI Agents (`--agent`)
+
+| Agent    | Notes                                                        |
+| -------- | ------------------------------------------------------------ |
+| `claude` | [Claude Code CLI](https://github.com/anthropics/claude-code) |
+| `gemini` | [Gemini CLI](https://github.com/google-gemini/gemini-cli)    |
+
+### API Models (`--model`)
+
+| Model                    | Notes                        |
+| ------------------------ | ---------------------------- |
+| `claude-sonnet-4`        | Requires `ANTHROPIC_API_KEY` |
+| `claude-sonnet-4-5`      | Requires `ANTHROPIC_API_KEY` |
+| `claude-opus-4`          | Requires `ANTHROPIC_API_KEY` |
+| `claude-opus-4-5`        | Requires `ANTHROPIC_API_KEY` |
+| `gemini-2.5-flash`       | Requires `GEMINI_API_KEY`    |
+| `gemini-2.5-pro`         | Requires `GEMINI_API_KEY`    |
+| `gemini-3-flash-preview` | Requires `GEMINI_API_KEY`    |
+| `gemini-3-pro-preview`   | Requires `GEMINI_API_KEY`    |
+
+Priority order for default: CLI agents first (claude > gemini), then API models.
 
 ## Environment Variables
 

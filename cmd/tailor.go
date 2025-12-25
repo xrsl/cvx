@@ -2,12 +2,14 @@ package cmd
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
 	"strings"
 	"text/template"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -23,25 +25,32 @@ var tailorCmd = &cobra.Command{
 	Short: "Tailor CV and cover letter for a job",
 	Long: `Tailor application materials for a job posting.
 
-Starts an interactive session to tailor your CV and cover letter
-based on the job posting. Resumes existing session if available.
+Prepares tailored CV and cover letter based on the job posting.
+Use -i for interactive session with the AI agent.
 
 Examples:
-  cvx tailor 42                    # Tailor for issue #42
-  cvx tailor 42 -a gemini          # Use Gemini CLI
+  cvx tailor 42                        # Prep tailored application
+  cvx tailor 42 -m claude-sonnet-4     # Use Claude API
+  cvx tailor 42 -i                     # Interactive session
+  cvx tailor 42 -a gemini -i           # Interactive with Gemini CLI
   cvx tailor 42 -c "Emphasize Python"`,
 	Args: cobra.ExactArgs(1),
 	RunE: runTailor,
 }
 
 var (
-	tailorAgentFlag   string
-	tailorContextFlag string
+	tailorAgentFlag       string
+	tailorModelFlag       string
+	tailorContextFlag     string
+	tailorInteractiveFlag bool
 )
 
 func init() {
-	tailorCmd.Flags().StringVarP(&tailorAgentFlag, "agent", "a", "", "AI agent (overrides config)")
+	tailorCmd.Flags().StringVarP(&tailorAgentFlag, "agent", "a", "", "CLI agent: claude, gemini")
+	tailorCmd.Flags().StringVarP(&tailorModelFlag, "model", "m", "", "API model: claude-sonnet-4, gemini-2.5-flash, etc.")
 	tailorCmd.Flags().StringVarP(&tailorContextFlag, "context", "c", "", "Additional context")
+	tailorCmd.Flags().BoolVarP(&tailorInteractiveFlag, "interactive", "i", false, "Interactive session")
+	tailorCmd.MarkFlagsMutuallyExclusive("agent", "model")
 	rootCmd.AddCommand(tailorCmd)
 }
 
@@ -53,35 +62,54 @@ func runTailor(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("config error: %w", err)
 	}
 
-	// Resolve agent (flag > config > default)
-	agentSetting := tailorAgentFlag
-	if agentSetting == "" {
+	// Resolve agent/model (flags > config > default)
+	var agentSetting string
+	switch {
+	case tailorAgentFlag != "":
+		if !ai.IsCLIAgentSupported(tailorAgentFlag) {
+			return fmt.Errorf("unsupported CLI agent: %s (supported: %v)", tailorAgentFlag, ai.SupportedCLIAgents())
+		}
+		agentSetting = tailorAgentFlag
+	case tailorModelFlag != "":
+		if !ai.IsModelSupported(tailorModelFlag) {
+			return fmt.Errorf("unsupported model: %s (supported: %v)", tailorModelFlag, ai.SupportedModels())
+		}
+		agentSetting = tailorModelFlag
+	case cfg.Agent != "":
 		agentSetting = cfg.Agent
-	}
-	if agentSetting == "" {
+	default:
 		agentSetting = ai.DefaultAgent()
 	}
 
-	// Validate agent
+	// Validate final setting
 	if !ai.IsAgentSupported(agentSetting) {
-		return fmt.Errorf("unsupported agent: %s (supported: %v)", agentSetting, ai.SupportedAgents())
+		return fmt.Errorf("unsupported agent/model: %s (supported: %v)", agentSetting, ai.SupportedAgents())
 	}
 
-	// Tailor requires CLI for interactive feedback loop
-	if !ai.IsAgentCLI(agentSetting) {
-		fmt.Printf("Note: tailor requires CLI agent for interactive feedback.\n")
-		fmt.Printf("Use -a claude or -a gemini, or configure in .cvx-config.yaml\n")
-		return fmt.Errorf("tailor requires CLI agent (claude or gemini)")
+	// Interactive mode requires CLI agent
+	if tailorInteractiveFlag && !ai.IsAgentCLI(agentSetting) {
+		return fmt.Errorf("interactive mode requires CLI agent (claude or gemini), got: %s", agentSetting)
 	}
 
 	// Override config agent for this run
 	cfg.Agent = agentSetting
-	agent := cfg.AgentCLI()
 
 	// Ensure we're on the correct branch
 	if err := ensureIssueBranch(cfg.Repo, issueNum); err != nil {
 		return err
 	}
+
+	// Interactive mode
+	if tailorInteractiveFlag {
+		return runTailorInteractive(cfg, issueNum)
+	}
+
+	// Non-interactive mode (API or CLI)
+	return runTailorNonInteractive(cmd.Context(), cfg, agentSetting, issueNum)
+}
+
+func runTailorInteractive(cfg *config.Config, issueNum string) error {
+	agent := cfg.AgentCLI()
 
 	// Use issue number as unified session key
 	sessionID, hasSession := getSession(issueNum)
@@ -138,6 +166,102 @@ func runTailor(cmd *cobra.Command, args []string) error {
 	}
 
 	return nil
+}
+
+func runTailorNonInteractive(ctx context.Context, cfg *config.Config, agent, issueNum string) error {
+	fmt.Printf("Tailoring application for issue #%s...\n", issueNum)
+
+	// Fetch issue body
+	issueBody, err := fetchIssueBody(cfg.Repo, issueNum)
+	if err != nil {
+		return fmt.Errorf("error fetching issue: %w", err)
+	}
+
+	systemPrompt, userPrompt, err := buildTailorPromptParts(cfg, issueBody)
+	if err != nil {
+		return err
+	}
+	if tailorContextFlag != "" {
+		userPrompt = fmt.Sprintf("%s\n\nAdditional context: %s", userPrompt, tailorContextFlag)
+	}
+
+	client, err := ai.NewClient(agent)
+	if err != nil {
+		return fmt.Errorf("error creating AI client: %w", err)
+	}
+	defer client.Close()
+
+	// Start spinner
+	done := make(chan bool)
+	go func() {
+		i := 0
+		for {
+			select {
+			case <-done:
+				fmt.Fprintf(os.Stderr, "\r\033[K")
+				return
+			default:
+				fmt.Fprintf(os.Stderr, "\r%s %s", style.C(style.Cyan, spinnerFrames[i%len(spinnerFrames)]), "Tailoring application using 🤖 "+agent+"...")
+				time.Sleep(80 * time.Millisecond)
+				i++
+			}
+		}
+	}()
+
+	var result string
+
+	// Use caching if supported
+	if cachingClient, ok := client.(ai.CachingClient); ok {
+		result, err = cachingClient.GenerateContentWithSystem(ctx, systemPrompt, userPrompt)
+	} else {
+		prompt := systemPrompt + "\n\n" + userPrompt
+		result, err = client.GenerateContent(ctx, prompt)
+	}
+
+	done <- true
+	close(done)
+
+	if err != nil {
+		return err
+	}
+
+	fmt.Println("\nTailoring suggestions:")
+	fmt.Println(result)
+
+	return nil
+}
+
+// buildTailorPromptParts returns the prompt split for caching
+func buildTailorPromptParts(cfg *config.Config, issueBody string) (system, user string, err error) {
+	workflowContent, loadErr := workflow.LoadTailor()
+	if loadErr != nil {
+		err = fmt.Errorf("error loading workflow: %w", loadErr)
+		return
+	}
+
+	tmpl, parseErr := template.New("tailor").Parse(workflowContent)
+	if parseErr != nil {
+		err = fmt.Errorf("error parsing workflow template: %w", parseErr)
+		return
+	}
+
+	data := struct {
+		CVPath        string
+		ReferencePath string
+	}{
+		CVPath:        cfg.CVPath,
+		ReferencePath: cfg.ReferencePath,
+	}
+
+	var buf bytes.Buffer
+	if execErr := tmpl.Execute(&buf, data); execErr != nil {
+		err = fmt.Errorf("error executing workflow template: %w", execErr)
+		return
+	}
+
+	system = buf.String()
+	user = fmt.Sprintf("## Job Posting\n%s", issueBody)
+	return
 }
 
 func buildTailorPrompt(cfg *config.Config, issueBody string) (string, error) {

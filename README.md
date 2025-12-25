@@ -50,10 +50,11 @@ Fetches job posting, extracts details with AI, creates GitHub issue.
 
 ```bash
 cvx add https://company.com/job
-cvx add https://company.com/job --dry-run     # extract only
-cvx add https://company.com/job -a gemini
-cvx add https://company.com/job --body        # use .cvx/body.md
-cvx add https://company.com/job -b job.md     # use custom file
+cvx add https://company.com/job --dry-run          # extract only
+cvx add https://company.com/job -a gemini          # use Gemini CLI
+cvx add https://company.com/job -m claude-sonnet-4 # use Claude API
+cvx add https://company.com/job --body             # use .cvx/body.md
+cvx add https://company.com/job -b job.md          # use custom file
 ```
 
 ### `cvx list`
@@ -71,24 +72,27 @@ cvx list --company google # filter by company
 Get career advice on job match quality.
 
 ```bash
-cvx advise 42                    # Analyze issue #42
-cvx advise 42 --push             # Post analysis as comment
-cvx advise 42 -a gemini          # Use Gemini CLI
-cvx advise 42 -i                 # Interactive session
+cvx advise 42                         # Analyze issue #42
+cvx advise 42 --push                  # Post analysis as comment
+cvx advise 42 -a gemini               # Use Gemini CLI
+cvx advise 42 -m gemini-2.5-flash     # Use Gemini API
+cvx advise 42 -i                      # Interactive session
 cvx advise https://example.com/job
 ```
 
 ### `cvx tailor <issue>`
 
-Tailor CV and cover letter interactively. Automatically creates/switches to the issue branch (`42-company-role`), then starts an AI session to edit your LaTeX source files.
+Tailor CV and cover letter for a job. Automatically creates/switches to the issue branch (`42-company-role`).
 
 ```bash
-cvx tailor 42                    # Start/resume tailoring session
-cvx tailor 42 -a gemini          # Use Gemini CLI
+cvx tailor 42                        # Prep tailored application
+cvx tailor 42 -m claude-sonnet-4     # Use Claude API
+cvx tailor 42 -i                     # Interactive session
+cvx tailor 42 -a gemini -i           # Interactive with Gemini CLI
 cvx tailor 42 -c "Emphasize Python"
 ```
 
-Sessions are shared per issue - `advise` and `tailor` continue the same conversation.
+Use `-i` for interactive mode with CLI agents. Sessions are shared per issue.
 
 ### `cvx view <issue>`
 
@@ -122,20 +126,38 @@ cvx init -c             # validate config resources
 cvx init -d             # delete .cvx/ and config
 ```
 
-## AI Agents
+## AI Agents and Models
 
-Priority order (first available is default):
+Use `--agent/-a` for CLI tools or `--model/-m` for API access:
 
-| Agent               | Notes                        |
-| ------------------- | ---------------------------- |
-| `claude`            | Uses Claude Code CLI         |
-| `gemini`            | Uses Gemini CLI              |
-| `claude-sonnet-4`   | Requires `ANTHROPIC_API_KEY` |
-| `claude-sonnet-4-5` | Requires `ANTHROPIC_API_KEY` |
-| `claude-opus-4`     | Requires `ANTHROPIC_API_KEY` |
-| `claude-opus-4-5`   | Requires `ANTHROPIC_API_KEY` |
-| `gemini-2.5-flash`  | Requires `GEMINI_API_KEY`    |
-| `gemini-2.5-pro`    | Requires `GEMINI_API_KEY`    |
+```bash
+cvx add https://job.com -a claude            # Claude CLI
+cvx add https://job.com -m claude-sonnet-4   # Claude API
+cvx advise 42 -a gemini                      # Gemini CLI
+cvx advise 42 -m gemini-2.5-flash            # Gemini API
+```
+
+### CLI Agents (`--agent`)
+
+| Agent    | Notes                                                        |
+| -------- | ------------------------------------------------------------ |
+| `claude` | [Claude Code CLI](https://github.com/anthropics/claude-code) |
+| `gemini` | [Gemini CLI](https://github.com/google-gemini/gemini-cli)    |
+
+### API Models (`--model`)
+
+| Model                    | Notes                        |
+| ------------------------ | ---------------------------- |
+| `claude-sonnet-4`        | Requires `ANTHROPIC_API_KEY` |
+| `claude-sonnet-4-5`      | Requires `ANTHROPIC_API_KEY` |
+| `claude-opus-4`          | Requires `ANTHROPIC_API_KEY` |
+| `claude-opus-4-5`        | Requires `ANTHROPIC_API_KEY` |
+| `gemini-2.5-flash`       | Requires `GEMINI_API_KEY`    |
+| `gemini-2.5-pro`         | Requires `GEMINI_API_KEY`    |
+| `gemini-3-flash-preview` | Requires `GEMINI_API_KEY`    |
+| `gemini-3-pro-preview`   | Requires `GEMINI_API_KEY`    |
+
+Priority order for default: CLI agents first (claude > gemini), then API models.
 
 ## GitHub Project
 
