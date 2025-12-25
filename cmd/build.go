@@ -274,9 +274,9 @@ func runBuildWithCLI(cfg *config.Config, agent, issueNum, issueBody string) erro
 		return fmt.Errorf("error running %s: %w", agent, err)
 	}
 
-	// Print output
+	// Print output in gray
 	if len(output) > 0 {
-		fmt.Println(string(output))
+		fmt.Println(style.C(style.Gray, string(output)))
 	}
 
 	// Save session if new
