@@ -4,9 +4,12 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/anthropics/anthropic-sdk-go"
 	"github.com/anthropics/anthropic-sdk-go/option"
+
+	"github.com/xrsl/cvx/pkg/retry"
 )
 
 const DefaultAgent = "claude-sonnet-4"
@@ -54,47 +57,68 @@ func (c *Client) GenerateContent(ctx context.Context, prompt string) (string, er
 	return c.GenerateContentWithSystem(ctx, "", prompt)
 }
 
+// isRetryableError checks if an error should trigger a retry
+func isRetryableError(err error) bool {
+	if err == nil {
+		return false
+	}
+	errStr := err.Error()
+	// Retry on rate limits, overloaded, and temporary network issues
+	return strings.Contains(errStr, "rate_limit") ||
+		strings.Contains(errStr, "overloaded") ||
+		strings.Contains(errStr, "529") ||
+		strings.Contains(errStr, "503") ||
+		strings.Contains(errStr, "timeout")
+}
+
 // GenerateContentWithSystem sends a prompt with a cached system message
 // The system prompt is marked for caching (5-min TTL, 90% cost reduction on cache hit)
 func (c *Client) GenerateContentWithSystem(ctx context.Context, systemPrompt, userPrompt string) (string, error) {
-	params := anthropic.MessageNewParams{
-		Model:     anthropic.Model(c.model),
-		MaxTokens: 4096,
-		Messages: []anthropic.MessageParam{
-			anthropic.NewUserMessage(anthropic.NewTextBlock(userPrompt)),
-		},
-	}
+	cfg := retry.DefaultConfig()
 
-	// Add system prompt with cache control if provided
-	if systemPrompt != "" {
-		params.System = []anthropic.TextBlockParam{
-			{
-				Type: "text",
-				Text: systemPrompt,
-				CacheControl: anthropic.CacheControlEphemeralParam{
-					Type: "ephemeral",
-				},
+	return retry.Do(ctx, cfg, func() (string, error) {
+		params := anthropic.MessageNewParams{
+			Model:     anthropic.Model(c.model),
+			MaxTokens: 4096,
+			Messages: []anthropic.MessageParam{
+				anthropic.NewUserMessage(anthropic.NewTextBlock(userPrompt)),
 			},
 		}
-	}
 
-	message, err := c.client.Messages.New(ctx, params)
-	if err != nil {
-		return "", fmt.Errorf("claude API error: %w", err)
-	}
-
-	if len(message.Content) == 0 {
-		return "", fmt.Errorf("no content in response")
-	}
-
-	// Extract text from response
-	for _, block := range message.Content {
-		if block.Type == "text" {
-			return block.Text, nil
+		// Add system prompt with cache control if provided
+		if systemPrompt != "" {
+			params.System = []anthropic.TextBlockParam{
+				{
+					Type: "text",
+					Text: systemPrompt,
+					CacheControl: anthropic.CacheControlEphemeralParam{
+						Type: "ephemeral",
+					},
+				},
+			}
 		}
-	}
 
-	return "", fmt.Errorf("no text content in response")
+		message, err := c.client.Messages.New(ctx, params)
+		if err != nil {
+			if isRetryableError(err) {
+				return "", retry.Retryable(fmt.Errorf("claude API error: %w", err))
+			}
+			return "", fmt.Errorf("claude API error: %w", err)
+		}
+
+		if len(message.Content) == 0 {
+			return "", fmt.Errorf("no content in response")
+		}
+
+		// Extract text from response
+		for _, block := range message.Content {
+			if block.Type == "text" {
+				return block.Text, nil
+			}
+		}
+
+		return "", fmt.Errorf("no text content in response")
+	})
 }
 
 func (c *Client) Close() {

@@ -151,10 +151,10 @@ func runAdviseURL(cfg *config.Config, agent, url string) error {
 	// Save to file
 	filename := sanitizeFilename(url) + ".md"
 	matchPath := filepath.Join(".cvx", "matches", filename)
-	if err := os.MkdirAll(filepath.Dir(matchPath), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(matchPath), 0o755); err != nil {
 		return fmt.Errorf("failed to create matches directory: %w", err)
 	}
-	if err := os.WriteFile(matchPath, []byte(result), 0644); err != nil {
+	if err := os.WriteFile(matchPath, []byte(result), 0o644); err != nil {
 		fmt.Printf("Warning: Could not save analysis: %v\n", err)
 	} else {
 		fmt.Printf("\n%s%s\n", style.Success("Analysis saved to"), matchPath)
@@ -297,8 +297,8 @@ func runAdviseAnalysis(cfg *config.Config, agent, issueNum, sessionKey string, h
 
 	// Save output
 	matchPath := filepath.Join(".cvx", "matches", issueNum+".md")
-	_ = os.MkdirAll(filepath.Dir(matchPath), 0755)
-	if err := os.WriteFile(matchPath, []byte(result), 0644); err != nil {
+	_ = os.MkdirAll(filepath.Dir(matchPath), 0o755)
+	if err := os.WriteFile(matchPath, []byte(result), 0o644); err != nil {
 		fmt.Printf("Warning: Could not save analysis: %v\n", err)
 	} else {
 		fmt.Printf("%s%s\n", style.Success("Analysis saved to"), matchPath)
@@ -444,9 +444,9 @@ func getSession(key string) (string, bool) {
 }
 
 func saveSession(key, sessionID string) error {
-	_ = os.MkdirAll(filepath.Join(".cvx", "sessions"), 0755)
+	_ = os.MkdirAll(filepath.Join(".cvx", "sessions"), 0o755)
 	sessionFile := filepath.Join(".cvx", "sessions", key+".sid")
-	return os.WriteFile(sessionFile, []byte(sessionID), 0644)
+	return os.WriteFile(sessionFile, []byte(sessionID), 0o644)
 }
 
 func getMostRecentAgentSession(agent string) string {

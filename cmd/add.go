@@ -117,7 +117,7 @@ func runAdd(cmd *cobra.Command, args []string) error {
 	}
 
 	// Get job text
-	jobText, err := getJobText(url, bodyPath)
+	jobText, err := getJobText(ctx, url, bodyPath)
 	if err != nil {
 		return err
 	}
@@ -142,14 +142,14 @@ func runAdd(cmd *cobra.Command, args []string) error {
 	return createDynamicIssue(repo, sch, title, data)
 }
 
-func getJobText(url, bodyPath string) (string, error) {
+func getJobText(ctx context.Context, url, bodyPath string) (string, error) {
 	// Use body file if specified
 	if bodyPath != "" {
 		content, err := os.ReadFile(bodyPath)
 		if err != nil {
 			return "", fmt.Errorf("failed to read %s: %w", bodyPath, err)
 		}
-		if len(strings.TrimSpace(string(content))) == 0 {
+		if strings.TrimSpace(string(content)) == "" {
 			return "", fmt.Errorf("%s is empty", bodyPath)
 		}
 		log("Using job posting from %s", bodyPath)
@@ -158,7 +158,7 @@ func getJobText(url, bodyPath string) (string, error) {
 
 	log("Fetching %s", url)
 	client := &http.Client{Timeout: 30 * time.Second}
-	req, err := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, http.NoBody)
 	if err != nil {
 		return "", fmt.Errorf("invalid URL: %w", err)
 	}

@@ -126,7 +126,7 @@ func runView(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("error extracting %s PDF: %w", docType, err)
 	}
 
-	if err := os.WriteFile(tmpPath, pdfData, 0644); err != nil {
+	if err := os.WriteFile(tmpPath, pdfData, 0o644); err != nil {
 		return fmt.Errorf("error writing PDF: %w", err)
 	}
 

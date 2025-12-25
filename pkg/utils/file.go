@@ -13,12 +13,12 @@ func ReadFile(path string) (string, error) {
 	return string(content), nil
 }
 
-func WriteFile(path string, content string) error {
+func WriteFile(path, content string) error {
 	dir := filepath.Dir(path)
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return err
 	}
-	return os.WriteFile(path, []byte(content), 0644)
+	return os.WriteFile(path, []byte(content), 0o644)
 }
 
 func FileExists(path string) bool {

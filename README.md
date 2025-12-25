@@ -1,4 +1,6 @@
 [![Go](https://img.shields.io/badge/Go-1.23+-00ADD8?style=flat&logo=go&logoColor=white)](https://go.dev/)
+[![CI](https://github.com/xrsl/cvx/actions/workflows/ci.yml/badge.svg)](https://github.com/xrsl/cvx/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/xrsl/cvx/graph/badge.svg)](https://codecov.io/gh/xrsl/cvx)
 [![prek](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/j178/prek/master/docs/assets/badge-v0.json)](https://github.com/j178/prek)
 [![GitHub release](https://img.shields.io/github/v/release/xrsl/cvx?style=flat&color=blue)](https://github.com/xrsl/cvx/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -26,7 +28,7 @@ go install github.com/xrsl/cvx@latest
 ## Requirements
 
 - `git` and [GitHub CLI](https://cli.github.com/) (`gh`) - installed and authenticated
-- One of: [Claude Code CLI](https://github.com/anthropics/claude-code), [Gemini CLI](https://github.com/google-gemini/gemini-cli), or an API key (`ANTROPIC_API_KEY` or `GEMINI_API_KEY`).
+- One of: [Claude Code CLI](https://github.com/anthropics/claude-code), [Gemini CLI](https://github.com/google-gemini/gemini-cli), or an API key (`ANTHROPIC_API_KEY` or `GEMINI_API_KEY`).
 - LaTeX: [BasicTeX](https://tug.org/mactex/morepackages.html) (light, recommended for Mac), [MacTeX](https://tug.org/mactex/), or [TeX Live](https://tug.org/texlive/) - for building PDFs
 
 ## Quickstart
@@ -186,3 +188,25 @@ AI prompts are stored in `.cvx/workflows/` and can be customized:
 Template variables available: `{{.CVPath}}`, `{{.ReferencePath}}`
 
 Reset to defaults with `cvx init -r`.
+
+## Shell Completion
+
+Generate shell completion scripts for your shell:
+
+```bash
+# Bash
+cvx completion bash > /etc/bash_completion.d/cvx
+
+# Zsh
+cvx completion zsh > "${fpath[1]}/_cvx"
+
+# Fish
+cvx completion fish > ~/.config/fish/completions/cvx.fish
+```
+
+## Global Flags
+
+| Flag            | Description                   |
+| --------------- | ----------------------------- |
+| `-q, --quiet`   | Suppress non-essential output |
+| `-v, --verbose` | Enable debug logging          |

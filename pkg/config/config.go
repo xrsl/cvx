@@ -144,7 +144,7 @@ func writeConfig(cfg *Config) error {
 	if err := enc.Encode(cfg); err != nil {
 		return err
 	}
-	return os.WriteFile(configFile, buf.Bytes(), 0644)
+	return os.WriteFile(configFile, buf.Bytes(), 0o644)
 }
 
 func All() (map[string]string, error) {
@@ -188,7 +188,7 @@ var cacheFile = ".cvx/cache.yaml"
 
 func saveProjectCache(cache ProjectCache) error {
 	cacheDir := filepath.Dir(cacheFile)
-	if err := os.MkdirAll(cacheDir, 0755); err != nil {
+	if err := os.MkdirAll(cacheDir, 0o755); err != nil {
 		return err
 	}
 	var buf bytes.Buffer
@@ -197,7 +197,7 @@ func saveProjectCache(cache ProjectCache) error {
 	if err := enc.Encode(map[string]ProjectCache{"project": cache}); err != nil {
 		return err
 	}
-	return os.WriteFile(cacheFile, buf.Bytes(), 0644)
+	return os.WriteFile(cacheFile, buf.Bytes(), 0o644)
 }
 
 // LoadProjectCache loads cached project IDs

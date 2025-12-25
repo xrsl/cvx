@@ -7,10 +7,14 @@ import (
 	"github.com/joho/godotenv"
 	"github.com/spf13/cobra"
 
+	clog "github.com/xrsl/cvx/pkg/log"
 	"github.com/xrsl/cvx/pkg/style"
 )
 
-var quiet bool
+var (
+	quiet   bool
+	verbose bool
+)
 
 var rootCmd = &cobra.Command{
 	Use:   "cvx",
@@ -19,6 +23,11 @@ var rootCmd = &cobra.Command{
 
 Manage job applications from the command line - add postings, analyze matches,
 tailor your CV and cover letters, and track everything in GitHub Issues.`,
+	PersistentPreRun: func(cmd *cobra.Command, args []string) {
+		// Configure logging based on flags
+		clog.SetVerbose(verbose)
+		clog.SetQuiet(quiet)
+	},
 }
 
 func Execute() {
@@ -36,4 +45,5 @@ func init() {
 	style.SetupHelp(rootCmd)
 
 	rootCmd.PersistentFlags().BoolVarP(&quiet, "quiet", "q", false, "Suppress non-essential output")
+	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Enable debug logging")
 }

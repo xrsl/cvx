@@ -4,9 +4,12 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/google/generative-ai-go/genai"
 	"google.golang.org/api/option"
+
+	"github.com/xrsl/cvx/pkg/retry"
 )
 
 const DefaultAgent = "gemini-2.5-flash"
@@ -62,6 +65,20 @@ func (c *Client) GenerateContent(ctx context.Context, prompt string) (string, er
 	return c.GenerateContentWithSystem(ctx, "", prompt)
 }
 
+// isRetryableError checks if an error should trigger a retry
+func isRetryableError(err error) bool {
+	if err == nil {
+		return false
+	}
+	errStr := err.Error()
+	// Retry on rate limits, quota exceeded, and temporary errors
+	return strings.Contains(errStr, "RESOURCE_EXHAUSTED") ||
+		strings.Contains(errStr, "UNAVAILABLE") ||
+		strings.Contains(errStr, "429") ||
+		strings.Contains(errStr, "503") ||
+		strings.Contains(errStr, "timeout")
+}
+
 // GenerateContentWithSystem uses system instruction for the prompt
 // Note: Gemini's context caching requires separate cache creation, so this just uses system instruction
 func (c *Client) GenerateContentWithSystem(ctx context.Context, systemPrompt, userPrompt string) (string, error) {
@@ -71,21 +88,28 @@ func (c *Client) GenerateContentWithSystem(ctx context.Context, systemPrompt, us
 		}
 	}
 
-	resp, err := c.model.GenerateContent(ctx, genai.Text(userPrompt))
-	if err != nil {
-		return "", err
-	}
+	cfg := retry.DefaultConfig()
 
-	if len(resp.Candidates) == 0 || len(resp.Candidates[0].Content.Parts) == 0 {
-		return "", fmt.Errorf("no content generated")
-	}
+	return retry.Do(ctx, cfg, func() (string, error) {
+		resp, err := c.model.GenerateContent(ctx, genai.Text(userPrompt))
+		if err != nil {
+			if isRetryableError(err) {
+				return "", retry.Retryable(err)
+			}
+			return "", err
+		}
 
-	part := resp.Candidates[0].Content.Parts[0]
-	if txt, ok := part.(genai.Text); ok {
-		return string(txt), nil
-	}
+		if len(resp.Candidates) == 0 || len(resp.Candidates[0].Content.Parts) == 0 {
+			return "", fmt.Errorf("no content generated")
+		}
 
-	return "", fmt.Errorf("unexpected response format")
+		part := resp.Candidates[0].Content.Parts[0]
+		if txt, ok := part.(genai.Text); ok {
+			return string(txt), nil
+		}
+
+		return "", fmt.Errorf("unexpected response format")
+	})
 }
 
 func (c *Client) Close() {

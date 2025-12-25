@@ -38,14 +38,39 @@ type OptionInfo struct {
 	Name string
 }
 
-// graphql executes a GraphQL query via gh CLI
-func graphql(query string) ([]byte, error) {
-	cmd := exec.Command("gh", "api", "graphql", "-f", fmt.Sprintf("query=%s", query))
+// graphqlWithVars executes a GraphQL query with variables via gh CLI
+// Variables are passed safely using -F flags, preventing injection
+func graphqlWithVars(query string, vars map[string]any) ([]byte, error) {
+	args := []string{"api", "graphql", "-f", "query=" + query}
+
+	// Add variables safely using -F (JSON) or -f (string)
+	for key, val := range vars {
+		switch v := val.(type) {
+		case string:
+			args = append(args, "-f", fmt.Sprintf("%s=%s", key, v))
+		case int:
+			args = append(args, "-F", fmt.Sprintf("%s=%d", key, v))
+		default:
+			// For complex types, marshal to JSON
+			jsonVal, err := json.Marshal(v)
+			if err != nil {
+				return nil, fmt.Errorf("failed to marshal variable %s: %w", key, err)
+			}
+			args = append(args, "-F", fmt.Sprintf("%s=%s", key, string(jsonVal)))
+		}
+	}
+
+	cmd := exec.Command("gh", args...)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return out, fmt.Errorf("%w: %s", err, string(out))
 	}
 	return out, nil
+}
+
+// graphql executes a simple GraphQL query without variables
+func graphql(query string) ([]byte, error) {
+	return graphqlWithVars(query, nil)
 }
 
 // GetUserID returns the authenticated user's node ID
@@ -76,14 +101,16 @@ func (c *Client) Create(title string, statuses []string) (*ProjectInfo, map[stri
 		return nil, nil, err
 	}
 
-	// Create project
-	mutation := fmt.Sprintf(`mutation {
-		createProjectV2(input: {ownerId: "%s", title: "%s"}) {
+	query := `mutation($ownerId: ID!, $title: String!) {
+		createProjectV2(input: {ownerId: $ownerId, title: $title}) {
 			projectV2 { id number title }
 		}
-	}`, userID, title)
+	}`
 
-	out, err := graphql(mutation)
+	out, err := graphqlWithVars(query, map[string]any{
+		"ownerId": userID,
+		"title":   title,
+	})
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to create project: %w", err)
 	}
@@ -164,22 +191,30 @@ func (c *Client) Create(title string, statuses []string) (*ProjectInfo, map[stri
 	return proj, fields, nil
 }
 
-func (c *Client) createSingleSelectField(projectID, name string, options []string) (*FieldInfo, error) {
-	optionsJSON := "["
-	for i, opt := range options {
-		if i > 0 {
-			optionsJSON += ","
-		}
-		optionsJSON += fmt.Sprintf(`{name: "%s", description: "", color: GRAY}`, opt)
-	}
-	optionsJSON += "]"
+// SingleSelectOption represents an option for createProjectV2Field
+type SingleSelectOption struct {
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Color       string `json:"color"`
+}
 
-	mutation := fmt.Sprintf(`mutation {
+func (c *Client) createSingleSelectField(projectID, name string, options []string) (*FieldInfo, error) {
+	// Build options array for the mutation
+	opts := make([]SingleSelectOption, len(options))
+	for i, opt := range options {
+		opts[i] = SingleSelectOption{
+			Name:        opt,
+			Description: "",
+			Color:       "GRAY",
+		}
+	}
+
+	query := `mutation($projectId: ID!, $name: String!, $options: [ProjectV2SingleSelectFieldOptionInput!]!) {
 		createProjectV2Field(input: {
-			projectId: "%s"
+			projectId: $projectId
 			dataType: SINGLE_SELECT
-			name: "%s"
-			singleSelectOptions: %s
+			name: $name
+			singleSelectOptions: $options
 		}) {
 			projectV2Field {
 				... on ProjectV2SingleSelectField {
@@ -189,9 +224,13 @@ func (c *Client) createSingleSelectField(projectID, name string, options []strin
 				}
 			}
 		}
-	}`, projectID, name, optionsJSON)
+	}`
 
-	out, err := graphql(mutation)
+	out, err := graphqlWithVars(query, map[string]any{
+		"projectId": projectID,
+		"name":      name,
+		"options":   opts,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -227,36 +266,45 @@ func (c *Client) createSingleSelectField(projectID, name string, options []strin
 
 func (c *Client) updateSingleSelectOptions(projectID, fieldID string, existingOptions []OptionInfo, newOptions []string) (*FieldInfo, error) {
 	// Delete existing options
+	deleteQuery := `mutation($projectId: ID!, $fieldId: ID!, $optionId: String!) {
+		deleteProjectV2SingleSelectFieldOption(input: {
+			projectId: $projectId
+			fieldId: $fieldId
+			optionId: $optionId
+		}) {
+			projectV2SingleSelectFieldOption { id }
+		}
+	}`
+
 	for _, opt := range existingOptions {
-		mutation := fmt.Sprintf(`mutation {
-			deleteProjectV2SingleSelectFieldOption(input: {
-				projectId: "%s"
-				fieldId: "%s"
-				optionId: "%s"
-			}) {
-				projectV2SingleSelectFieldOption { id }
-			}
-		}`, projectID, fieldID, opt.ID)
-		if _, err := graphql(mutation); err != nil {
+		if _, err := graphqlWithVars(deleteQuery, map[string]any{
+			"projectId": projectID,
+			"fieldId":   fieldID,
+			"optionId":  opt.ID,
+		}); err != nil {
 			return nil, fmt.Errorf("failed to delete option %s: %w", opt.Name, err)
 		}
 	}
 
 	// Create new options
+	createQuery := `mutation($projectId: ID!, $fieldId: ID!, $name: String!) {
+		createProjectV2SingleSelectFieldOption(input: {
+			projectId: $projectId
+			fieldId: $fieldId
+			name: $name
+			color: GRAY
+		}) {
+			projectV2SingleSelectFieldOption { id name }
+		}
+	}`
+
 	var createdOptions []OptionInfo
 	for _, optName := range newOptions {
-		mutation := fmt.Sprintf(`mutation {
-			createProjectV2SingleSelectFieldOption(input: {
-				projectId: "%s"
-				fieldId: "%s"
-				name: "%s"
-				color: GRAY
-			}) {
-				projectV2SingleSelectFieldOption { id name }
-			}
-		}`, projectID, fieldID, optName)
-
-		out, err := graphql(mutation)
+		out, err := graphqlWithVars(createQuery, map[string]any{
+			"projectId": projectID,
+			"fieldId":   fieldID,
+			"name":      optName,
+		})
 		if err != nil {
 			return nil, fmt.Errorf("failed to create option %s: %w", optName, err)
 		}
@@ -287,19 +335,22 @@ func (c *Client) updateSingleSelectOptions(projectID, fieldID string, existingOp
 }
 
 func (c *Client) createTextField(projectID, name string) (*FieldInfo, error) {
-	mutation := fmt.Sprintf(`mutation {
+	query := `mutation($projectId: ID!, $name: String!) {
 		createProjectV2Field(input: {
-			projectId: "%s"
+			projectId: $projectId
 			dataType: TEXT
-			name: "%s"
+			name: $name
 		}) {
 			projectV2Field {
 				... on ProjectV2Field { id name }
 			}
 		}
-	}`, projectID, name)
+	}`
 
-	out, err := graphql(mutation)
+	out, err := graphqlWithVars(query, map[string]any{
+		"projectId": projectID,
+		"name":      name,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -326,19 +377,22 @@ func (c *Client) createTextField(projectID, name string) (*FieldInfo, error) {
 }
 
 func (c *Client) createDateField(projectID, name string) (*FieldInfo, error) {
-	mutation := fmt.Sprintf(`mutation {
+	query := `mutation($projectId: ID!, $name: String!) {
 		createProjectV2Field(input: {
-			projectId: "%s"
+			projectId: $projectId
 			dataType: DATE
-			name: "%s"
+			name: $name
 		}) {
 			projectV2Field {
 				... on ProjectV2Field { id name }
 			}
 		}
-	}`, projectID, name)
+	}`
 
-	out, err := graphql(mutation)
+	out, err := graphqlWithVars(query, map[string]any{
+		"projectId": projectID,
+		"name":      name,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -371,8 +425,14 @@ func (c *Client) linkToRepo(projectID string) error {
 	}
 
 	// Get repo ID
-	query := fmt.Sprintf(`query { repository(owner: "%s", name: "%s") { id } }`, parts[0], parts[1])
-	out, err := graphql(query)
+	query := `query($owner: String!, $name: String!) {
+		repository(owner: $owner, name: $name) { id }
+	}`
+
+	out, err := graphqlWithVars(query, map[string]any{
+		"owner": parts[0],
+		"name":  parts[1],
+	})
 	if err != nil {
 		return err
 	}
@@ -389,13 +449,16 @@ func (c *Client) linkToRepo(projectID string) error {
 	}
 
 	// Link project to repo
-	mutation := fmt.Sprintf(`mutation {
-		linkProjectV2ToRepository(input: {projectId: "%s", repositoryId: "%s"}) {
+	linkQuery := `mutation($projectId: ID!, $repositoryId: ID!) {
+		linkProjectV2ToRepository(input: {projectId: $projectId, repositoryId: $repositoryId}) {
 			repository { id }
 		}
-	}`, projectID, repoResult.Data.Repository.ID)
+	}`
 
-	_, err = graphql(mutation)
+	_, err = graphqlWithVars(linkQuery, map[string]any{
+		"projectId":    projectID,
+		"repositoryId": repoResult.Data.Repository.ID,
+	})
 	return err
 }
 
@@ -417,15 +480,17 @@ func (c *Client) ListProjects() ([]ProjectInfo, error) {
 }
 
 func (c *Client) listUserProjects(owner string) ([]ProjectInfo, error) {
-	query := fmt.Sprintf(`query {
-		user(login: "%s") {
+	query := `query($login: String!) {
+		user(login: $login) {
 			projectsV2(first: 20) {
 				nodes { id number title }
 			}
 		}
-	}`, owner)
+	}`
 
-	out, err := graphql(query)
+	out, err := graphqlWithVars(query, map[string]any{
+		"login": owner,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -455,15 +520,18 @@ func (c *Client) listUserProjects(owner string) ([]ProjectInfo, error) {
 }
 
 func (c *Client) listRepoProjects(owner, name string) ([]ProjectInfo, error) {
-	query := fmt.Sprintf(`query {
-		repository(owner: "%s", name: "%s") {
+	query := `query($owner: String!, $name: String!) {
+		repository(owner: $owner, name: $name) {
 			projectsV2(first: 20) {
 				nodes { id number title }
 			}
 		}
-	}`, owner, name)
+	}`
 
-	out, err := graphql(query)
+	out, err := graphqlWithVars(query, map[string]any{
+		"owner": owner,
+		"name":  name,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -494,8 +562,8 @@ func (c *Client) listRepoProjects(owner, name string) ([]ProjectInfo, error) {
 
 // DiscoverFields returns field IDs for an existing project
 func (c *Client) DiscoverFields(projectID string) (map[string]FieldInfo, error) {
-	query := fmt.Sprintf(`query {
-		node(id: "%s") {
+	query := `query($nodeId: ID!) {
+		node(id: $nodeId) {
 			... on ProjectV2 {
 				fields(first: 30) {
 					nodes {
@@ -510,9 +578,11 @@ func (c *Client) DiscoverFields(projectID string) (map[string]FieldInfo, error) 
 				}
 			}
 		}
-	}`, projectID)
+	}`
 
-	out, err := graphql(query)
+	out, err := graphqlWithVars(query, map[string]any{
+		"nodeId": projectID,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -561,13 +631,17 @@ func (c *Client) GetIssueNodeID(issueNumber int) (string, error) {
 		return "", fmt.Errorf("invalid repo format")
 	}
 
-	query := fmt.Sprintf(`query {
-		repository(owner: "%s", name: "%s") {
-			issue(number: %d) { id }
+	query := `query($owner: String!, $name: String!, $number: Int!) {
+		repository(owner: $owner, name: $name) {
+			issue(number: $number) { id }
 		}
-	}`, parts[0], parts[1], issueNumber)
+	}`
 
-	out, err := graphql(query)
+	out, err := graphqlWithVars(query, map[string]any{
+		"owner":  parts[0],
+		"name":   parts[1],
+		"number": issueNumber,
+	})
 	if err != nil {
 		return "", err
 	}
@@ -590,13 +664,16 @@ func (c *Client) GetIssueNodeID(issueNumber int) (string, error) {
 
 // AddItem adds an issue to a project
 func (c *Client) AddItem(projectID, issueNodeID string) (string, error) {
-	mutation := fmt.Sprintf(`mutation {
-		addProjectV2ItemById(input: {projectId: "%s", contentId: "%s"}) {
+	query := `mutation($projectId: ID!, $contentId: ID!) {
+		addProjectV2ItemById(input: {projectId: $projectId, contentId: $contentId}) {
 			item { id }
 		}
-	}`, projectID, issueNodeID)
+	}`
 
-	out, err := graphql(mutation)
+	out, err := graphqlWithVars(query, map[string]any{
+		"projectId": projectID,
+		"contentId": issueNodeID,
+	})
 	if err != nil {
 		return "", err
 	}
@@ -619,52 +696,67 @@ func (c *Client) AddItem(projectID, issueNodeID string) (string, error) {
 
 // SetTextField sets a text field value
 func (c *Client) SetTextField(projectID, itemID, fieldID, value string) error {
-	mutation := fmt.Sprintf(`mutation {
+	query := `mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $value: String!) {
 		updateProjectV2ItemFieldValue(input: {
-			projectId: "%s"
-			itemId: "%s"
-			fieldId: "%s"
-			value: {text: "%s"}
+			projectId: $projectId
+			itemId: $itemId
+			fieldId: $fieldId
+			value: {text: $value}
 		}) {
 			projectV2Item { id }
 		}
-	}`, projectID, itemID, fieldID, value)
+	}`
 
-	_, err := graphql(mutation)
+	_, err := graphqlWithVars(query, map[string]any{
+		"projectId": projectID,
+		"itemId":    itemID,
+		"fieldId":   fieldID,
+		"value":     value,
+	})
 	return err
 }
 
 // SetDateField sets a date field value
 func (c *Client) SetDateField(projectID, itemID, fieldID, date string) error {
-	mutation := fmt.Sprintf(`mutation {
+	query := `mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $date: Date!) {
 		updateProjectV2ItemFieldValue(input: {
-			projectId: "%s"
-			itemId: "%s"
-			fieldId: "%s"
-			value: {date: "%s"}
+			projectId: $projectId
+			itemId: $itemId
+			fieldId: $fieldId
+			value: {date: $date}
 		}) {
 			projectV2Item { id }
 		}
-	}`, projectID, itemID, fieldID, date)
+	}`
 
-	_, err := graphql(mutation)
+	_, err := graphqlWithVars(query, map[string]any{
+		"projectId": projectID,
+		"itemId":    itemID,
+		"fieldId":   fieldID,
+		"date":      date,
+	})
 	return err
 }
 
 // SetStatusField sets a single-select field value
 func (c *Client) SetStatusField(projectID, itemID, fieldID, optionID string) error {
-	mutation := fmt.Sprintf(`mutation {
+	query := `mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $optionId: String!) {
 		updateProjectV2ItemFieldValue(input: {
-			projectId: "%s"
-			itemId: "%s"
-			fieldId: "%s"
-			value: {singleSelectOptionId: "%s"}
+			projectId: $projectId
+			itemId: $itemId
+			fieldId: $fieldId
+			value: {singleSelectOptionId: $optionId}
 		}) {
 			projectV2Item { id }
 		}
-	}`, projectID, itemID, fieldID, optionID)
+	}`
 
-	_, err := graphql(mutation)
+	_, err := graphqlWithVars(query, map[string]any{
+		"projectId": projectID,
+		"itemId":    itemID,
+		"fieldId":   fieldID,
+		"optionId":  optionID,
+	})
 	return err
 }
 
@@ -675,9 +767,9 @@ func (c *Client) GetItemID(projectID string, issueNumber int) (string, error) {
 		return "", fmt.Errorf("invalid repo format")
 	}
 
-	query := fmt.Sprintf(`query {
-		repository(owner: "%s", name: "%s") {
-			issue(number: %d) {
+	query := `query($owner: String!, $name: String!, $number: Int!) {
+		repository(owner: $owner, name: $name) {
+			issue(number: $number) {
 				projectItems(first: 10) {
 					nodes {
 						id
@@ -686,9 +778,13 @@ func (c *Client) GetItemID(projectID string, issueNumber int) (string, error) {
 				}
 			}
 		}
-	}`, parts[0], parts[1], issueNumber)
+	}`
 
-	out, err := graphql(query)
+	out, err := graphqlWithVars(query, map[string]any{
+		"owner":  parts[0],
+		"name":   parts[1],
+		"number": issueNumber,
+	})
 	if err != nil {
 		return "", err
 	}

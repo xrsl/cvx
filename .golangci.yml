@@ -1,14 +1,97 @@
 linters:
   enable:
+    # Default
     - govet
     - errcheck
     - staticcheck
     - ineffassign
     - unused
-    - misspell
+    # Formatting
     - gofmt
     - goimports
+    - misspell
+    # Security
+    - gosec
+    # Error handling
+    - errorlint
+    # Code quality
+    - revive
+    - gocritic
+    - gocyclo
+    - dupl
+    - unconvert
+    - unparam
+    # - prealloc  # Disabled: minor optimization, noisy
 
 linters-settings:
   goimports:
-    local-prefixes: cvx
+    local-prefixes: github.com/xrsl/cvx
+
+  gocyclo:
+    min-complexity: 20
+
+  dupl:
+    threshold: 150
+
+  gocritic:
+    enabled-tags:
+      - diagnostic
+      - style
+      - performance
+    disabled-checks:
+      - whyNoLint
+      - hugeParam
+      - ifElseChain        # Subjective - if/else often clearer than switch
+      - paramTypeCombine   # Minor style preference
+      - sprintfQuotedString # False positive in GraphQL queries
+      - rangeValCopy       # Handled case-by-case
+
+  revive:
+    rules:
+      - name: blank-imports
+      - name: context-as-argument
+      - name: context-keys-type
+      - name: error-return
+      - name: error-strings
+      - name: error-naming
+      - name: exported
+      - name: increment-decrement
+      - name: var-naming
+      - name: package-comments
+        disabled: true
+      - name: range
+      - name: receiver-naming
+      - name: time-naming
+      - name: unexported-return
+      - name: indent-error-flow
+      - name: errorf
+
+  gosec:
+    excludes:
+      - G104 # Duplicates errcheck
+      - G204 # Subprocess with variable args - we use gh CLI intentionally
+      - G304 # File path from variable (we validate inputs)
+      - G306 # WriteFile permissions - 0644 is fine for config files
+      - G404 # Weak random - used only for jitter, not security
+
+issues:
+  exclude-rules:
+    # Exclude some linters from tests
+    - path: _test\.go
+      linters:
+        - dupl
+        - gocritic
+        - gocyclo
+        - gosec
+    # Allow high cyclomatic complexity in init/list commands (wizard/display flow)
+    - path: cmd/(init|list)\.go
+      linters:
+        - gocyclo
+    # Allow stutter in exported type names for clarity
+    - linters:
+        - revive
+      text: "stutters"
+    # Allow long param lists for GraphQL response parsing
+    - linters:
+        - revive
+      text: "AddProjectV2ItemById"

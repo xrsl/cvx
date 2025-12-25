@@ -33,35 +33,35 @@ func Init(schemaPath string) error {
 	// Create directories
 	dirs := []string{".cvx/workflows", ".cvx/sessions", ".cvx/matches", ".github/ISSUE_TEMPLATE"}
 	for _, dir := range dirs {
-		if err := os.MkdirAll(dir, 0755); err != nil {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
 			return err
 		}
 	}
 
 	// Create default job-ad-schema.yaml if it doesn't exist
 	if _, err := os.Stat(schemaPath); os.IsNotExist(err) {
-		if err := os.WriteFile(schemaPath, schema.DefaultSchemaYAML(), 0644); err != nil {
+		if err := os.WriteFile(schemaPath, schema.DefaultSchemaYAML(), 0o644); err != nil {
 			return err
 		}
 	}
 
 	// Create default add.md if it doesn't exist
 	if _, err := os.Stat(AddPath); os.IsNotExist(err) {
-		if err := os.WriteFile(AddPath, []byte(DefaultAdd), 0644); err != nil {
+		if err := os.WriteFile(AddPath, []byte(DefaultAdd), 0o644); err != nil {
 			return err
 		}
 	}
 
 	// Create default advise.md if it doesn't exist
 	if _, err := os.Stat(AdvisePath); os.IsNotExist(err) {
-		if err := os.WriteFile(AdvisePath, []byte(DefaultAdvise), 0644); err != nil {
+		if err := os.WriteFile(AdvisePath, []byte(DefaultAdvise), 0o644); err != nil {
 			return err
 		}
 	}
 
 	// Create default tailor.md if it doesn't exist
 	if _, err := os.Stat(TailorPath); os.IsNotExist(err) {
-		if err := os.WriteFile(TailorPath, []byte(DefaultTailor), 0644); err != nil {
+		if err := os.WriteFile(TailorPath, []byte(DefaultTailor), 0o644); err != nil {
 			return err
 		}
 	}
@@ -98,16 +98,16 @@ func LoadAdd() (string, error) {
 
 // ResetWorkflows overwrites workflow files with defaults
 func ResetWorkflows() error {
-	if err := os.MkdirAll(".cvx/workflows", 0755); err != nil {
+	if err := os.MkdirAll(".cvx/workflows", 0o755); err != nil {
 		return err
 	}
-	if err := os.WriteFile(AddPath, []byte(DefaultAdd), 0644); err != nil {
+	if err := os.WriteFile(AddPath, []byte(DefaultAdd), 0o644); err != nil {
 		return err
 	}
-	if err := os.WriteFile(AdvisePath, []byte(DefaultAdvise), 0644); err != nil {
+	if err := os.WriteFile(AdvisePath, []byte(DefaultAdvise), 0o644); err != nil {
 		return err
 	}
-	if err := os.WriteFile(TailorPath, []byte(DefaultTailor), 0644); err != nil {
+	if err := os.WriteFile(TailorPath, []byte(DefaultTailor), 0o644); err != nil {
 		return err
 	}
 	return nil
