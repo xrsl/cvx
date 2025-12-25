@@ -248,8 +248,8 @@ func TestRateLimiterWait(t *testing.T) {
 }
 
 func TestRateLimiterWaitContextCancelled(t *testing.T) {
-	// Create a rate limiter with very low rate
-	rl := NewRateLimiter(0.1) // 1 token per 10 seconds
+	// Create a rate limiter with 1 token
+	rl := NewRateLimiter(1.0)
 
 	// Drain the initial token
 	ctx := context.Background()
@@ -257,7 +257,7 @@ func TestRateLimiterWaitContextCancelled(t *testing.T) {
 		t.Fatalf("unexpected error draining token: %v", err)
 	}
 
-	// Now try with cancelled context
+	// Now try with cancelled context (no tokens left)
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel() // Cancel immediately
 

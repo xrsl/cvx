@@ -1,5 +1,6 @@
-[![Go](https://img.shields.io/badge/Go-1.23+-00ADD8?style=flat&logo=go&logoColor=white)](https://go.dev/)
+[![Go](https://img.shields.io/badge/Go-1.25+-00ADD8?style=flat&logo=go&logoColor=white)](https://go.dev/)
 [![CI](https://github.com/xrsl/cvx/actions/workflows/ci.yml/badge.svg)](https://github.com/xrsl/cvx/actions/workflows/ci.yml)
+[![docs](https://github.com/xrsl/cvx/actions/workflows/docs.yml/badge.svg)](https://github.com/xrsl/cvx/actions/workflows/docs.yml)
 [![codecov](https://codecov.io/gh/xrsl/cvx/graph/badge.svg)](https://codecov.io/gh/xrsl/cvx)
 [![prek](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/j178/prek/master/docs/assets/badge-v0.json)](https://github.com/j178/prek)
 [![GitHub release](https://img.shields.io/github/v/release/xrsl/cvx?style=flat&color=blue)](https://github.com/xrsl/cvx/releases)
