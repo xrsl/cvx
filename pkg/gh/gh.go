@@ -8,6 +8,8 @@ import (
 )
 
 // CLI defines the interface for GitHub CLI operations
+//
+//nolint:dupl // Mock in gh_test.go mirrors this interface by design
 type CLI interface {
 	// IssueCreate creates a new issue and returns the issue URL
 	IssueCreate(repo, title, body string) (string, error)

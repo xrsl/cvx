@@ -31,3 +31,9 @@ To list your most recent Claude Code session IDs and limit the output to the fir
 ```
 ls -t ~/.claude/projects/**/*.jsonl | head -n 5 | xargs -n 1 basename -s .jsonl
 ```
+
+# To test lint job in ci.yaml locally
+
+```
+golangci-lint run
+```
