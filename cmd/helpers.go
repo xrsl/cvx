@@ -29,7 +29,7 @@ func ensureIssueBranch(repo, issueNumber string) error {
 
 	// Already on correct branch
 	if currentBranch == branchName {
-		fmt.Printf("On branch %s\n", branchName)
+		fmt.Printf("%s On branch %s\n", style.C(style.Green, "✓"), style.C(style.Cyan, branchName))
 		return nil
 	}
 
@@ -41,17 +41,17 @@ func ensureIssueBranch(repo, issueNumber string) error {
 		if output, err := gitCmd.CombinedOutput(); err != nil {
 			return fmt.Errorf("error switching to branch: %w\n%s", err, string(output))
 		}
-		fmt.Printf("%s'%s'\n", style.Success("Switched to branch "), branchName)
+		fmt.Printf("%s Switched to branch %s\n", style.C(style.Green, "✓"), style.C(style.Cyan, branchName))
 	} else {
 		// Create new branch from main
 		gitCmd := exec.Command("git", "checkout", "-b", branchName, "main")
 		if output, err := gitCmd.CombinedOutput(); err != nil {
 			return fmt.Errorf("error creating branch: %w\n%s", err, string(output))
 		}
-		fmt.Printf("%s'%s'\n", style.Success("Created branch "), branchName)
+		fmt.Printf("%s Created branch %s\n", style.C(style.Green, "✓"), style.C(style.Cyan, branchName))
 	}
 
-	fmt.Printf("Issue #%s: %s at %s\n", issueNumber, title, company)
+	fmt.Printf("  Issue %s: %s @ %s\n", style.C(style.Cyan, "#"+issueNumber), title, style.C(style.Cyan, company))
 	return nil
 }
 

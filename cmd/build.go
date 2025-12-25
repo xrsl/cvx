@@ -32,6 +32,7 @@ Examples:
   cvx build                           # Infer issue from branch
   cvx build 42                        # Build for issue #42
   cvx build -o                        # Build and open PDF
+  cvx build -o --no-build             # Just open PDF (skip build)
   cvx build -c "emphasize Python"     # Continue with feedback
   cvx build -i                        # Interactive session`,
 	Args: cobra.MaximumNArgs(1),
@@ -44,6 +45,7 @@ var (
 	buildContextFlag     string
 	buildInteractiveFlag bool
 	buildOpenFlag        bool
+	buildNoBuildFlag     bool
 )
 
 func init() {
@@ -52,11 +54,20 @@ func init() {
 	buildCmd.Flags().StringVarP(&buildContextFlag, "context", "c", "", "Feedback or additional context")
 	buildCmd.Flags().BoolVarP(&buildInteractiveFlag, "interactive", "i", false, "Interactive session")
 	buildCmd.Flags().BoolVarP(&buildOpenFlag, "open", "o", false, "Open combined.pdf in VSCode after build")
+	buildCmd.Flags().BoolVar(&buildNoBuildFlag, "no-build", false, "Skip build, use with -o to just open PDF")
 	buildCmd.MarkFlagsMutuallyExclusive("agent", "model")
 	rootCmd.AddCommand(buildCmd)
 }
 
 func runBuild(cmd *cobra.Command, args []string) error {
+	// Skip build - just open if -o is also set
+	if buildNoBuildFlag {
+		if buildOpenFlag {
+			return openCombinedPDF()
+		}
+		return nil
+	}
+
 	cfg, _, err := config.LoadWithCache()
 	if err != nil {
 		return fmt.Errorf("config error: %w", err)
@@ -138,19 +149,19 @@ func runBuildInteractive(cfg *config.Config, issueNum string) error {
 	agent := cfg.AgentCLI()
 
 	// Use issue number as unified session key
-	sessionID, hasSession := getSession(issueNum)
+	sessionID, hasSession := getSession(issueNum + "-build")
 
 	var execCmd *exec.Cmd
 
 	if hasSession {
-		fmt.Printf("Resuming session for issue #%s...\n", issueNum)
+		fmt.Printf("%s Resuming session for issue %s\n", style.C(style.Cyan, "↻"), style.C(style.Cyan, "#"+issueNum))
 		if buildContextFlag != "" {
 			execCmd = exec.Command(agent, "--resume", sessionID, "-p", buildContextFlag)
 		} else {
 			execCmd = exec.Command(agent, "--resume", sessionID)
 		}
 	} else {
-		fmt.Printf("Starting build session for issue #%s...\n", issueNum)
+		fmt.Printf("%s Starting build session for issue %s\n", style.C(style.Green, "▶"), style.C(style.Cyan, "#"+issueNum))
 
 		// Fetch issue body
 		issueBody, err := fetchIssueBody(cfg.Repo, issueNum)
@@ -186,8 +197,8 @@ func runBuildInteractive(cfg *config.Config, issueNum string) error {
 	// Save session if new
 	if !hasSession {
 		if newSessionID := getMostRecentAgentSession(agent); newSessionID != "" {
-			_ = saveSession(issueNum, newSessionID)
-			fmt.Printf("%sissue #%s\n", style.Success("Session saved for "), issueNum)
+			_ = saveSession(issueNum+"-build", newSessionID)
+			fmt.Printf("%s Session saved for issue %s\n", style.C(style.Green, "✓"), style.C(style.Cyan, "#"+issueNum))
 		}
 	}
 
@@ -206,36 +217,55 @@ func runBuildNonInteractive(ctx context.Context, cfg *config.Config, agent, issu
 		return fmt.Errorf("error fetching issue: %w", err)
 	}
 
-	fmt.Printf("Building tailored application for issue #%s...\n", issueNum)
-
 	// Path 1: CLI agent (headless) - claude/gemini handles tool use internally
 	if ai.IsAgentCLI(agent) {
-		return runBuildWithCLI(cfg, agent, issueBody)
+		return runBuildWithCLI(cfg, agent, issueNum, issueBody)
 	}
 
 	// Path 2: API model - use structured output
+	fmt.Printf("%s Building application for issue %s\n", style.C(style.Green, "▶"), style.C(style.Cyan, "#"+issueNum))
 	return runBuildWithAPI(ctx, cfg, agent, issueBody)
 }
 
 // runBuildWithCLI shells out to claude/gemini CLI in headless mode
-func runBuildWithCLI(cfg *config.Config, agent, issueBody string) error {
-	prompt, err := buildBuildPrompt(cfg, issueBody)
-	if err != nil {
-		return err
-	}
-
-	if buildContextFlag != "" {
-		prompt = fmt.Sprintf("%s\n\nFeedback: %s", prompt, buildContextFlag)
-	}
-
-	var args []string
+func runBuildWithCLI(cfg *config.Config, agent, issueNum, issueBody string) error {
 	var cliName string
 	if agent == "gemini" || strings.HasPrefix(agent, "gemini:") {
 		cliName = "gemini"
-		args = []string{"-p", prompt}
 	} else {
 		cliName = "claude"
-		args = []string{"-p", prompt, "--verbose"}
+	}
+
+	// Check for existing session
+	sessionID, hasSession := getSession(issueNum + "-build")
+
+	var args []string
+	if hasSession {
+		fmt.Printf("%s Resuming session for issue %s\n", style.C(style.Cyan, "↻"), style.C(style.Cyan, "#"+issueNum))
+		// Resume existing session
+		if buildContextFlag != "" {
+			args = []string{"--resume", sessionID, "-p", buildContextFlag}
+		} else {
+			args = []string{"--resume", sessionID, "-p", "continue"}
+		}
+	} else {
+		fmt.Printf("%s Starting build session for issue %s\n", style.C(style.Green, "▶"), style.C(style.Cyan, "#"+issueNum))
+		// Start new session
+		prompt, err := buildBuildPrompt(cfg, issueBody)
+		if err != nil {
+			return err
+		}
+
+		if buildContextFlag != "" {
+			prompt = fmt.Sprintf("%s\n\nFeedback: %s", prompt, buildContextFlag)
+		}
+
+		args = []string{"-p", prompt}
+	}
+
+	// Add CLI-specific flags
+	if cliName == "claude" {
+		args = append(args, "--dangerously-skip-permissions")
 	}
 
 	// Use shared spinner helper
@@ -247,6 +277,14 @@ func runBuildWithCLI(cfg *config.Config, agent, issueBody string) error {
 	// Print output
 	if len(output) > 0 {
 		fmt.Println(string(output))
+	}
+
+	// Save session if new
+	if !hasSession {
+		if newSessionID := getMostRecentAgentSession(cliName); newSessionID != "" {
+			_ = saveSession(issueNum+"-build", newSessionID)
+			fmt.Printf("%s Session saved for issue %s\n", style.C(style.Green, "✓"), style.C(style.Cyan, "#"+issueNum))
+		}
 	}
 
 	return nil
@@ -336,12 +374,12 @@ Do not include any explanation, markdown, or text outside the JSON object.`
 	if err := os.WriteFile(cvPath, []byte(output.CV), 0o644); err != nil {
 		return fmt.Errorf("failed to write %s: %w", cvPath, err)
 	}
-	fmt.Printf("%s%s\n", style.Success("Wrote "), cvPath)
+	fmt.Printf("%s Wrote %s\n", style.C(style.Green, "✓"), style.C(style.Cyan, cvPath))
 
 	if err := os.WriteFile(letterPath, []byte(output.Letter), 0o644); err != nil {
 		return fmt.Errorf("failed to write %s: %w", letterPath, err)
 	}
-	fmt.Printf("%s%s\n", style.Success("Wrote "), letterPath)
+	fmt.Printf("%s Wrote %s\n", style.C(style.Green, "✓"), style.C(style.Cyan, letterPath))
 
 	return nil
 }
@@ -445,6 +483,6 @@ func openCombinedPDF() error {
 		return fmt.Errorf("error opening PDF: %w", err)
 	}
 
-	fmt.Printf("%s%s\n", style.Success("Opened "), pdfPath)
+	fmt.Printf("%s Opened build/combined.pdf in VSCode\n", style.C(style.Green, "✓"))
 	return nil
 }

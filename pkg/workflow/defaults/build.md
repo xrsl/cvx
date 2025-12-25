@@ -21,9 +21,9 @@ Build tailored application materials for the job posting.
 
 4. **Write files:**
 
-   - Update the CV file with tailored content
-   - Write the cover letter to the appropriate location
-   - Ensure all changes are saved to disk
+   - Write tailored CV to `src/cv.tex`
+   - Write cover letter to `src/letter.tex`
+   - Both files MUST be written - do not skip the cover letter
 
 5. **Verify accuracy:**
 

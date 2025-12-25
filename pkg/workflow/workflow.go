@@ -38,6 +38,14 @@ func Init(schemaPath string) error {
 		}
 	}
 
+	// Gitignore sessions (local only)
+	sessionsGitignore := ".cvx/sessions/.gitignore"
+	if _, err := os.Stat(sessionsGitignore); os.IsNotExist(err) {
+		if err := os.WriteFile(sessionsGitignore, []byte("*\n!.gitignore\n"), 0o644); err != nil {
+			return err
+		}
+	}
+
 	// Create default job-ad-schema.yaml if it doesn't exist
 	if _, err := os.Stat(schemaPath); os.IsNotExist(err) {
 		if err := os.WriteFile(schemaPath, schema.DefaultSchemaYAML(), 0o644); err != nil {
