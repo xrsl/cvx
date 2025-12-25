@@ -22,3 +22,12 @@ repos:
   rev: v1.62.2
   hooks:
     - id: golangci-lint
+
+- repo: local
+  hooks:
+    - id: go-mod-tidy
+      name: go mod tidy
+      entry: bash -c 'go mod tidy && git diff --exit-code go.mod go.sum'
+      language: system
+      files: \.go$
+      pass_filenames: false
