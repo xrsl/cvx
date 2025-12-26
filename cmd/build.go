@@ -41,18 +41,20 @@ Examples:
 }
 
 var (
-	buildAgentFlag       string
-	buildModelFlag       string
-	buildContextFlag     string
-	buildInteractiveFlag bool
-	buildOpenFlag        bool
-	buildCommitFlag      bool
-	buildPushFlag        bool
+	buildAgentFlag           string
+	buildModelFlag           string
+	buildContextFlag         string
+	buildInteractiveFlag     bool
+	buildOpenFlag            bool
+	buildCommitFlag          bool
+	buildPushFlag            bool
+	buildCallAPIDirectlyFlag bool
 )
 
 func init() {
-	buildCmd.Flags().StringVarP(&buildAgentFlag, "agent", "a", "", "AI agent: claude-code, gemini-cli, api")
+	buildCmd.Flags().StringVarP(&buildAgentFlag, "agent", "a", "", "CLI agent: claude-code, gemini-cli")
 	buildCmd.Flags().StringVarP(&buildModelFlag, "model", "m", "", "Model: sonnet-4, sonnet-4-5, opus-4, opus-4-5, flash, pro, flash-3, pro-3")
+	buildCmd.Flags().BoolVar(&buildCallAPIDirectlyFlag, "call-api-directly", false, "Explicitly call API directly (requires --model)")
 	buildCmd.Flags().StringVarP(&buildContextFlag, "context", "c", "", "Feedback or additional context")
 	buildCmd.Flags().BoolVarP(&buildInteractiveFlag, "interactive", "i", false, "Interactive session")
 	buildCmd.Flags().BoolVarP(&buildOpenFlag, "open", "o", false, "Open combined.pdf in VSCode after build")
@@ -127,46 +129,44 @@ func resolveIssueNumber(args []string) (string, error) {
 }
 
 func resolveAgent(cfg *config.Config) (string, error) {
-	// Determine base agent
-	baseAgent := ""
-	if buildAgentFlag != "" {
-		if buildAgentFlag == "api" {
-			baseAgent = "api"
-		} else if !ai.IsCLIAgentSupported(buildAgentFlag) {
-			return "", fmt.Errorf("unsupported AI agent: %s (supported: claude-code, gemini-cli, api)", buildAgentFlag)
-		} else {
-			baseAgent = buildAgentFlag
-		}
-	} else if cfg.Agent != "" {
-		baseAgent = cfg.Agent
-	} else {
-		baseAgent = ai.DefaultAgent()
-	}
+	var agentSetting string
 
-	// Validate model if specified
-	var modelConfig ai.Model
-	var hasModel bool
-	if buildModelFlag != "" {
-		modelConfig, hasModel = ai.GetModel(buildModelFlag)
+	if buildCallAPIDirectlyFlag {
+		// API mode - requires explicit model
+		if buildInteractiveFlag {
+			return "", fmt.Errorf("interactive mode not supported with --call-api-directly")
+		}
+		if buildModelFlag == "" {
+			return "", fmt.Errorf("--call-api-directly requires --model")
+		}
+
+		modelConfig, hasModel := ai.GetModel(buildModelFlag)
 		if !hasModel {
 			return "", fmt.Errorf("unsupported model: %s (supported: %v)", buildModelFlag, ai.SupportedModelNames())
 		}
-	}
 
-	// Build final agent string
-	var agentSetting string
-	if baseAgent == "api" {
-		// API mode
-		if buildInteractiveFlag {
-			return "", fmt.Errorf("interactive mode not supported with --agent api")
-		}
-		if !hasModel {
-			return "", fmt.Errorf("--agent api requires --model")
-		}
 		agentSetting = modelConfig.APIName
+
 	} else {
 		// CLI agent mode
-		if hasModel {
+		baseAgent := ""
+		if buildAgentFlag != "" {
+			if !ai.IsCLIAgentSupported(buildAgentFlag) {
+				return "", fmt.Errorf("unsupported CLI agent: %s (supported: claude-code, gemini-cli). Use --call-api-directly for API access", buildAgentFlag)
+			}
+			baseAgent = buildAgentFlag
+		} else if cfg.Agent != "" {
+			baseAgent = cfg.Agent
+		} else {
+			baseAgent = ai.DefaultAgent()
+		}
+
+		// Apply model if specified
+		if buildModelFlag != "" {
+			modelConfig, hasModel := ai.GetModel(buildModelFlag)
+			if !hasModel {
+				return "", fmt.Errorf("unsupported model: %s (supported: %v)", buildModelFlag, ai.SupportedModelNames())
+			}
 			agentSetting = baseAgent + ":" + modelConfig.CLIName
 		} else {
 			agentSetting = baseAgent
@@ -175,10 +175,6 @@ func resolveAgent(cfg *config.Config) (string, error) {
 
 	if !ai.IsAgentSupported(agentSetting) {
 		return "", fmt.Errorf("unsupported agent/model: %s", agentSetting)
-	}
-
-	if buildInteractiveFlag && !ai.IsAgentCLI(agentSetting) {
-		return "", fmt.Errorf("interactive mode requires AI agent (claude-code or gemini-cli), got: %s", agentSetting)
 	}
 
 	return agentSetting, nil
@@ -321,7 +317,8 @@ func runBuildWithCLI(cfg *config.Config, agent, issueNum, issueBody string) erro
 	}
 
 	// Use shared spinner helper
-	output, err := runAgentWithSpinner(cliName, args, "Building with 🤖 "+agent+"...")
+	spinnerMsg := fmt.Sprintf("Building with 🤖 %s...", agent)
+	output, err := runAgentWithSpinner(cliName, args, spinnerMsg)
 	if err != nil {
 		return fmt.Errorf("error running %s: %w", agent, err)
 	}
@@ -407,7 +404,8 @@ Do not include any explanation, markdown, or text outside the JSON object.`, cvP
 				fmt.Fprintf(os.Stderr, "\r\033[K")
 				return
 			default:
-				fmt.Fprintf(os.Stderr, "\r%s %s", style.C(style.Cyan, spinnerFrames[i%len(spinnerFrames)]), "Building application using 🤖 "+agent+"...")
+				msg := fmt.Sprintf("Building application using 🤖 %s...", agent)
+				fmt.Fprintf(os.Stderr, "\r%s %s", style.C(style.Cyan, spinnerFrames[i%len(spinnerFrames)]), msg)
 				time.Sleep(80 * time.Millisecond)
 				i++
 			}

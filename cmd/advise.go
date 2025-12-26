@@ -22,11 +22,11 @@ import (
 )
 
 var (
-	adviseAgentFlag       string
-	adviseModelFlag       string
-	adviseContextFlag     string
-	adviseInteractiveFlag bool
-	advisePushFlag        bool
+	adviseAgentFlag           string
+	adviseModelFlag           string
+	adviseContextFlag         string
+	advisePostAsCommentFlag   bool
+	adviseCallAPIDirectlyFlag bool
 )
 
 var adviseCmd = &cobra.Command{
@@ -38,23 +38,22 @@ Takes a GitHub issue number or job posting URL and analyzes
 how well your CV matches the position.
 
 Examples:
-  cvx advise 42                        # Analyze issue #42
-  cvx advise 42 --push                 # Analyze and post as comment
-  cvx advise 42 -a gemini-cli          # Gemini AI agent
-  cvx advise 42 -m sonnet-4            # Claude AI agent with sonnet-4 model
-  cvx advise 42 -a api -m flash        # Gemini API directly with flash model
-  cvx advise 42 -c "Focus on backend"
-  cvx advise 42 -i                     # Interactive session`,
+  cvx advise 42                                  # Analyze issue #42
+  cvx advise 42 --post-as-comment                # Analyze and post as comment
+  cvx advise 42 -a gemini-cli                    # Gemini CLI agent
+  cvx advise 42 -m sonnet-4                      # Claude CLI with sonnet-4 model
+  cvx advise 42 --call-api-directly -m flash     # Gemini API directly with flash model
+  cvx advise 42 -c "Focus on backend"`,
 	Args: cobra.ExactArgs(1),
 	RunE: runAdvise,
 }
 
 func init() {
-	adviseCmd.Flags().StringVarP(&adviseAgentFlag, "agent", "a", "", "AI agent: claude-code, gemini-cli, api")
+	adviseCmd.Flags().StringVarP(&adviseAgentFlag, "agent", "a", "", "CLI agent: claude-code, gemini-cli")
 	adviseCmd.Flags().StringVarP(&adviseModelFlag, "model", "m", "", "Model: sonnet-4, sonnet-4-5, opus-4, opus-4-5, flash, pro, flash-3, pro-3")
+	adviseCmd.Flags().BoolVar(&adviseCallAPIDirectlyFlag, "call-api-directly", false, "Explicitly call API directly (requires --model)")
 	adviseCmd.Flags().StringVarP(&adviseContextFlag, "context", "c", "", "Additional context for analysis")
-	adviseCmd.Flags().BoolVarP(&adviseInteractiveFlag, "interactive", "i", false, "Join session interactively")
-	adviseCmd.Flags().BoolVarP(&advisePushFlag, "push", "p", false, "Post analysis to GitHub issue")
+	adviseCmd.Flags().BoolVar(&advisePostAsCommentFlag, "post-as-comment", false, "Post analysis to GitHub issue as comment")
 	rootCmd.AddCommand(adviseCmd)
 }
 
@@ -67,48 +66,42 @@ func runAdvise(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("config error: %w", err)
 	}
 
-	// Resolve agent/model (flags > config > default)
+	// Resolve agent/model (flags > config)
 	var agentSetting string
 
-	// Determine base agent
-	baseAgent := ""
-	if adviseAgentFlag != "" {
-		if adviseAgentFlag == "api" {
-			baseAgent = "api"
-		} else if !ai.IsCLIAgentSupported(adviseAgentFlag) {
-			return fmt.Errorf("unsupported AI agent: %s (supported: claude-code, gemini-cli, api)", adviseAgentFlag)
-		} else {
-			baseAgent = adviseAgentFlag
+	if adviseCallAPIDirectlyFlag {
+		// API mode - requires explicit model
+		if adviseModelFlag == "" {
+			return fmt.Errorf("--call-api-directly requires --model")
 		}
-	} else if cfg.Agent != "" {
-		baseAgent = cfg.Agent
-	} else {
-		baseAgent = ai.DefaultAgent()
-	}
 
-	// Validate model if specified
-	var modelConfig ai.Model
-	var hasModel bool
-	if adviseModelFlag != "" {
-		modelConfig, hasModel = ai.GetModel(adviseModelFlag)
+		modelConfig, hasModel := ai.GetModel(adviseModelFlag)
 		if !hasModel {
 			return fmt.Errorf("unsupported model: %s (supported: %v)", adviseModelFlag, ai.SupportedModelNames())
 		}
-	}
 
-	// Build final agent string
-	if baseAgent == "api" {
-		// API mode
-		if adviseInteractiveFlag {
-			return fmt.Errorf("interactive mode not supported with --agent api")
-		}
-		if !hasModel {
-			return fmt.Errorf("--agent api requires --model")
-		}
 		agentSetting = modelConfig.APIName
+
 	} else {
 		// CLI agent mode
-		if hasModel {
+		baseAgent := ""
+		if adviseAgentFlag != "" {
+			if !ai.IsCLIAgentSupported(adviseAgentFlag) {
+				return fmt.Errorf("unsupported CLI agent: %s (supported: claude-code, gemini-cli). Use --call-api-directly for API access", adviseAgentFlag)
+			}
+			baseAgent = adviseAgentFlag
+		} else if cfg.Agent != "" {
+			baseAgent = cfg.Agent
+		} else {
+			baseAgent = ai.DefaultAgent()
+		}
+
+		// Apply model if specified
+		if adviseModelFlag != "" {
+			modelConfig, hasModel := ai.GetModel(adviseModelFlag)
+			if !hasModel {
+				return fmt.Errorf("unsupported model: %s (supported: %v)", adviseModelFlag, ai.SupportedModelNames())
+			}
 			agentSetting = baseAgent + ":" + modelConfig.CLIName
 		} else {
 			agentSetting = baseAgent
@@ -138,12 +131,9 @@ func runAdvise(cmd *cobra.Command, args []string) error {
 }
 
 func runAdviseURL(ctx context.Context, cfg *config.Config, agent, url string) error {
-	if advisePushFlag {
-		fmt.Println("Warning: --push flag is not supported for URL-based analysis")
-		fmt.Println("Create an issue first, then run 'cvx advise <issue-number> --push'")
-	}
-	if adviseInteractiveFlag {
-		fmt.Println("Warning: --interactive flag is not supported for URL-based analysis")
+	if advisePostAsCommentFlag {
+		fmt.Println("Warning: --post-as-comment flag is not supported for URL-based analysis")
+		fmt.Println("Create an issue first, then run 'cvx advise <issue-number> --post-as-comment'")
 	}
 
 	fmt.Printf("Running analysis for: %s\n", url)
@@ -175,7 +165,8 @@ func runAdviseURL(ctx context.Context, cfg *config.Config, agent, url string) er
 		}
 
 		args := buildCLIArgs(agent, prompt, "", false)
-		output, err := runAgentWithSpinner(agent, args, "Analyzing job posting using 🤖 "+agent+"...")
+		spinnerMsg := fmt.Sprintf("Analyzing job posting using 🤖 %s...", cfg.Agent)
+		output, err := runAgentWithSpinner(agent, args, spinnerMsg)
 		if err != nil {
 			return fmt.Errorf("agent error: %w", err)
 		}
@@ -226,7 +217,8 @@ func runAdviseWithAPI(ctx context.Context, agent, systemPrompt, userPrompt strin
 				fmt.Fprintf(os.Stderr, "\r\033[K")
 				return
 			default:
-				fmt.Fprintf(os.Stderr, "\r%s %s", style.C(style.Cyan, spinnerFrames[i%len(spinnerFrames)]), "Analyzing job match using 🤖 "+agent+"...")
+				msg := fmt.Sprintf("Analyzing job match using 🤖 %s...", agent)
+				fmt.Fprintf(os.Stderr, "\r%s %s", style.C(style.Cyan, spinnerFrames[i%len(spinnerFrames)]), msg)
 				time.Sleep(80 * time.Millisecond)
 				i++
 			}
@@ -257,8 +249,8 @@ func runAdviseIssue(ctx context.Context, cfg *config.Config, agent, issueNum str
 	// Check for existing session
 	sessionID, hasSession := getSession(sessionKey)
 
-	// Handle --push flag
-	if advisePushFlag {
+	// Handle --post-as-comment flag
+	if advisePostAsCommentFlag {
 		// Check if analysis exists
 		content, err := os.ReadFile(matchPath)
 		if err != nil && os.IsNotExist(err) {
@@ -285,12 +277,7 @@ func runAdviseIssue(ctx context.Context, cfg *config.Config, agent, issueNum str
 		return nil
 	}
 
-	// Interactive mode
-	if adviseInteractiveFlag {
-		return runAdviseInteractive(ctx, cfg, agent, issueNum, sessionKey, hasSession, sessionID)
-	}
-
-	// Normal analysis
+	// Run analysis
 	return runAdviseAnalysis(ctx, cfg, agent, issueNum, sessionKey, hasSession, sessionID)
 }
 
@@ -341,9 +328,17 @@ func runAdviseAnalysis(ctx context.Context, cfg *config.Config, agent, issueNum,
 			fmt.Printf("Running analysis for issue #%s...\n", issueNum)
 		}
 
-		output, err := runAgentWithSpinner(agent, args, "Analyzing job match using 🤖 "+agent+"...")
+		// Build spinner message with agent name and model
+		spinnerMsg := fmt.Sprintf("Analyzing job match using 🤖 %s...", cfg.Agent)
+
+		output, err := runAgentWithSpinner(agent, args, spinnerMsg)
 		if err != nil {
 			return fmt.Errorf("agent error: %w", err)
+		}
+
+		// Debug: print raw output
+		if os.Getenv("DEBUG") != "" {
+			fmt.Printf("\n=== RAW OUTPUT ===\n%s\n=== END RAW OUTPUT ===\n", string(output))
 		}
 
 		var newSessionID string
@@ -354,8 +349,8 @@ func runAdviseAnalysis(ctx context.Context, cfg *config.Config, agent, issueNum,
 			if err := saveSession(sessionKey, newSessionID); err != nil {
 				fmt.Printf("Warning: Could not save session: %v\n", err)
 			} else {
-				fmt.Printf("%sUse 'cvx advise %s -c \"context\"' or 'cvx advise %s -i' to continue.\n",
-					style.Success("Session saved."), issueNum, issueNum)
+				fmt.Printf("%sUse 'cvx advise %s -c \"context\"' to continue.\n",
+					style.Success("Session saved."), issueNum)
 			}
 		}
 	}
@@ -371,63 +366,6 @@ func runAdviseAnalysis(ctx context.Context, cfg *config.Config, agent, issueNum,
 
 	fmt.Println("\nMatch Analysis:")
 	fmt.Println(result)
-
-	return nil
-}
-
-func runAdviseInteractive(ctx context.Context, cfg *config.Config, agent, issueNum, sessionKey string, hasSession bool, sessionID string) error {
-	// Interactive mode requires CLI agent
-	if !ai.IsAgentCLI(cfg.Agent) {
-		fmt.Printf("Note: Interactive mode requires AI agent (claude-code or gemini-cli).\n")
-		fmt.Printf("Running single analysis instead.\n\n")
-		return runAdviseAnalysis(ctx, cfg, agent, issueNum, sessionKey, hasSession, sessionID)
-	}
-
-	var cmd *exec.Cmd
-
-	if hasSession {
-		fmt.Printf("Resuming interactive session for issue #%s...\n", issueNum)
-		cmd = exec.Command(agent, "--resume", sessionID)
-	} else {
-		fmt.Printf("Starting new interactive session for issue #%s...\n", issueNum)
-
-		// Fetch issue body
-		issueBody, err := fetchIssueBody(cfg.Repo, issueNum)
-		if err != nil {
-			return fmt.Errorf("error fetching issue: %w", err)
-		}
-
-		prompt, err := buildAdvisePrompt(cfg, "", issueBody)
-		if err != nil {
-			return err
-		}
-
-		if adviseContextFlag != "" {
-			prompt = fmt.Sprintf("%s\n\nAdditional context: %s", prompt, adviseContextFlag)
-		}
-
-		// Use -i for gemini (prompt-interactive), -p for claude
-		if agent == "gemini-cli" || strings.HasPrefix(agent, "gemini-cli:") {
-			cmd = exec.Command("gemini", "-i", prompt)
-		} else {
-			cmd = exec.Command("claude", "-p", prompt)
-		}
-	}
-
-	cmd.Stdin = os.Stdin
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("error running %s: %w", agent, err)
-	}
-
-	// Save session if new
-	if !hasSession {
-		if newSessionID := getMostRecentAgentSession(agent); newSessionID != "" {
-			_ = saveSession(sessionKey, newSessionID)
-		}
-	}
 
 	return nil
 }
@@ -686,13 +624,20 @@ func parseAgentOutput(output []byte) (result string, sessionID string) {
 	var parsed struct {
 		SessionID string `json:"session_id"`
 		Result    string `json:"result"`
+		Response  string `json:"response"` // gemini uses "response" instead of "result"
 	}
 
 	if err := json.Unmarshal([]byte(jsonStr), &parsed); err != nil {
 		return str, ""
 	}
 
-	return parsed.Result, parsed.SessionID
+	// Try response field first (gemini), then result field (claude)
+	resultText := parsed.Response
+	if resultText == "" {
+		resultText = parsed.Result
+	}
+
+	return resultText, parsed.SessionID
 }
 
 func sanitizeFilename(s string) string {

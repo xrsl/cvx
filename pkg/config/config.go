@@ -10,6 +10,8 @@ import (
 
 	"github.com/spf13/viper"
 	"gopkg.in/yaml.v3"
+
+	"github.com/xrsl/cvx/pkg/ai"
 )
 
 type Config struct {
@@ -101,11 +103,32 @@ func Path() string {
 	return configFile
 }
 
+// validateAgent checks if the configured agent is valid
+// Only CLI agents (claude-code, gemini-cli) are allowed in config files
+func validateAgent(agent string) error {
+	if agent == "" {
+		return nil // Empty is ok, will use default
+	}
+
+	// Check if it's a CLI agent
+	if !ai.IsAgentCLI(agent) {
+		return fmt.Errorf("config contains API agent '%s'. Only CLI agents (claude-code, gemini-cli) allowed in config. Use --call-api-directly for API access", agent)
+	}
+
+	return nil
+}
+
 func Load() (*Config, error) {
 	var cfg Config
 	if err := v.Unmarshal(&cfg); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
 	}
+
+	// Validate agent setting
+	if err := validateAgent(cfg.Agent); err != nil {
+		return nil, err
+	}
+
 	return &cfg, nil
 }
 
@@ -128,6 +151,10 @@ func Set(key, value string) error {
 	case "repo":
 		cfg.Repo = value
 	case "agent":
+		// Validate agent before setting
+		if err := validateAgent(value); err != nil {
+			return err
+		}
 		cfg.Agent = value
 	case "schema":
 		cfg.Schema = value
