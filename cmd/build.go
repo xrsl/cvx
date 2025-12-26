@@ -68,38 +68,76 @@ func runBuild(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("config error: %w", err)
 	}
 
-	// Get issue number from args or infer from branch
-	var issueNum string
-	if len(args) > 0 {
-		issueNum = args[0]
-		// Validate issue number is numeric
-		if _, err := fmt.Sscanf(issueNum, "%d", new(int)); err != nil {
-			return fmt.Errorf("invalid issue number: %s (must be numeric)", issueNum)
-		}
-	} else {
-		// Infer from current branch
-		currentBranch, err := getCurrentBranch()
-		if err != nil {
-			return err
-		}
-		issueNum = extractIssueFromBranch(currentBranch)
-		if issueNum == "" {
-			return fmt.Errorf("could not infer issue number from branch '%s'. Provide it explicitly: cvx build <issue-number>", currentBranch)
-		}
-		fmt.Printf("Using issue #%s (from branch %s)\n", issueNum, currentBranch)
+	issueNum, err := resolveIssueNumber(args)
+	if err != nil {
+		return err
 	}
 
-	// Resolve agent/model (flags > config > default)
+	agentSetting, err := resolveAgent(cfg)
+	if err != nil {
+		return err
+	}
+	cfg.Agent = agentSetting
+
+	if err := ensureIssueBranch(cfg.Repo, issueNum); err != nil {
+		return err
+	}
+
+	if buildInteractiveFlag {
+		return runBuildInteractive(cfg, issueNum)
+	}
+
+	if err := runBuildNonInteractive(cmd.Context(), cfg, agentSetting, issueNum); err != nil {
+		return err
+	}
+
+	if err := buildPDF(); err != nil {
+		return err
+	}
+
+	if err := commitAndPush(cfg.Repo, issueNum); err != nil {
+		return err
+	}
+
+	if buildOpenFlag {
+		return openCombinedPDF()
+	}
+
+	return nil
+}
+
+func resolveIssueNumber(args []string) (string, error) {
+	if len(args) > 0 {
+		issueNum := args[0]
+		if _, err := fmt.Sscanf(issueNum, "%d", new(int)); err != nil {
+			return "", fmt.Errorf("invalid issue number: %s (must be numeric)", issueNum)
+		}
+		return issueNum, nil
+	}
+
+	currentBranch, err := getCurrentBranch()
+	if err != nil {
+		return "", err
+	}
+	issueNum := extractIssueFromBranch(currentBranch)
+	if issueNum == "" {
+		return "", fmt.Errorf("could not infer issue number from branch '%s'. Provide it explicitly: cvx build <issue-number>", currentBranch)
+	}
+	fmt.Printf("Using issue #%s (from branch %s)\n", issueNum, currentBranch)
+	return issueNum, nil
+}
+
+func resolveAgent(cfg *config.Config) (string, error) {
 	var agentSetting string
 	switch {
 	case buildAgentFlag != "":
 		if !ai.IsCLIAgentSupported(buildAgentFlag) {
-			return fmt.Errorf("unsupported CLI agent: %s (supported: %v)", buildAgentFlag, ai.SupportedCLIAgents())
+			return "", fmt.Errorf("unsupported CLI agent: %s (supported: %v)", buildAgentFlag, ai.SupportedCLIAgents())
 		}
 		agentSetting = buildAgentFlag
 	case buildModelFlag != "":
 		if !ai.IsModelSupported(buildModelFlag) {
-			return fmt.Errorf("unsupported model: %s (supported: %v)", buildModelFlag, ai.SupportedModels())
+			return "", fmt.Errorf("unsupported model: %s (supported: %v)", buildModelFlag, ai.SupportedModels())
 		}
 		agentSetting = buildModelFlag
 	case cfg.Agent != "":
@@ -108,57 +146,27 @@ func runBuild(cmd *cobra.Command, args []string) error {
 		agentSetting = ai.DefaultAgent()
 	}
 
-	// Validate final setting
 	if !ai.IsAgentSupported(agentSetting) {
-		return fmt.Errorf("unsupported agent/model: %s (supported: %v)", agentSetting, ai.SupportedAgents())
+		return "", fmt.Errorf("unsupported agent/model: %s (supported: %v)", agentSetting, ai.SupportedAgents())
 	}
 
-	// Interactive mode requires CLI agent
 	if buildInteractiveFlag && !ai.IsAgentCLI(agentSetting) {
-		return fmt.Errorf("interactive mode requires CLI agent (claude or gemini), got: %s", agentSetting)
+		return "", fmt.Errorf("interactive mode requires CLI agent (claude or gemini), got: %s", agentSetting)
 	}
 
-	// Override config agent for this run
-	cfg.Agent = agentSetting
+	return agentSetting, nil
+}
 
-	// Ensure we're on the correct branch
-	if err := ensureIssueBranch(cfg.Repo, issueNum); err != nil {
+func commitAndPush(repo, issueNum string) error {
+	if !buildCommitFlag {
+		return nil
+	}
+	if err := commitBuildChanges(repo, issueNum); err != nil {
 		return err
 	}
-
-	// Interactive mode
-	if buildInteractiveFlag {
-		return runBuildInteractive(cfg, issueNum)
+	if buildPushFlag {
+		return pushChanges()
 	}
-
-	// Non-interactive mode (API or CLI)
-	if err := runBuildNonInteractive(cmd.Context(), cfg, agentSetting, issueNum); err != nil {
-		return err
-	}
-
-	// Build PDF
-	if err := buildPDF(); err != nil {
-		return err
-	}
-
-	// Commit if requested
-	if buildCommitFlag {
-		if err := commitBuildChanges(cfg.Repo, issueNum); err != nil {
-			return err
-		}
-		// Push if requested
-		if buildPushFlag {
-			if err := pushChanges(); err != nil {
-				return err
-			}
-		}
-	}
-
-	// Open PDF if requested
-	if buildOpenFlag {
-		return openCombinedPDF()
-	}
-
 	return nil
 }
 
