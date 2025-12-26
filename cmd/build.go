@@ -322,13 +322,41 @@ func runBuildWithAPI(ctx context.Context, cfg *config.Config, agent, issueBody s
 		return err
 	}
 
-	// Add structured output instruction
-	structuredInstruction := `
+	// Read existing templates to extract preambles
+	cvTemplate, err := os.ReadFile(filepath.Join("src", "cv.tex"))
+	if err != nil {
+		return fmt.Errorf("failed to read cv.tex template: %w", err)
+	}
+	letterTemplate, err := os.ReadFile(filepath.Join("src", "letter.tex"))
+	if err != nil {
+		return fmt.Errorf("failed to read letter.tex template: %w", err)
+	}
 
-IMPORTANT: You must respond with ONLY a valid JSON object in this exact format:
-{"cv": "<full latex content for cv.tex>", "letter": "<full latex content for letter.tex>"}
+	// Extract preambles (everything before \begin{document})
+	cvPreamble := extractPreamble(string(cvTemplate))
+	letterPreamble := extractPreamble(string(letterTemplate))
 
-Do not include any explanation, markdown, or text outside the JSON object.`
+	// Add structured output instruction - only ask for document body
+	structuredInstruction := fmt.Sprintf(`
+
+IMPORTANT: You must respond with ONLY a valid JSON object containing the document BODY content (everything between \begin{document} and \end{document}).
+
+The preambles are fixed and will be preserved. You MUST use the exact same LaTeX commands from the templates.
+
+CV preamble (preserved, for reference of available commands):
+%s
+
+Letter preamble (preserved, for reference of available commands):
+%s
+
+Return JSON in this exact format:
+{
+  "cv_body": "<content between \\begin{document} and \\end{document} for cv.tex>",
+  "letter_body": "<content between \\begin{document} and \\end{document} for letter.tex>"
+}
+
+Do not include \\begin{document} or \\end{document} in your response.
+Do not include any explanation, markdown, or text outside the JSON object.`, cvPreamble, letterPreamble)
 
 	userPrompt += structuredInstruction
 
@@ -378,8 +406,8 @@ Do not include any explanation, markdown, or text outside the JSON object.`
 
 	// Parse structured output
 	var output struct {
-		CV     string `json:"cv"`
-		Letter string `json:"letter"`
+		CVBody     string `json:"cv_body"`
+		LetterBody string `json:"letter_body"`
 	}
 
 	// Try to extract JSON from response (may have markdown code blocks)
@@ -388,25 +416,38 @@ Do not include any explanation, markdown, or text outside the JSON object.`
 		return fmt.Errorf("failed to parse AI response as JSON: %w\nResponse was: %s", err, result)
 	}
 
-	if output.CV == "" || output.Letter == "" {
-		return fmt.Errorf("AI response missing cv or letter content")
+	if output.CVBody == "" || output.LetterBody == "" {
+		return fmt.Errorf("AI response missing cv_body or letter_body")
 	}
+
+	// Combine preambles with AI-generated bodies
+	cvContent := cvPreamble + "\n\\begin{document}\n" + output.CVBody + "\n\\end{document}\n"
+	letterContent := letterPreamble + "\n\\begin{document}\n" + output.LetterBody + "\n\\end{document}\n"
 
 	// Write files
 	cvPath := filepath.Join("src", "cv.tex")
 	letterPath := filepath.Join("src", "letter.tex")
 
-	if err := os.WriteFile(cvPath, []byte(output.CV), 0o644); err != nil {
+	if err := os.WriteFile(cvPath, []byte(cvContent), 0o644); err != nil {
 		return fmt.Errorf("failed to write %s: %w", cvPath, err)
 	}
 	fmt.Printf("%s Wrote %s\n", style.C(style.Green, "✓"), style.C(style.Cyan, cvPath))
 
-	if err := os.WriteFile(letterPath, []byte(output.Letter), 0o644); err != nil {
+	if err := os.WriteFile(letterPath, []byte(letterContent), 0o644); err != nil {
 		return fmt.Errorf("failed to write %s: %w", letterPath, err)
 	}
 	fmt.Printf("%s Wrote %s\n", style.C(style.Green, "✓"), style.C(style.Cyan, letterPath))
 
 	return nil
+}
+
+// extractPreamble returns everything before \begin{document}
+func extractPreamble(content string) string {
+	marker := "\\begin{document}"
+	if idx := strings.Index(content, marker); idx != -1 {
+		return strings.TrimSpace(content[:idx])
+	}
+	return content
 }
 
 // extractJSON attempts to extract JSON from a response that may contain markdown
