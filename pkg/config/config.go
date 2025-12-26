@@ -26,6 +26,12 @@ func (c *Config) AgentCLI() string {
 	if strings.HasPrefix(c.Agent, "gemini") {
 		return "gemini"
 	}
+	if c.Agent == "claude-code" || strings.HasPrefix(c.Agent, "claude-code:") {
+		return "claude"
+	}
+	if c.Agent == "gemini-cli" || strings.HasPrefix(c.Agent, "gemini-cli:") {
+		return "gemini"
+	}
 	return "claude"
 }
 
@@ -80,7 +86,7 @@ func init() {
 	v.SetConfigFile(configFile)
 
 	// Defaults
-	v.SetDefault("agent", "claude")
+	v.SetDefault("agent", "claude-code")
 
 	// Environment variables
 	v.SetEnvPrefix("CVX")
@@ -239,5 +245,5 @@ func ResetForTest(testPath string) {
 	cacheFile = testPath + "/.cvx/cache.yaml"
 	v = viper.New()
 	v.SetConfigFile(configFile)
-	v.SetDefault("agent", "claude")
+	v.SetDefault("agent", "claude-code")
 }

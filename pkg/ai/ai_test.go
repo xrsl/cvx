@@ -88,9 +88,9 @@ func TestNewClientClaude(t *testing.T) {
 		t.Skip("Claude CLI not available")
 	}
 
-	client, err := NewClient("claude")
+	client, err := NewClient("claude-code")
 	if err != nil {
-		t.Errorf("NewClient(claude) error: %v", err)
+		t.Errorf("NewClient(claude-code) error: %v", err)
 		return
 	}
 	defer client.Close()
@@ -101,9 +101,9 @@ func TestNewClientClaudeWithSubAgent(t *testing.T) {
 		t.Skip("Claude CLI not available")
 	}
 
-	client, err := NewClient("claude:opus-4.5")
+	client, err := NewClient("claude-code:opus-4.5")
 	if err != nil {
-		t.Errorf("NewClient(claude:opus-4.5) error: %v", err)
+		t.Errorf("NewClient(claude-code:opus-4.5) error: %v", err)
 		return
 	}
 	defer client.Close()
@@ -112,17 +112,17 @@ func TestNewClientClaudeWithSubAgent(t *testing.T) {
 func TestIsAgentSupportedCLI(t *testing.T) {
 	// CLI agents should be supported if CLI is available
 	if IsClaudeCLIAvailable() {
-		if !IsAgentSupported("claude") {
-			t.Error("claude should be supported when CLI is available")
+		if !IsAgentSupported("claude-code") {
+			t.Error("claude-code should be supported when CLI is available")
 		}
-		if !IsAgentSupported("claude:opus-4.5") {
-			t.Error("claude:opus-4.5 should be supported when CLI is available")
+		if !IsAgentSupported("claude-code:opus-4.5") {
+			t.Error("claude-code:opus-4.5 should be supported when CLI is available")
 		}
 	}
 
 	if IsGeminiCLIAvailable() {
-		if !IsAgentSupported("gemini") {
-			t.Error("gemini should be supported when CLI is available")
+		if !IsAgentSupported("gemini-cli") {
+			t.Error("gemini-cli should be supported when CLI is available")
 		}
 	}
 }

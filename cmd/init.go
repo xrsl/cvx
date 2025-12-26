@@ -92,7 +92,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 		}
 		cfg := &config.Config{
 			Repo:          repo,
-			Agent:         "claude",
+			Agent:         "claude-code",
 			Schema:        workflow.DefaultSchemaPath,
 			CVPath:        "src/cv.tex",
 			ReferencePath: "reference/",
@@ -413,15 +413,15 @@ func buildAgentList() []agentOption {
 	var agents []agentOption
 
 	if ai.IsClaudeCLIAvailable() {
-		agents = append(agents, agentOption{"claude", ""})
+		agents = append(agents, agentOption{"claude-code", ""})
 	}
 
 	if ai.IsGeminiCLIAvailable() {
-		agents = append(agents, agentOption{"gemini", ""})
+		agents = append(agents, agentOption{"gemini-cli", ""})
 	}
 
 	for _, a := range ai.SupportedAgents() {
-		if a == "claude" || a == "gemini" {
+		if a == "claude-code" || a == "gemini-cli" {
 			continue
 		}
 		note := ""

@@ -168,7 +168,7 @@ cvx advise 42 -m gemini-2.5-flash            # Gemini API
 | `gemini-3-flash-preview` | Requires `GEMINI_API_KEY`    |
 | `gemini-3-pro-preview`   | Requires `GEMINI_API_KEY`    |
 
-Priority order for default: CLI agents first (claude > gemini), then API models.
+Priority order for default: CLI agents first (claude-code > gemini-cli), then API models.
 
 ## GitHub Project
 
@@ -199,7 +199,7 @@ Located at `.cvx-config.yaml` in your repo root:
 
 ```yaml
 repo: owner/repo
-agent: claude
+agent: claude-code
 cv_path: src/cv.tex
 reference_path: reference/
 project: owner/1

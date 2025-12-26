@@ -6,7 +6,7 @@ Located at `.cvx-config.yaml` in your repo root:
 
 ```yaml
 repo: owner/repo
-agent: claude
+agent: claude-code
 cv_path: src/cv.tex
 reference_path: reference/
 project: owner/1
@@ -17,7 +17,7 @@ project: owner/1
 | Key              | Description                    | Default       |
 | ---------------- | ------------------------------ | ------------- |
 | `repo`           | GitHub repository (owner/repo) | Auto-detected |
-| `agent`          | AI agent to use                | `claude`      |
+| `agent`          | AI agent to use                | `claude-code` |
 | `schema`         | Job schema file path           | Built-in      |
 | `cv_path`        | CV file for advise/build       | `src/cv.tex`  |
 | `reference_path` | Reference materials directory  | `reference/`  |
@@ -29,10 +29,10 @@ Use `--agent/-a` for CLI tools or `--model/-m` for API access. These flags are m
 
 ### CLI Agents (`--agent`)
 
-| Agent    | Notes                                                        |
-| -------- | ------------------------------------------------------------ |
-| `claude` | [Claude Code CLI](https://github.com/anthropics/claude-code) |
-| `gemini` | [Gemini CLI](https://github.com/google-gemini/gemini-cli)    |
+| Agent         | Notes                                                        |
+| ------------- | ------------------------------------------------------------ |
+| `claude-code` | [Claude Code CLI](https://github.com/anthropics/claude-code) |
+| `gemini-cli`  | [Gemini CLI](https://github.com/google-gemini/gemini-cli)    |
 
 ### API Models (`--model`)
 
@@ -47,7 +47,7 @@ Use `--agent/-a` for CLI tools or `--model/-m` for API access. These flags are m
 | `gemini-3-flash-preview` | Requires `GEMINI_API_KEY`    |
 | `gemini-3-pro-preview`   | Requires `GEMINI_API_KEY`    |
 
-Priority order for default: CLI agents first (claude > gemini), then API models.
+Priority order for default: CLI agents first (claude-code > gemini-cli), then API models.
 
 ## Environment Variables
 

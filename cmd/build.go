@@ -51,14 +51,13 @@ var (
 )
 
 func init() {
-	buildCmd.Flags().StringVarP(&buildAgentFlag, "agent", "a", "", "CLI agent: claude, gemini")
-	buildCmd.Flags().StringVarP(&buildModelFlag, "model", "m", "", "API model: claude-sonnet-4, gemini-2.5-flash, etc.")
+	buildCmd.Flags().StringVarP(&buildAgentFlag, "agent", "a", "", "AI agent: claude-code, gemini-cli, api")
+	buildCmd.Flags().StringVarP(&buildModelFlag, "model", "m", "", "Model: sonnet-4, sonnet-4-5, opus-4, opus-4-5, flash, pro, flash-3, pro-3")
 	buildCmd.Flags().StringVarP(&buildContextFlag, "context", "c", "", "Feedback or additional context")
 	buildCmd.Flags().BoolVarP(&buildInteractiveFlag, "interactive", "i", false, "Interactive session")
 	buildCmd.Flags().BoolVarP(&buildOpenFlag, "open", "o", false, "Open combined.pdf in VSCode after build")
 	buildCmd.Flags().BoolVar(&buildCommitFlag, "commit", false, "Commit changes on the issue branch")
 	buildCmd.Flags().BoolVar(&buildPushFlag, "push", false, "Push commits to remote (requires --commit)")
-	buildCmd.MarkFlagsMutuallyExclusive("agent", "model")
 	rootCmd.AddCommand(buildCmd)
 }
 
@@ -128,30 +127,58 @@ func resolveIssueNumber(args []string) (string, error) {
 }
 
 func resolveAgent(cfg *config.Config) (string, error) {
+	// Determine base agent
+	baseAgent := ""
+	if buildAgentFlag != "" {
+		if buildAgentFlag == "api" {
+			baseAgent = "api"
+		} else if !ai.IsCLIAgentSupported(buildAgentFlag) {
+			return "", fmt.Errorf("unsupported AI agent: %s (supported: claude-code, gemini-cli, api)", buildAgentFlag)
+		} else {
+			baseAgent = buildAgentFlag
+		}
+	} else if cfg.Agent != "" {
+		baseAgent = cfg.Agent
+	} else {
+		baseAgent = ai.DefaultAgent()
+	}
+
+	// Validate model if specified
+	var modelConfig ai.Model
+	var hasModel bool
+	if buildModelFlag != "" {
+		modelConfig, hasModel = ai.GetModel(buildModelFlag)
+		if !hasModel {
+			return "", fmt.Errorf("unsupported model: %s (supported: %v)", buildModelFlag, ai.SupportedModelNames())
+		}
+	}
+
+	// Build final agent string
 	var agentSetting string
-	switch {
-	case buildAgentFlag != "":
-		if !ai.IsCLIAgentSupported(buildAgentFlag) {
-			return "", fmt.Errorf("unsupported CLI agent: %s (supported: %v)", buildAgentFlag, ai.SupportedCLIAgents())
+	if baseAgent == "api" {
+		// API mode
+		if buildInteractiveFlag {
+			return "", fmt.Errorf("interactive mode not supported with --agent api")
 		}
-		agentSetting = buildAgentFlag
-	case buildModelFlag != "":
-		if !ai.IsModelSupported(buildModelFlag) {
-			return "", fmt.Errorf("unsupported model: %s (supported: %v)", buildModelFlag, ai.SupportedModels())
+		if !hasModel {
+			return "", fmt.Errorf("--agent api requires --model")
 		}
-		agentSetting = buildModelFlag
-	case cfg.Agent != "":
-		agentSetting = cfg.Agent
-	default:
-		agentSetting = ai.DefaultAgent()
+		agentSetting = modelConfig.APIName
+	} else {
+		// CLI agent mode
+		if hasModel {
+			agentSetting = baseAgent + ":" + modelConfig.CLIName
+		} else {
+			agentSetting = baseAgent
+		}
 	}
 
 	if !ai.IsAgentSupported(agentSetting) {
-		return "", fmt.Errorf("unsupported agent/model: %s (supported: %v)", agentSetting, ai.SupportedAgents())
+		return "", fmt.Errorf("unsupported agent/model: %s", agentSetting)
 	}
 
 	if buildInteractiveFlag && !ai.IsAgentCLI(agentSetting) {
-		return "", fmt.Errorf("interactive mode requires CLI agent (claude or gemini), got: %s", agentSetting)
+		return "", fmt.Errorf("interactive mode requires AI agent (claude-code or gemini-cli), got: %s", agentSetting)
 	}
 
 	return agentSetting, nil
@@ -204,7 +231,7 @@ func runBuildInteractive(cfg *config.Config, issueNum string) error {
 		}
 
 		// Use -i for gemini (prompt-interactive), -p for claude
-		if agent == "gemini" || strings.HasPrefix(agent, "gemini:") {
+		if agent == "gemini-cli" || strings.HasPrefix(agent, "gemini-cli:") {
 			execCmd = exec.Command("gemini", "-i", prompt)
 		} else {
 			execCmd = exec.Command("claude", "-p", prompt)
@@ -242,7 +269,7 @@ func runBuildNonInteractive(ctx context.Context, cfg *config.Config, agent, issu
 		return fmt.Errorf("error fetching issue: %w", err)
 	}
 
-	// Path 1: CLI agent (headless) - claude/gemini handles tool use internally
+	// Path 1: CLI agent (headless) - claude-code/gemini-cli handles tool use internally
 	if ai.IsAgentCLI(agent) {
 		return runBuildWithCLI(cfg, agent, issueNum, issueBody)
 	}
@@ -252,10 +279,10 @@ func runBuildNonInteractive(ctx context.Context, cfg *config.Config, agent, issu
 	return runBuildWithAPI(ctx, cfg, agent, issueBody)
 }
 
-// runBuildWithCLI shells out to claude/gemini CLI in headless mode
+// runBuildWithCLI shells out to claude-code/gemini-cli CLI in headless mode
 func runBuildWithCLI(cfg *config.Config, agent, issueNum, issueBody string) error {
 	var cliName string
-	if agent == "gemini" || strings.HasPrefix(agent, "gemini:") {
+	if agent == "gemini-cli" || strings.HasPrefix(agent, "gemini-cli:") {
 		cliName = "gemini"
 	} else {
 		cliName = "claude"

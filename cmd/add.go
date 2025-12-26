@@ -41,21 +41,21 @@ Use --body to read job posting from a file instead of fetching URL.
 Examples:
   cvx add https://company.com/job
   cvx add https://company.com/job --dry-run
-  cvx add https://company.com/job -a gemini          # Gemini CLI
-  cvx add https://company.com/job -m claude-sonnet-4 # Claude API
-  cvx add https://company.com/job --body             # use .cvx/body.md`,
+  cvx add https://company.com/job -a gemini-cli       # Gemini AI agent
+  cvx add https://company.com/job -m sonnet-4         # Claude AI agent with sonnet-4 model
+  cvx add https://company.com/job -a api -m flash     # Gemini API directly with flash model
+  cvx add https://company.com/job --body              # use .cvx/body.md`,
 	Args: cobra.ExactArgs(1),
 	RunE: runAdd,
 }
 
 func init() {
-	addCmd.Flags().StringVarP(&agentFlag, "agent", "a", "", "CLI agent: claude, gemini")
-	addCmd.Flags().StringVarP(&modelFlag, "model", "m", "", "API model: claude-sonnet-4, gemini-2.5-flash, etc.")
+	addCmd.Flags().StringVarP(&agentFlag, "agent", "a", "", "AI agent: claude-code, gemini-cli, api")
+	addCmd.Flags().StringVarP(&modelFlag, "model", "m", "", "Model: sonnet-4, sonnet-4-5, opus-4, opus-4-5, flash, pro, flash-3, pro-3")
 	addCmd.Flags().StringVarP(&repoFlag, "repo", "r", "", "GitHub repo (overrides config)")
 	addCmd.Flags().StringVarP(&schemaFlag, "schema", "s", "", "Schema file (overrides config)")
 	addCmd.Flags().StringVarP(&bodyFlag, "body", "b", "", "Read job posting from file (default: .cvx/body.md)")
 	addCmd.Flags().BoolVar(&dryRunFlag, "dry-run", false, "Extract only, don't create issue")
-	addCmd.MarkFlagsMutuallyExclusive("agent", "model")
 	rootCmd.AddCommand(addCmd)
 }
 
@@ -86,28 +86,52 @@ func runAdd(cmd *cobra.Command, args []string) error {
 
 	// Resolve agent/model (flags > config > default)
 	var agent string
-	switch {
-	case agentFlag != "":
-		// --agent flag: must be CLI agent
-		if !ai.IsCLIAgentSupported(agentFlag) {
-			return fmt.Errorf("unsupported CLI agent: %s (supported: %v)", agentFlag, ai.SupportedCLIAgents())
+
+	// Determine base agent
+	baseAgent := ""
+	if agentFlag != "" {
+		if agentFlag == "api" {
+			baseAgent = "api"
+		} else if !ai.IsCLIAgentSupported(agentFlag) {
+			return fmt.Errorf("unsupported AI agent: %s (supported: claude-code, gemini-cli, api)", agentFlag)
+		} else {
+			baseAgent = agentFlag
 		}
-		agent = agentFlag
-	case modelFlag != "":
-		// --model flag: must be API model
-		if !ai.IsModelSupported(modelFlag) {
-			return fmt.Errorf("unsupported model: %s (supported: %v)", modelFlag, ai.SupportedModels())
+	} else if cfg.Agent != "" {
+		baseAgent = cfg.Agent
+	} else {
+		baseAgent = ai.DefaultAgent()
+	}
+
+	// Validate model if specified
+	var modelConfig ai.Model
+	var hasModel bool
+	if modelFlag != "" {
+		modelConfig, hasModel = ai.GetModel(modelFlag)
+		if !hasModel {
+			return fmt.Errorf("unsupported model: %s (supported: %v)", modelFlag, ai.SupportedModelNames())
 		}
-		agent = modelFlag
-	case cfg.Agent != "":
-		agent = cfg.Agent
-	default:
-		agent = ai.DefaultAgent()
+	}
+
+	// Build final agent string
+	if baseAgent == "api" {
+		// API mode
+		if !hasModel {
+			return fmt.Errorf("--agent api requires --model")
+		}
+		agent = modelConfig.APIName
+	} else {
+		// CLI agent mode
+		if hasModel {
+			agent = baseAgent + ":" + modelConfig.CLIName
+		} else {
+			agent = baseAgent
+		}
 	}
 
 	// Validate final setting
 	if !ai.IsAgentSupported(agent) {
-		return fmt.Errorf("unsupported agent/model: %s (supported: %v)", agent, ai.SupportedAgents())
+		return fmt.Errorf("unsupported agent/model: %s", agent)
 	}
 
 	// Resolve schema (flag > config > default)

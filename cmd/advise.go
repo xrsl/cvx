@@ -40,8 +40,9 @@ how well your CV matches the position.
 Examples:
   cvx advise 42                        # Analyze issue #42
   cvx advise 42 --push                 # Analyze and post as comment
-  cvx advise 42 -a gemini              # Gemini CLI
-  cvx advise 42 -m gemini-2.5-flash    # Gemini API
+  cvx advise 42 -a gemini-cli          # Gemini AI agent
+  cvx advise 42 -m sonnet-4            # Claude AI agent with sonnet-4 model
+  cvx advise 42 -a api -m flash        # Gemini API directly with flash model
   cvx advise 42 -c "Focus on backend"
   cvx advise 42 -i                     # Interactive session`,
 	Args: cobra.ExactArgs(1),
@@ -49,12 +50,11 @@ Examples:
 }
 
 func init() {
-	adviseCmd.Flags().StringVarP(&adviseAgentFlag, "agent", "a", "", "CLI agent: claude, gemini")
-	adviseCmd.Flags().StringVarP(&adviseModelFlag, "model", "m", "", "API model: claude-sonnet-4, gemini-2.5-flash, etc.")
+	adviseCmd.Flags().StringVarP(&adviseAgentFlag, "agent", "a", "", "AI agent: claude-code, gemini-cli, api")
+	adviseCmd.Flags().StringVarP(&adviseModelFlag, "model", "m", "", "Model: sonnet-4, sonnet-4-5, opus-4, opus-4-5, flash, pro, flash-3, pro-3")
 	adviseCmd.Flags().StringVarP(&adviseContextFlag, "context", "c", "", "Additional context for analysis")
 	adviseCmd.Flags().BoolVarP(&adviseInteractiveFlag, "interactive", "i", false, "Join session interactively")
 	adviseCmd.Flags().BoolVarP(&advisePushFlag, "push", "p", false, "Post analysis to GitHub issue")
-	adviseCmd.MarkFlagsMutuallyExclusive("agent", "model")
 	rootCmd.AddCommand(adviseCmd)
 }
 
@@ -69,28 +69,55 @@ func runAdvise(cmd *cobra.Command, args []string) error {
 
 	// Resolve agent/model (flags > config > default)
 	var agentSetting string
-	switch {
-	case adviseAgentFlag != "":
-		// --agent flag: must be CLI agent
-		if !ai.IsCLIAgentSupported(adviseAgentFlag) {
-			return fmt.Errorf("unsupported CLI agent: %s (supported: %v)", adviseAgentFlag, ai.SupportedCLIAgents())
+
+	// Determine base agent
+	baseAgent := ""
+	if adviseAgentFlag != "" {
+		if adviseAgentFlag == "api" {
+			baseAgent = "api"
+		} else if !ai.IsCLIAgentSupported(adviseAgentFlag) {
+			return fmt.Errorf("unsupported AI agent: %s (supported: claude-code, gemini-cli, api)", adviseAgentFlag)
+		} else {
+			baseAgent = adviseAgentFlag
 		}
-		agentSetting = adviseAgentFlag
-	case adviseModelFlag != "":
-		// --model flag: must be API model
-		if !ai.IsModelSupported(adviseModelFlag) {
-			return fmt.Errorf("unsupported model: %s (supported: %v)", adviseModelFlag, ai.SupportedModels())
+	} else if cfg.Agent != "" {
+		baseAgent = cfg.Agent
+	} else {
+		baseAgent = ai.DefaultAgent()
+	}
+
+	// Validate model if specified
+	var modelConfig ai.Model
+	var hasModel bool
+	if adviseModelFlag != "" {
+		modelConfig, hasModel = ai.GetModel(adviseModelFlag)
+		if !hasModel {
+			return fmt.Errorf("unsupported model: %s (supported: %v)", adviseModelFlag, ai.SupportedModelNames())
 		}
-		agentSetting = adviseModelFlag
-	case cfg.Agent != "":
-		agentSetting = cfg.Agent
-	default:
-		agentSetting = ai.DefaultAgent()
+	}
+
+	// Build final agent string
+	if baseAgent == "api" {
+		// API mode
+		if adviseInteractiveFlag {
+			return fmt.Errorf("interactive mode not supported with --agent api")
+		}
+		if !hasModel {
+			return fmt.Errorf("--agent api requires --model")
+		}
+		agentSetting = modelConfig.APIName
+	} else {
+		// CLI agent mode
+		if hasModel {
+			agentSetting = baseAgent + ":" + modelConfig.CLIName
+		} else {
+			agentSetting = baseAgent
+		}
 	}
 
 	// Validate final setting
 	if !ai.IsAgentSupported(agentSetting) {
-		return fmt.Errorf("unsupported agent/model: %s (supported: %v)", agentSetting, ai.SupportedAgents())
+		return fmt.Errorf("unsupported agent/model: %s", agentSetting)
 	}
 
 	// Override config agent for this run
@@ -351,7 +378,7 @@ func runAdviseAnalysis(ctx context.Context, cfg *config.Config, agent, issueNum,
 func runAdviseInteractive(ctx context.Context, cfg *config.Config, agent, issueNum, sessionKey string, hasSession bool, sessionID string) error {
 	// Interactive mode requires CLI agent
 	if !ai.IsAgentCLI(cfg.Agent) {
-		fmt.Printf("Note: Interactive mode requires CLI agent (claude-cli or gemini-cli).\n")
+		fmt.Printf("Note: Interactive mode requires AI agent (claude-code or gemini-cli).\n")
 		fmt.Printf("Running single analysis instead.\n\n")
 		return runAdviseAnalysis(ctx, cfg, agent, issueNum, sessionKey, hasSession, sessionID)
 	}
@@ -380,7 +407,7 @@ func runAdviseInteractive(ctx context.Context, cfg *config.Config, agent, issueN
 		}
 
 		// Use -i for gemini (prompt-interactive), -p for claude
-		if agent == "gemini" || strings.HasPrefix(agent, "gemini:") {
+		if agent == "gemini-cli" || strings.HasPrefix(agent, "gemini-cli:") {
 			cmd = exec.Command("gemini", "-i", prompt)
 		} else {
 			cmd = exec.Command("claude", "-p", prompt)

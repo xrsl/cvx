@@ -27,24 +27,23 @@ Add a job application from a URL.
 cvx add <url> [flags]
 ```
 
-| Flag        | Short | Description                                      |
-| ----------- | ----- | ------------------------------------------------ |
-| `--agent`   | `-a`  | CLI agent: claude, gemini                        |
-| `--model`   | `-m`  | API model: claude-sonnet-4, gemini-2.5-flash etc |
-| `--repo`    | `-r`  | GitHub repo (overrides config)                   |
-| `--schema`  | `-s`  | Schema file path                                 |
-| `--body`    | `-b`  | Read job posting from file                       |
-| `--dry-run` |       | Extract only, don't create issue                 |
-
-`--agent` and `--model` are mutually exclusive.
+| Flag        | Short | Description                                                               |
+| ----------- | ----- | ------------------------------------------------------------------------- |
+| `--agent`   | `-a`  | AI agent: claude-code, gemini-cli, api                                    |
+| `--model`   | `-m`  | Model: sonnet-4, sonnet-4-5, opus-4, opus-4-5, flash, pro, flash-3, pro-3 |
+| `--repo`    | `-r`  | GitHub repo (overrides config)                                            |
+| `--schema`  | `-s`  | Schema file path                                                          |
+| `--body`    | `-b`  | Read job posting from file                                                |
+| `--dry-run` |       | Extract only, don't create issue                                          |
 
 **Examples:**
 
 ```bash
 cvx add https://company.com/job
 cvx add https://company.com/job --dry-run
-cvx add https://company.com/job -a gemini          # Gemini CLI
-cvx add https://company.com/job -m claude-sonnet-4 # Claude API
+cvx add https://company.com/job -a gemini-cli       # Gemini AI agent
+cvx add https://company.com/job -m sonnet-4         # Claude AI agent with sonnet-4 model
+cvx add https://company.com/job -a api -m flash     # Gemini API directly with flash model
 ```
 
 ---
@@ -82,25 +81,24 @@ Get career advice on job match quality.
 cvx advise <issue-or-url> [flags]
 ```
 
-| Flag            | Short | Description                                      |
-| --------------- | ----- | ------------------------------------------------ |
-| `--agent`       | `-a`  | CLI agent: claude, gemini                        |
-| `--model`       | `-m`  | API model: claude-sonnet-4, gemini-2.5-flash etc |
-| `--context`     | `-c`  | Additional context                               |
-| `--interactive` | `-i`  | Interactive session                              |
-| `--push`        | `-p`  | Post analysis to issue                           |
-
-`--agent` and `--model` are mutually exclusive.
+| Flag            | Short | Description                                                               |
+| --------------- | ----- | ------------------------------------------------------------------------- |
+| `--agent`       | `-a`  | AI agent: claude-code, gemini-cli, api                                    |
+| `--model`       | `-m`  | Model: sonnet-4, sonnet-4-5, opus-4, opus-4-5, flash, pro, flash-3, pro-3 |
+| `--context`     | `-c`  | Additional context                                                        |
+| `--interactive` | `-i`  | Interactive session                                                       |
+| `--push`        | `-p`  | Post analysis to issue                                                    |
 
 **Examples:**
 
 ```bash
-cvx advise 42                         # Analyze issue #42
-cvx advise 42 --push                  # Post as comment
-cvx advise 42 -a gemini               # Gemini CLI
-cvx advise 42 -m gemini-2.5-flash     # Gemini API
+cvx advise 42                        # Analyze issue #42
+cvx advise 42 --push                 # Post as comment
+cvx advise 42 -a gemini-cli          # Gemini AI agent
+cvx advise 42 -m sonnet-4            # Claude AI agent with sonnet-4 model
+cvx advise 42 -a api -m flash        # Gemini API directly with flash model
 cvx advise 42 -c "Focus on backend"
-cvx advise 42 -i                      # Interactive mode
+cvx advise 42 -i                     # Interactive mode
 ```
 
 ---
@@ -113,15 +111,15 @@ Build tailored CV and cover letter for a job posting.
 cvx build [issue-number] [flags]
 ```
 
-| Flag            | Short | Description                                      |
-| --------------- | ----- | ------------------------------------------------ |
-| `--agent`       | `-a`  | CLI agent: claude, gemini                        |
-| `--model`       | `-m`  | API model: claude-sonnet-4, gemini-2.5-flash etc |
-| `--context`     | `-c`  | Feedback or additional context                   |
-| `--interactive` | `-i`  | Interactive session (requires CLI agent)         |
-| `--open`        | `-o`  | Open combined.pdf in VSCode after build          |
-| `--commit`      |       | Commit changes on the issue branch               |
-| `--push`        |       | Push commits to remote (requires --commit)       |
+| Flag            | Short | Description                                                               |
+| --------------- | ----- | ------------------------------------------------------------------------- |
+| `--agent`       | `-a`  | AI agent: claude-code, gemini-cli, api                                    |
+| `--model`       | `-m`  | Model: sonnet-4, sonnet-4-5, opus-4, opus-4-5, flash, pro, flash-3, pro-3 |
+| `--context`     | `-c`  | Feedback or additional context                                            |
+| `--interactive` | `-i`  | Interactive session (requires AI agent)                                   |
+| `--open`        | `-o`  | Open combined.pdf in VSCode after build                                   |
+| `--commit`      |       | Commit changes on the issue branch                                        |
+| `--push`        |       | Push commits to remote (requires --commit)                                |
 
 If issue-number is omitted, it's inferred from the current branch name.
 
