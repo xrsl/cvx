@@ -78,81 +78,25 @@ func runAdd(cmd *cobra.Command, args []string) error {
 	}
 
 	// Resolve repo (flag > config)
-	repo := repoFlag
-	if repo == "" {
-		repo = cfg.Repo
-	}
-	if repo == "" && !dryRunFlag {
-		return fmt.Errorf("no repo configured. Run: cvx init")
+	repo, err := resolveAddRepo(cfg)
+	if err != nil {
+		return err
 	}
 
 	// Resolve agent/model (flags > config)
-	var agent string
-
-	if callAPIDirectlyFlag {
-		// API mode - requires explicit model
-		if modelFlag == "" {
-			return fmt.Errorf("--call-api-directly requires --model")
-		}
-
-		modelConfig, hasModel := ai.GetModel(modelFlag)
-		if !hasModel {
-			return fmt.Errorf("unsupported model: %s (supported: %v)", modelFlag, ai.SupportedModelNames())
-		}
-
-		agent = modelConfig.APIName
-
-	} else {
-		// CLI agent mode
-		baseAgent := ""
-		if agentFlag != "" {
-			if !ai.IsCLIAgentSupported(agentFlag) {
-				return fmt.Errorf("unsupported CLI agent: %s (supported: claude-code, gemini-cli). Use --call-api-directly for API access", agentFlag)
-			}
-			baseAgent = agentFlag
-		} else if cfg.Agent != "" {
-			baseAgent = cfg.Agent
-		} else {
-			baseAgent = ai.DefaultAgent()
-		}
-
-		// Apply model if specified
-		if modelFlag != "" {
-			modelConfig, hasModel := ai.GetModel(modelFlag)
-			if !hasModel {
-				return fmt.Errorf("unsupported model: %s (supported: %v)", modelFlag, ai.SupportedModelNames())
-			}
-			agent = baseAgent + ":" + modelConfig.CLIName
-		} else {
-			agent = baseAgent
-		}
-	}
-
-	// Validate final setting
-	if !ai.IsAgentSupported(agent) {
-		return fmt.Errorf("unsupported agent/model: %s", agent)
+	agent, err := resolveAddAgent(cfg)
+	if err != nil {
+		return err
 	}
 
 	// Resolve schema (flag > config > default)
-	schemaPath := schemaFlag
-	if schemaPath == "" {
-		schemaPath = cfg.Schema
-	}
-
-	// Load schema
-	sch, err := schema.Load(schemaPath)
+	sch, err := resolveAddSchema(cfg)
 	if err != nil {
-		return fmt.Errorf("schema error: %w", err)
+		return err
 	}
 
 	// Resolve body file path if flag was used
-	var bodyPath string
-	if cmd.Flags().Changed("body") {
-		bodyPath = bodyFlag
-		if bodyPath == "" {
-			bodyPath = ".cvx/body.md"
-		}
-	}
+	bodyPath := resolveAddBodyPath(cmd)
 
 	// Get job text
 	jobText, err := getJobText(ctx, url, bodyPath)
@@ -178,6 +122,96 @@ func runAdd(cmd *cobra.Command, args []string) error {
 
 	// Create GitHub issue
 	return createDynamicIssue(repo, sch, title, data)
+}
+
+func resolveAddRepo(cfg *config.Config) (string, error) {
+	repo := repoFlag
+	if repo == "" {
+		repo = cfg.Repo
+	}
+	if repo == "" && !dryRunFlag {
+		return "", fmt.Errorf("no repo configured. Run: cvx init")
+	}
+	return repo, nil
+}
+
+func resolveAddAgent(cfg *config.Config) (string, error) {
+	if callAPIDirectlyFlag {
+		return resolveAddAPIAgent()
+	}
+	return resolveAddCLIAgent(cfg)
+}
+
+func resolveAddAPIAgent() (string, error) {
+	if modelFlag == "" {
+		return "", fmt.Errorf("--call-api-directly requires --model")
+	}
+
+	modelConfig, hasModel := ai.GetModel(modelFlag)
+	if !hasModel {
+		return "", fmt.Errorf("unsupported model: %s (supported: %v)", modelFlag, ai.SupportedModelNames())
+	}
+
+	return modelConfig.APIName, nil
+}
+
+func resolveAddCLIAgent(cfg *config.Config) (string, error) {
+	baseAgent, err := resolveAddBaseAgent(cfg)
+	if err != nil {
+		return "", err
+	}
+
+	agent := baseAgent
+	if modelFlag != "" {
+		modelConfig, hasModel := ai.GetModel(modelFlag)
+		if !hasModel {
+			return "", fmt.Errorf("unsupported model: %s (supported: %v)", modelFlag, ai.SupportedModelNames())
+		}
+		agent = baseAgent + ":" + modelConfig.CLIName
+	}
+
+	if !ai.IsAgentSupported(agent) {
+		return "", fmt.Errorf("unsupported agent/model: %s", agent)
+	}
+
+	return agent, nil
+}
+
+func resolveAddBaseAgent(cfg *config.Config) (string, error) {
+	if agentFlag != "" {
+		if !ai.IsCLIAgentSupported(agentFlag) {
+			return "", fmt.Errorf("unsupported CLI agent: %s (supported: claude-code, gemini-cli). Use --call-api-directly for API access", agentFlag)
+		}
+		return agentFlag, nil
+	}
+	if cfg.Agent != "" {
+		return cfg.Agent, nil
+	}
+	return ai.DefaultAgent(), nil
+}
+
+func resolveAddSchema(cfg *config.Config) (*schema.Schema, error) {
+	schemaPath := schemaFlag
+	if schemaPath == "" {
+		schemaPath = cfg.Schema
+	}
+
+	sch, err := schema.Load(schemaPath)
+	if err != nil {
+		return nil, fmt.Errorf("schema error: %w", err)
+	}
+
+	return sch, nil
+}
+
+func resolveAddBodyPath(cmd *cobra.Command) string {
+	if !cmd.Flags().Changed("body") {
+		return ""
+	}
+	if bodyFlag == "" {
+		return ".cvx/body.md"
+	}
+	return bodyFlag
 }
 
 func getJobText(ctx context.Context, url, bodyPath string) (string, error) {
