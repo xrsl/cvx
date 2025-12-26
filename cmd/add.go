@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/PuerkitoBio/goquery"
 	"github.com/spf13/cobra"
 
 	"github.com/xrsl/cvx/pkg/ai"
@@ -251,7 +252,34 @@ func getJobText(ctx context.Context, url, bodyPath string) (string, error) {
 		return "", fmt.Errorf("read failed: %w", err)
 	}
 
-	return string(body), nil
+	return cleanHTML(string(body))
+}
+
+func cleanHTML(html string) (string, error) {
+	doc, err := goquery.NewDocumentFromReader(strings.NewReader(html))
+	if err != nil {
+		return "", fmt.Errorf("failed to parse HTML: %w", err)
+	}
+
+	// Remove unwanted elements
+	doc.Find("script, style, nav, footer, header").Remove()
+
+	// Extract text
+	text := doc.Text()
+
+	// Clean up whitespace
+	lines := strings.Split(text, "\n")
+	var cleaned []string
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line != "" {
+			cleaned = append(cleaned, line)
+		}
+	}
+
+	result := strings.Join(cleaned, "\n")
+	log("Extracted %d chars (cleaned from HTML)", len(result))
+	return result, nil
 }
 
 func extractWithSchema(ctx context.Context, agent string, sch *schema.Schema, url, jobText string) (map[string]any, error) {
