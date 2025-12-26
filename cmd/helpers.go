@@ -33,17 +33,32 @@ func ensureIssueBranch(repo, issueNumber string) error {
 		return nil
 	}
 
-	// Check if branch exists
-	checkCmd := exec.Command("git", "rev-parse", "--verify", branchName)
-	if err := checkCmd.Run(); err == nil {
-		// Branch exists, switch to it
+	// Fetch from remote to get latest branches
+	_ = exec.Command("git", "fetch", "origin").Run()
+
+	// Check if branch exists locally
+	localExists := exec.Command("git", "rev-parse", "--verify", branchName).Run() == nil
+
+	// Check if branch exists on remote
+	remoteExists := exec.Command("git", "rev-parse", "--verify", "origin/"+branchName).Run() == nil
+
+	switch {
+	case localExists:
+		// Local branch exists, switch to it
 		gitCmd := exec.Command("git", "checkout", branchName)
 		if output, err := gitCmd.CombinedOutput(); err != nil {
 			return fmt.Errorf("error switching to branch: %w\n%s", err, string(output))
 		}
 		fmt.Printf("%s Switched to branch %s\n", style.C(style.Green, "✓"), style.C(style.Cyan, branchName))
-	} else {
-		// Create new branch from main
+	case remoteExists:
+		// Remote branch exists, checkout and track it
+		gitCmd := exec.Command("git", "checkout", "-b", branchName, "origin/"+branchName)
+		if output, err := gitCmd.CombinedOutput(); err != nil {
+			return fmt.Errorf("error checking out remote branch: %w\n%s", err, string(output))
+		}
+		fmt.Printf("%s Checked out remote branch %s\n", style.C(style.Green, "✓"), style.C(style.Cyan, branchName))
+	default:
+		// Neither exists, create new branch from main
 		gitCmd := exec.Command("git", "checkout", "-b", branchName, "main")
 		if output, err := gitCmd.CombinedOutput(); err != nil {
 			return fmt.Errorf("error creating branch: %w\n%s", err, string(output))

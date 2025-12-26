@@ -120,7 +120,8 @@ cvx build [issue-number] [flags]
 | `--context`     | `-c`  | Feedback or additional context                   |
 | `--interactive` | `-i`  | Interactive session (requires CLI agent)         |
 | `--open`        | `-o`  | Open combined.pdf in VSCode after build          |
-| `--no-build`    |       | Skip build, use with -o to just open PDF         |
+| `--commit`      |       | Commit changes on the issue branch               |
+| `--push`        |       | Push commits to remote (requires --commit)       |
 
 If issue-number is omitted, it's inferred from the current branch name.
 
@@ -130,9 +131,9 @@ If issue-number is omitted, it's inferred from the current branch name.
 cvx build                            # Infer issue from branch
 cvx build 42                         # Build for issue #42
 cvx build -o                         # Build and open PDF
-cvx build -o --no-build              # Just open PDF (skip build)
 cvx build -c "emphasize Python"      # Continue with feedback
 cvx build -i                         # Interactive session
+cvx build --commit --push            # Build, commit, and push
 ```
 
 ---

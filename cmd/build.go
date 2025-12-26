@@ -32,9 +32,10 @@ Examples:
   cvx build                           # Infer issue from branch
   cvx build 42                        # Build for issue #42
   cvx build -o                        # Build and open PDF
-  cvx build -o --no-build             # Just open PDF (skip build)
   cvx build -c "emphasize Python"     # Continue with feedback
-  cvx build -i                        # Interactive session`,
+  cvx build -i                        # Interactive session
+  cvx build --commit                  # Build and commit changes
+  cvx build --commit --push           # Build, commit, and push`,
 	Args: cobra.MaximumNArgs(1),
 	RunE: runBuild,
 }
@@ -45,7 +46,8 @@ var (
 	buildContextFlag     string
 	buildInteractiveFlag bool
 	buildOpenFlag        bool
-	buildNoBuildFlag     bool
+	buildCommitFlag      bool
+	buildPushFlag        bool
 )
 
 func init() {
@@ -54,20 +56,13 @@ func init() {
 	buildCmd.Flags().StringVarP(&buildContextFlag, "context", "c", "", "Feedback or additional context")
 	buildCmd.Flags().BoolVarP(&buildInteractiveFlag, "interactive", "i", false, "Interactive session")
 	buildCmd.Flags().BoolVarP(&buildOpenFlag, "open", "o", false, "Open combined.pdf in VSCode after build")
-	buildCmd.Flags().BoolVar(&buildNoBuildFlag, "no-build", false, "Skip build, use with -o to just open PDF")
+	buildCmd.Flags().BoolVar(&buildCommitFlag, "commit", false, "Commit changes on the issue branch")
+	buildCmd.Flags().BoolVar(&buildPushFlag, "push", false, "Push commits to remote (requires --commit)")
 	buildCmd.MarkFlagsMutuallyExclusive("agent", "model")
 	rootCmd.AddCommand(buildCmd)
 }
 
 func runBuild(cmd *cobra.Command, args []string) error {
-	// Skip build - just open if -o is also set
-	if buildNoBuildFlag {
-		if buildOpenFlag {
-			return openCombinedPDF()
-		}
-		return nil
-	}
-
 	cfg, _, err := config.LoadWithCache()
 	if err != nil {
 		return fmt.Errorf("config error: %w", err)
@@ -77,6 +72,10 @@ func runBuild(cmd *cobra.Command, args []string) error {
 	var issueNum string
 	if len(args) > 0 {
 		issueNum = args[0]
+		// Validate issue number is numeric
+		if _, err := fmt.Sscanf(issueNum, "%d", new(int)); err != nil {
+			return fmt.Errorf("invalid issue number: %s (must be numeric)", issueNum)
+		}
 	} else {
 		// Infer from current branch
 		currentBranch, err := getCurrentBranch()
@@ -135,6 +134,24 @@ func runBuild(cmd *cobra.Command, args []string) error {
 	// Non-interactive mode (API or CLI)
 	if err := runBuildNonInteractive(cmd.Context(), cfg, agentSetting, issueNum); err != nil {
 		return err
+	}
+
+	// Build PDF
+	if err := buildPDF(); err != nil {
+		return err
+	}
+
+	// Commit if requested
+	if buildCommitFlag {
+		if err := commitBuildChanges(cfg.Repo, issueNum); err != nil {
+			return err
+		}
+		// Push if requested
+		if buildPushFlag {
+			if err := pushChanges(); err != nil {
+				return err
+			}
+		}
 	}
 
 	// Open PDF if requested
@@ -484,5 +501,68 @@ func openCombinedPDF() error {
 	}
 
 	fmt.Printf("%s Opened build/combined.pdf in VSCode\n", style.C(style.Green, "✓"))
+	return nil
+}
+
+func commitBuildChanges(repo, issueNum string) error {
+	// Verify we're on the expected issue branch
+	currentBranch, err := getCurrentBranch()
+	if err != nil {
+		return err
+	}
+	expectedBranch, _, _, err := getIssueBranchName(repo, issueNum)
+	if err != nil {
+		return fmt.Errorf("error getting expected branch name: %w", err)
+	}
+	if currentBranch != expectedBranch {
+		return fmt.Errorf("refusing to commit: expected branch %s, but on %s", expectedBranch, currentBranch)
+	}
+
+	// Stage src/ and build/ changes
+	addCmd := exec.Command("git", "add", "src/", "build/")
+	if err := addCmd.Run(); err != nil {
+		return fmt.Errorf("error staging changes: %w", err)
+	}
+
+	// Check if there are changes to commit
+	diffCmd := exec.Command("git", "diff", "--cached", "--quiet")
+	if err := diffCmd.Run(); err == nil {
+		// No changes to commit
+		fmt.Printf("%s No changes to commit\n", style.C(style.Yellow, "⚠"))
+		return nil
+	}
+
+	// Set git identity for CI environments
+	_ = exec.Command("git", "config", "user.name", "cvx").Run()
+	_ = exec.Command("git", "config", "user.email", "cvx@automated").Run()
+
+	// Commit with message
+	commitMsg := fmt.Sprintf("build: update application for issue #%s", issueNum)
+	commitCmd := exec.Command("git", "commit", "-m", commitMsg)
+	if err := commitCmd.Run(); err != nil {
+		return fmt.Errorf("error committing changes: %w", err)
+	}
+
+	fmt.Printf("%s Committed changes for issue #%s\n", style.C(style.Green, "✓"), issueNum)
+	return nil
+}
+
+func pushChanges() error {
+	pushCmd := exec.Command("git", "push", "-u", "origin", "HEAD")
+	if err := pushCmd.Run(); err != nil {
+		return fmt.Errorf("error pushing changes: %w", err)
+	}
+
+	fmt.Printf("%s Pushed changes to remote\n", style.C(style.Green, "✓"))
+	return nil
+}
+
+func buildPDF() error {
+	fmt.Printf("%s Building PDF...\n", style.C(style.Cyan, "⧗"))
+	makeCmd := exec.Command("make", "combined")
+	if output, err := makeCmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("error building PDF: %w\n%s", err, string(output))
+	}
+	fmt.Printf("%s PDF built successfully\n", style.C(style.Green, "✓"))
 	return nil
 }

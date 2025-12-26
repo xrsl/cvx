@@ -89,9 +89,9 @@ Build tailored CV and cover letter. Automatically creates/switches to the issue 
 cvx build                            # Infer issue from branch
 cvx build 42                         # Build for issue #42
 cvx build -o                         # Build and open PDF
-cvx build -o --no-build              # Just open PDF
 cvx build -c "emphasize Python"      # Continue with feedback
 cvx build -i                         # Interactive session
+cvx build --commit --push            # Build, commit, and push
 ```
 
 Sessions are shared per issue. Use `-c` to continue with feedback.
