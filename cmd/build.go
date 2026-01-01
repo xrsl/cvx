@@ -17,6 +17,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/xrsl/cvx/pkg/ai"
+	"github.com/xrsl/cvx/pkg/cache"
 	"github.com/xrsl/cvx/pkg/config"
 	"github.com/xrsl/cvx/pkg/style"
 	"github.com/xrsl/cvx/pkg/workflow"
@@ -49,6 +50,8 @@ var (
 	buildInteractiveFlag     bool
 	buildOpenFlag            bool
 	buildCommitFlag          bool
+	buildNoCacheFlag         bool
+	buildDryRunFlag          bool
 	buildPushFlag            bool
 	buildCallAPIDirectlyFlag bool
 )
@@ -62,6 +65,8 @@ func init() {
 	buildCmd.Flags().BoolVarP(&buildOpenFlag, "open", "o", false, "Open combined.pdf in VSCode after build")
 	buildCmd.Flags().BoolVar(&buildCommitFlag, "commit", false, "Commit changes on the issue branch")
 	buildCmd.Flags().BoolVar(&buildPushFlag, "push", false, "Push commits to remote (requires --commit)")
+	buildCmd.Flags().BoolVar(&buildNoCacheFlag, "no-cache", false, "Skip cache read/write")
+	buildCmd.Flags().BoolVar(&buildDryRunFlag, "dry-run", false, "Print plan without calling agent")
 	rootCmd.AddCommand(buildCmd)
 }
 
@@ -860,14 +865,65 @@ func runBuildWithPythonAgent(cfg *config.Config, issueNum string) error {
 		return fmt.Errorf("failed to read %s: %w", letterPath, err)
 	}
 
-	// 3. Call Python agent
-	fmt.Printf("%s Calling Python agent...\n", style.C(style.Cyan, "⧗"))
-	cvOut, letterOut, err := callPythonAgent(issueBody, cv, letter)
-	if err != nil {
-		return err
+	// 3. Read schema if available
+	schemaContent := ""
+	schemaPath := "schema/schema.json"
+	if data, err := os.ReadFile(schemaPath); err == nil {
+		schemaContent = string(data)
 	}
 
-	// 4. Write output YAML
+	// 4. Compute cache key
+	cvStr, _ := yaml.Marshal(cv)
+	letterStr, _ := yaml.Marshal(letter)
+	cacheKey := cache.CacheKey(issueBody, string(cvStr), string(letterStr), schemaContent, buildModelFlag)
+
+	// 5. Handle --dry-run
+	if buildDryRunFlag {
+		fmt.Printf("%s Dry run mode\n", style.C(style.Cyan, "►"))
+		fmt.Printf("  Model: %s\n", buildModelFlag)
+		fmt.Printf("  Cache key: %s\n", cacheKey[:16]+"...")
+		if cache.Exists(cacheKey) && !buildNoCacheFlag {
+			fmt.Printf("  Cache: %s (hit)\n", style.C(style.Green, "✓"))
+		} else {
+			fmt.Printf("  Cache: %s (miss)\n", style.C(style.Yellow, "○"))
+		}
+		fmt.Printf("  Agent command: uvx --from <agent-dir> cvx-agent\n")
+		return nil
+	}
+
+	// 6. Check cache (unless --no-cache)
+	var cvOut, letterOut map[string]interface{}
+	if !buildNoCacheFlag && cache.Exists(cacheKey) {
+		fmt.Printf("%s Cache hit\n", style.C(style.Green, "✓"))
+		cached, err := cache.Read(cacheKey)
+		if err == nil {
+			cvOut = cached["cv"].(map[string]interface{})
+			letterOut = cached["letter"].(map[string]interface{})
+		} else {
+			fmt.Printf("%s Cache read failed, calling agent\n", style.C(style.Yellow, "⚠"))
+			cvOut, letterOut, err = callPythonAgent(issueBody, cv, letter)
+			if err != nil {
+				return err
+			}
+		}
+	} else {
+		// 7. Call Python agent
+		fmt.Printf("%s Calling Python agent...\n", style.C(style.Cyan, "⧗"))
+		var err error
+		cvOut, letterOut, err = callPythonAgent(issueBody, cv, letter)
+		if err != nil {
+			return err
+		}
+
+		// 8. Write to cache (unless --no-cache)
+		if !buildNoCacheFlag {
+			if err := cache.Write(cacheKey, cvOut, letterOut); err != nil {
+				fmt.Printf("%s Failed to write cache: %v\n", style.C(style.Yellow, "⚠"), err)
+			}
+		}
+	}
+
+	// 9. Write output YAML
 	if err := writeYAMLCV(cvPath, cvOut); err != nil {
 		return fmt.Errorf("failed to write %s: %w", cvPath, err)
 	}

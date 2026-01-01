@@ -44,13 +44,14 @@ def test_agent_stdin_stdout():
         },
     }
 
-    # Call the agent via subprocess
+    # Call the agent via subprocess using the renamed main.py
     proc = subprocess.Popen(
-        [sys.executable, "-m", "cvx_agent"],
+        ["python", "-m", "cvx_agent.main"],
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
+        cwd="/Users/resulal/ghub/cvx/agent",
     )
 
     stdout, stderr = proc.communicate(input=json.dumps(input_data))
@@ -99,11 +100,12 @@ def test_agent_with_invalid_input():
     }
 
     proc = subprocess.Popen(
-        [sys.executable, "-m", "cvx_agent"],
+        ["python", "-m", "cvx_agent.main"],
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
+        cwd="/Users/resulal/ghub/cvx/agent",
     )
 
     stdout, stderr = proc.communicate(input=json.dumps(incomplete_input))
@@ -125,11 +127,12 @@ def test_agent_with_malformed_json():
     malformed_json = "{ this is not valid json"
 
     proc = subprocess.Popen(
-        [sys.executable, "-m", "cvx_agent"],
+        ["python", "-m", "cvx_agent.main"],
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
+        cwd="/Users/resulal/ghub/cvx/agent",
     )
 
     stdout, stderr = proc.communicate(input=malformed_json)
