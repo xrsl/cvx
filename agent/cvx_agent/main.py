@@ -23,3 +23,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+# Also support running as a module with -m cvx_agent for backward compatibility
+if __name__ == "cvx_agent.__main__":
+    main()

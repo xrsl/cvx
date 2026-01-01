@@ -5,15 +5,18 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
-    "pydantic>=2.12.5",
-    "pydantic-ai>=1.39.0",
-    "python-dotenv>=1.2.1",
+  "pydantic>=2.12.5",
+  "pydantic-ai>=1.39.0",
+  "python-dotenv>=1.2.1",
 ]
 
 [project.scripts]
-cvx-agent = "cvx_agent.__main__:main"
+cvx-agent = "cvx_agent.main:main"
 
 [dependency-groups]
 dev = [
-    "pytest>=9.0.2",
+  "pytest>=9.0.2",
 ]
+
+[tool.setuptools]
+packages = ["cvx_agent"]

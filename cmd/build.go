@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -13,6 +14,7 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	"gopkg.in/yaml.v3"
 
 	"github.com/xrsl/cvx/pkg/ai"
 	"github.com/xrsl/cvx/pkg/config"
@@ -72,6 +74,15 @@ func runBuild(cmd *cobra.Command, args []string) error {
 	issueNum, err := resolveIssueNumber(args)
 	if err != nil {
 		return err
+	}
+
+	// NEW: If -m flag is used without --call-api-directly, use Python agent
+	if buildModelFlag != "" && !buildCallAPIDirectlyFlag {
+		// Set model for Python agent via environment variable
+		if err := os.Setenv("AI_MODEL", buildModelFlag); err != nil {
+			return fmt.Errorf("failed to set AI_MODEL env var: %w", err)
+		}
+		return runBuildWithPythonAgent(cfg, issueNum)
 	}
 
 	agentSetting, err := resolveAgent(cfg)
@@ -638,5 +649,234 @@ func buildPDF() error {
 		return fmt.Errorf("error building PDF: %w\n%s", err, string(output))
 	}
 	fmt.Printf("%s PDF built successfully\n", style.C(style.Green, "✓"))
+	return nil
+}
+
+// ========================================
+// Python Agent Mode Functions
+// ========================================
+
+// readYAMLCV reads cv.yaml and extracts the cv field
+func readYAMLCV(path string) (map[string]interface{}, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+
+	var wrapper struct {
+		CV map[string]interface{} `yaml:"cv"`
+	}
+	if err := yaml.Unmarshal(data, &wrapper); err != nil {
+		return nil, err
+	}
+	return wrapper.CV, nil
+}
+
+// readYAMLLetter reads letter.yaml and extracts the letter field
+func readYAMLLetter(path string) (map[string]interface{}, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+
+	var wrapper struct {
+		Letter map[string]interface{} `yaml:"letter"`
+	}
+	if err := yaml.Unmarshal(data, &wrapper); err != nil {
+		return nil, err
+	}
+	return wrapper.Letter, nil
+}
+
+// writeYAMLCV writes cv data back to cv.yaml
+func writeYAMLCV(path string, cv map[string]interface{}) error {
+	wrapper := struct {
+		CV map[string]interface{} `yaml:"cv"`
+	}{CV: cv}
+
+	data, err := yaml.Marshal(&wrapper)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(path, data, 0o644)
+}
+
+// writeYAMLLetter writes letter data back to letter.yaml
+func writeYAMLLetter(path string, letter map[string]interface{}) error {
+	wrapper := struct {
+		Letter map[string]interface{} `yaml:"letter"`
+	}{Letter: letter}
+
+	data, err := yaml.Marshal(&wrapper)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(path, data, 0o644)
+}
+
+// callPythonAgent calls the Python agent subprocess with JSON stdin/stdout
+// extractAgentToCache extracts the embedded agent to a cache directory for reuse
+func extractAgentToCache() (string, error) {
+	if agentFS == nil {
+		return "", fmt.Errorf("agent filesystem not initialized")
+	}
+
+	// Use ~/.cache/cvx/agent as persistent cache
+	cacheDir := filepath.Join(os.ExpandEnv("$HOME"), ".cache", "cvx", "agent")
+
+	// Check if already extracted (simple version check via stat)
+	if stat, err := os.Stat(cacheDir); err == nil && stat.IsDir() {
+		// Cache exists, reuse it
+		return cacheDir, nil
+	}
+
+	// Create cache directory
+	if err := os.MkdirAll(cacheDir, 0o755); err != nil {
+		return "", fmt.Errorf("failed to create cache dir: %w", err)
+	}
+
+	// Walk the embedded FS and extract all files
+	err := fs.WalkDir(*agentFS, "agent", func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+
+		// Get relative path (remove "agent" or "agent/" prefix)
+		relPath := strings.TrimPrefix(path, "agent")
+		relPath = strings.TrimPrefix(relPath, "/")
+		if relPath == "" {
+			return nil // skip the agent directory itself
+		}
+
+		targetPath := filepath.Join(cacheDir, relPath)
+
+		if d.IsDir() {
+			return os.MkdirAll(targetPath, 0o755)
+		}
+
+		// Read file from embedded FS
+		data, err := fs.ReadFile(*agentFS, path)
+		if err != nil {
+			return err
+		}
+
+		// Write to cache directory
+		return os.WriteFile(targetPath, data, 0o644)
+	})
+
+	if err != nil {
+		_ = os.RemoveAll(cacheDir) // cleanup on error
+		return "", fmt.Errorf("failed to extract agent: %w", err)
+	}
+
+	return cacheDir, nil
+}
+
+// Go boundary: subprocess management, JSON marshaling
+// Python boundary: AI calls, validation, caching
+func callPythonAgent(jobPosting string, cv, letter map[string]interface{}) (cvOut, letterOut map[string]interface{}, err error) {
+	// Check if uv is available
+	if _, err := exec.LookPath("uv"); err != nil {
+		return nil, nil, fmt.Errorf("uv is not installed. Please install uv: https://docs.astral.sh/uv/")
+	}
+
+	// Extract embedded agent to cache directory
+	agentDir, err := extractAgentToCache()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// Prepare input JSON
+	input := map[string]interface{}{
+		"job_posting": jobPosting,
+		"cv":          cv,
+		"letter":      letter,
+	}
+
+	inputJSON, err := json.Marshal(input)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to marshal input: %w", err)
+	}
+
+	// Call Python agent via uvx
+	cmd := exec.Command("uvx", "--from", agentDir, "cvx-agent")
+	cmd.Stdin = bytes.NewReader(inputJSON)
+
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	if err := cmd.Run(); err != nil {
+		return nil, nil, fmt.Errorf("python agent failed: %w\nstderr: %s", err, stderr.String())
+	}
+
+	// Parse output JSON
+	var output struct {
+		CV     map[string]interface{} `json:"cv"`
+		Letter map[string]interface{} `json:"letter"`
+	}
+
+	if err := json.Unmarshal(stdout.Bytes(), &output); err != nil {
+		return nil, nil, fmt.Errorf("failed to parse output: %w\noutput: %s", err, stdout.String())
+	}
+
+	// Validate output has required fields
+	if output.CV == nil || output.Letter == nil {
+		return nil, nil, fmt.Errorf("invalid output: missing cv or letter fields")
+	}
+
+	return output.CV, output.Letter, nil
+}
+
+// runBuildWithPythonAgent executes the build command using the Python agent
+// This mode is triggered when -m flag is used without --call-api-directly
+func runBuildWithPythonAgent(cfg *config.Config, issueNum string) error {
+	fmt.Printf("%s Building with Python agent for issue %s\n",
+		style.C(style.Green, "▶"), style.C(style.Cyan, "#"+issueNum))
+
+	// 1. Fetch job posting from GitHub
+	issueBody, err := fetchIssueBody(cfg.Repo, issueNum)
+	if err != nil {
+		return fmt.Errorf("error fetching issue: %w", err)
+	}
+
+	// 2. Read YAML files
+	cvPath := cfg.CVYAMLPath
+	if cvPath == "" {
+		cvPath = "src/cv.yaml"
+	}
+	letterPath := cfg.LetterYAMLPath
+	if letterPath == "" {
+		letterPath = "src/letter.yaml"
+	}
+
+	cv, err := readYAMLCV(cvPath)
+	if err != nil {
+		return fmt.Errorf("failed to read %s: %w", cvPath, err)
+	}
+
+	letter, err := readYAMLLetter(letterPath)
+	if err != nil {
+		return fmt.Errorf("failed to read %s: %w", letterPath, err)
+	}
+
+	// 3. Call Python agent
+	fmt.Printf("%s Calling Python agent...\n", style.C(style.Cyan, "⧗"))
+	cvOut, letterOut, err := callPythonAgent(issueBody, cv, letter)
+	if err != nil {
+		return err
+	}
+
+	// 4. Write output YAML
+	if err := writeYAMLCV(cvPath, cvOut); err != nil {
+		return fmt.Errorf("failed to write %s: %w", cvPath, err)
+	}
+	fmt.Printf("%s Wrote %s\n", style.C(style.Green, "✓"), cvPath)
+
+	if err := writeYAMLLetter(letterPath, letterOut); err != nil {
+		return fmt.Errorf("failed to write %s: %w", letterPath, err)
+	}
+	fmt.Printf("%s Wrote %s\n", style.C(style.Green, "✓"), letterPath)
+
 	return nil
 }

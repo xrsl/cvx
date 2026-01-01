@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"embed"
 	"errors"
 	"fmt"
 	"os"
@@ -13,6 +14,14 @@ import (
 	"github.com/xrsl/cvx/pkg/signal"
 	"github.com/xrsl/cvx/pkg/style"
 )
+
+// agentFS will be set by the main package
+var agentFS *embed.FS
+
+// SetAgentFS sets the embedded agent filesystem
+func SetAgentFS(fs *embed.FS) {
+	agentFS = fs
+}
 
 var (
 	quiet   bool
