@@ -1,5 +1,5 @@
 [project]
-name = "agent"
+name = "cvx-agent"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
@@ -8,4 +8,12 @@ dependencies = [
     "pydantic>=2.12.5",
     "pydantic-ai>=1.39.0",
     "python-dotenv>=1.2.1",
+]
+
+[project.scripts]
+cvx-agent = "cvx_agent.__main__:main"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.2",
 ]

@@ -7,3 +7,6 @@ dependencies = [
     "datamodel-code-generator>=0.51.0",
     "mkdocs-material>=9.5",
 ]
+
+[dependency-groups]
+dev = []

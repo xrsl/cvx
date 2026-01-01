@@ -1,5 +1,7 @@
 .env
 convos/
+.cache/
+*/.cache/
 
 # Go
 *.exe
