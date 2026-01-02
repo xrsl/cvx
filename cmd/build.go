@@ -46,11 +46,12 @@ Examples:
 }
 
 var (
-	buildModelFlag       string
-	buildContextFlag     string
-	buildInteractiveFlag bool
-	buildNoCacheFlag     bool
-	buildDryRunFlag      bool
+	buildModelFlag        string
+	buildContextFlag      string
+	buildInteractiveFlag  bool
+	buildNoCacheFlag      bool
+	buildRefreshCacheFlag bool
+	buildDryRunFlag       bool
 )
 
 func init() {
@@ -58,6 +59,7 @@ func init() {
 	buildCmd.Flags().BoolVarP(&buildInteractiveFlag, "interactive", "i", false, "Interactive CLI mode (auto-detects claude-code or gemini-cli)")
 	buildCmd.Flags().StringVarP(&buildContextFlag, "context", "c", "", "Feedback or additional context")
 	buildCmd.Flags().BoolVar(&buildNoCacheFlag, "no-cache", false, "Skip cache (Python agent mode only)")
+	buildCmd.Flags().BoolVar(&buildRefreshCacheFlag, "refresh-cache", false, "Recompute and overwrite cache (Python agent mode only)")
 	buildCmd.Flags().BoolVar(&buildDryRunFlag, "dry-run", false, "Preview without AI call (Python agent mode only)")
 	rootCmd.AddCommand(buildCmd)
 }
@@ -77,8 +79,11 @@ func runBuild(cmd *cobra.Command, args []string) error {
 	if buildInteractiveFlag && buildModelFlag != "" {
 		return fmt.Errorf("cannot use -i and -m together (choose one mode)")
 	}
-	if buildInteractiveFlag && (buildDryRunFlag || buildNoCacheFlag) {
-		return fmt.Errorf("--dry-run and --no-cache only work with -m mode")
+	if buildInteractiveFlag && (buildDryRunFlag || buildNoCacheFlag || buildRefreshCacheFlag) {
+		return fmt.Errorf("--dry-run, --no-cache, and --refresh-cache only work with -m mode")
+	}
+	if buildNoCacheFlag && buildRefreshCacheFlag {
+		return fmt.Errorf("cannot use --no-cache and --refresh-cache together")
 	}
 
 	// Interactive CLI mode
@@ -826,17 +831,30 @@ func runBuildWithPythonAgent(cfg *config.Config, issueNum string) error {
 		schemaContent = string(data)
 	}
 
-	// 4. Compute cache key
-	cvStr, _ := yaml.Marshal(cv)
-	letterStr, _ := yaml.Marshal(letter)
-	cacheKey := cache.CacheKey(issueBody, string(cvStr), string(letterStr), schemaContent, buildModelFlag)
+	// 4. Compute cache key using canonical JSON
+	cvJSON, err := json.Marshal(cv)
+	if err != nil {
+		return fmt.Errorf("failed to marshal CV to JSON: %w", err)
+	}
+	letterJSON, err := json.Marshal(letter)
+	if err != nil {
+		return fmt.Errorf("failed to marshal letter to JSON: %w", err)
+	}
+
+	// Convert issue number to int for cache key
+	var issueNumInt int
+	if _, err := fmt.Sscanf(issueNum, "%d", &issueNumInt); err != nil {
+		return fmt.Errorf("invalid issue number %q: %w", issueNum, err)
+	}
+
+	cacheKey := cache.CacheKey(issueNumInt, issueBody, string(cvJSON), string(letterJSON), schemaContent, buildModelFlag)
 
 	// 5. Handle --dry-run
 	if buildDryRunFlag {
 		fmt.Printf("%s Dry run mode\n", style.C(style.Cyan, "►"))
 		fmt.Printf("  Model: %s\n", buildModelFlag)
 		fmt.Printf("  Cache key: %s\n", cacheKey[:16]+"...")
-		if cache.Exists(cacheKey) && !buildNoCacheFlag {
+		if cache.Exists(cacheKey) && !buildNoCacheFlag && !buildRefreshCacheFlag {
 			fmt.Printf("  Cache: %s (hit)\n", style.C(style.Green, "✓"))
 		} else {
 			fmt.Printf("  Cache: %s (miss)\n", style.C(style.Yellow, "○"))
@@ -845,9 +863,11 @@ func runBuildWithPythonAgent(cfg *config.Config, issueNum string) error {
 		return nil
 	}
 
-	// 6. Check cache (unless --no-cache)
+	// 6. Check cache (unless --no-cache or --refresh-cache)
 	var cvOut, letterOut map[string]interface{}
-	if !buildNoCacheFlag && cache.Exists(cacheKey) {
+	useCache := !buildNoCacheFlag && !buildRefreshCacheFlag
+
+	if useCache && cache.Exists(cacheKey) {
 		fmt.Printf("%s Cache hit\n", style.C(style.Green, "✓"))
 		cached, err := cache.Read(cacheKey)
 		if err == nil {
@@ -862,7 +882,11 @@ func runBuildWithPythonAgent(cfg *config.Config, issueNum string) error {
 		}
 	} else {
 		// 7. Call Python agent
-		fmt.Printf("%s Calling Python agent...\n", style.C(style.Cyan, "⧗"))
+		if buildRefreshCacheFlag {
+			fmt.Printf("%s Refreshing cache, calling Python agent...\n", style.C(style.Cyan, "⧗"))
+		} else {
+			fmt.Printf("%s Calling Python agent...\n", style.C(style.Cyan, "⧗"))
+		}
 		var err error
 		cvOut, letterOut, err = callPythonAgent(issueBody, cv, letter)
 		if err != nil {

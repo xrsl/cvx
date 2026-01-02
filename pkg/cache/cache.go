@@ -10,9 +10,10 @@ import (
 )
 
 // CacheKey computes a deterministic SHA256 hash of build inputs
-// Order is critical: job posting, cv, letter, schema, model
-func CacheKey(jobPosting, cv, letter, schema, model string) string {
+// Order is critical: issue number, job posting, cv, letter, schema, model
+func CacheKey(issueNumber int, jobPosting, cv, letter, schema, model string) string {
 	h := sha256.New()
+	_, _ = fmt.Fprintf(h, "%d", issueNumber) // hash.Hash.Write never returns an error
 	h.Write([]byte(jobPosting))
 	h.Write([]byte(cv))
 	h.Write([]byte(letter))
@@ -22,8 +23,14 @@ func CacheKey(jobPosting, cv, letter, schema, model string) string {
 }
 
 // CachePath returns the path to the cache file for a given key
+// Cache is stored in .cvx/cache/agent/ relative to current working directory
 func CachePath(key string) string {
-	cacheDir := filepath.Join(os.ExpandEnv("$HOME"), ".cache", "cvx", "agent", "runs")
+	cwd, err := os.Getwd()
+	if err != nil {
+		// Fallback to current directory if we can't get cwd
+		cwd = "."
+	}
+	cacheDir := filepath.Join(cwd, ".cvx", "cache", "agent")
 	return filepath.Join(cacheDir, key+".json")
 }
 
