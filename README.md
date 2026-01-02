@@ -29,8 +29,9 @@ go install github.com/xrsl/cvx@latest
 ## Requirements
 
 - `git` and [GitHub CLI](https://cli.github.com/) (`gh`) - installed and authenticated
-- One of: [Claude Code CLI](https://github.com/anthropics/claude-code), [Gemini CLI](https://github.com/google-gemini/gemini-cli), or an API key (`ANTHROPIC_API_KEY` or `GEMINI_API_KEY`).
+- One of: [Claude Code CLI](https://github.com/anthropics/claude-code), [Gemini CLI](https://github.com/google-gemini/gemini-cli), or an API key (`ANTHROPIC_API_KEY` or `GEMINI_API_KEY`)
 - LaTeX: [BasicTeX](https://tug.org/mactex/morepackages.html) (light, recommended for Mac), [MacTeX](https://tug.org/mactex/), or [TeX Live](https://tug.org/texlive/) - for building PDFs
+- [uv](https://docs.astral.sh/uv/) - required for Python agent mode (`cvx build -m`)
 
 ## Quickstart
 
@@ -85,14 +86,35 @@ cvx advise https://example.com/job
 
 Build tailored CV and cover letter. Automatically creates/switches to the issue branch (`42-company-role`).
 
+**Two Build Modes:**
+
+1. **Python Agent Mode** (default when using `-m`): Uses structured YAML output with schema validation
+2. **CLI Agent Mode**: Uses Claude Code or Gemini CLI for interactive/non-interactive sessions
+
 ```bash
+# Python Agent Mode (structured YAML)
+cvx build -m claude-sonnet-4         # Use Python agent with Claude
+cvx build -m gemini-2.5-flash        # Use Python agent with Gemini
+cvx build -m sonnet-4 --dry-run      # Preview without calling AI
+cvx build -m sonnet-4 --no-cache     # Skip cache
+
+# CLI Agent Mode (LaTeX editing)
 cvx build                            # Infer issue from branch
 cvx build 42                         # Build for issue #42
-cvx build -o                         # Build and open PDF
-cvx build -c "emphasize Python"      # Continue with feedback
 cvx build -i                         # Interactive session
+cvx build -a claude                  # Use Claude CLI
+cvx build -a gemini                  # Use Gemini CLI
+cvx build -c "emphasize Python"      # Continue with feedback
+
+# Common options
+cvx build -o                         # Build and open PDF
 cvx build --commit --push            # Build, commit, and push
+
+# Direct API mode (legacy)
+cvx build -m sonnet-4 --call-api-directly
 ```
+
+**Python Agent Mode** requires [uv](https://docs.astral.sh/uv/) and works with YAML files (`src/cv.yaml`, `src/letter.yaml`) validated against `schema/schema.json`. It provides structured output, automatic caching, and multi-provider fallback.
 
 Sessions are shared per issue. Use `-c` to continue with feedback.
 
