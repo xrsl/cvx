@@ -17,6 +17,7 @@ import (
 type Config struct {
 	Repo           string `mapstructure:"repo" yaml:"repo,omitempty"`
 	Agent          string `mapstructure:"agent" yaml:"agent,omitempty"`
+	DefaultCLIAgent string `mapstructure:"default_cli_agent" yaml:"default_cli_agent,omitempty"`
 	Schema         string `mapstructure:"schema" yaml:"schema,omitempty"`
 	CVPath         string `mapstructure:"cv_path" yaml:"cv_path,omitempty"`
 	ReferencePath  string `mapstructure:"reference_path" yaml:"reference_path,omitempty"`
@@ -136,7 +137,7 @@ func Load() (*Config, error) {
 
 func Get(key string) (string, error) {
 	switch key {
-	case "repo", "agent", "schema", "cv_path", "reference_path", "cv_yaml_path", "letter_yaml_path":
+	case "repo", "agent", "default_cli_agent", "schema", "cv_path", "reference_path", "cv_yaml_path", "letter_yaml_path":
 		return v.GetString(key), nil
 	default:
 		return "", fmt.Errorf("unknown config key: %s", key)
@@ -158,6 +159,8 @@ func Set(key, value string) error {
 			return err
 		}
 		cfg.Agent = value
+	case "default_cli_agent":
+		cfg.DefaultCLIAgent = value
 	case "schema":
 		cfg.Schema = value
 	case "cv_path":
@@ -169,7 +172,7 @@ func Set(key, value string) error {
 	case "letter_yaml_path":
 		cfg.LetterYAMLPath = value
 	default:
-		return fmt.Errorf("unknown config key: %s (valid: repo, agent, schema, cv_path, reference_path, cv_yaml_path, letter_yaml_path)", key)
+		return fmt.Errorf("unknown config key: %s (valid: repo, agent, default_cli_agent, schema, cv_path, reference_path, cv_yaml_path, letter_yaml_path)", key)
 	}
 
 	v.Set(key, value) // keep viper in sync
@@ -188,13 +191,14 @@ func writeConfig(cfg *Config) error {
 
 func All() (map[string]string, error) {
 	return map[string]string{
-		"repo":             v.GetString("repo"),
-		"agent":            v.GetString("agent"),
-		"schema":           v.GetString("schema"),
-		"cv_path":          v.GetString("cv_path"),
-		"reference_path":   v.GetString("reference_path"),
-		"cv_yaml_path":     v.GetString("cv_yaml_path"),
-		"letter_yaml_path": v.GetString("letter_yaml_path"),
+		"repo":              v.GetString("repo"),
+		"agent":             v.GetString("agent"),
+		"default_cli_agent": v.GetString("default_cli_agent"),
+		"schema":            v.GetString("schema"),
+		"cv_path":           v.GetString("cv_path"),
+		"reference_path":    v.GetString("reference_path"),
+		"cv_yaml_path":      v.GetString("cv_yaml_path"),
+		"letter_yaml_path":  v.GetString("letter_yaml_path"),
 	}, nil
 }
 

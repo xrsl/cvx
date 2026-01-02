@@ -88,35 +88,25 @@ Build tailored CV and cover letter. Automatically creates/switches to the issue 
 
 **Two Build Modes:**
 
-1. **Python Agent Mode** (default when using `-m`): Uses structured YAML output with schema validation
-2. **CLI Agent Mode**: Uses Claude Code or Gemini CLI for interactive/non-interactive sessions
+1. **Python Agent** (default): Structured YAML with caching and validation
+2. **Interactive CLI**: Real-time editing with auto-detected CLI tools
 
 ```bash
-# Python Agent Mode (structured YAML)
-cvx build -m claude-sonnet-4         # Use Python agent with Claude
-cvx build -m gemini-2.5-flash        # Use Python agent with Gemini
-cvx build -m sonnet-4 --dry-run      # Preview without calling AI
-cvx build -m sonnet-4 --no-cache     # Skip cache
+# Python Agent Mode
+cvx build -m sonnet-4           # Structured YAML with caching
+cvx build -m flash              # Use Gemini
+cvx build -m sonnet-4 --dry-run # Preview without AI call
+cvx build -m sonnet-4 --no-cache # Skip cache
 
-# CLI Agent Mode (LaTeX editing)
-cvx build                            # Infer issue from branch
-cvx build 42                         # Build for issue #42
-cvx build -i                         # Interactive session
-cvx build -a claude                  # Use Claude CLI
-cvx build -a gemini                  # Use Gemini CLI
-cvx build -c "emphasize Python"      # Continue with feedback
-
-# Common options
-cvx build -o                         # Build and open PDF
-cvx build --commit --push            # Build, commit, and push
-
-# Direct API mode (legacy)
-cvx build -m sonnet-4 --call-api-directly
+# Interactive CLI Mode
+cvx build -i                    # Auto-detect CLI, infer issue
+cvx build 42 -i                 # Interactive for issue #42
+cvx build -i -c "focus on ML"   # Interactive with context
 ```
 
-**Python Agent Mode** requires [uv](https://docs.astral.sh/uv/) and works with YAML files (`src/cv.yaml`, `src/letter.yaml`) validated against `schema/schema.json`. It provides structured output, automatic caching, and multi-provider fallback.
+**Python Agent Mode** requires [uv](https://docs.astral.sh/uv/) and works with YAML files (`src/cv.yaml`, `src/letter.yaml`) validated against `schema/schema.json`.
 
-Sessions are shared per issue. Use `-c` to continue with feedback.
+**Interactive Mode** auto-detects claude-code or gemini-cli.
 
 ### `cvx approve [issue]`
 
@@ -222,12 +212,14 @@ Located at `.cvx-config.yaml` in your repo root:
 ```yaml
 repo: owner/repo
 agent: claude-code
+default_cli_agent: claude-code
 cv_path: src/cv.tex
 reference_path: reference/
 project: owner/1
 ```
 
-The `reference_path` directory should contain your experience documentation, guidelines, and other reference materials used by `advise` and `build` commands.
+- `default_cli_agent`: CLI tool used for interactive mode (`cvx build -i`). Set during `cvx init` or auto-detected from available tools (claude-code, gemini-cli).
+- `reference_path`: Directory containing your experience documentation, guidelines, and other reference materials used by `advise` and `build` commands.
 
 Internal project IDs are cached in `.cvx/cache.yaml` (auto-managed).
 

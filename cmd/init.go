@@ -90,13 +90,19 @@ func runInit(cmd *cobra.Command, args []string) error {
 		if parts := strings.Split(repo, "/"); len(parts) == 2 {
 			owner = parts[0]
 		}
+		// Auto-detect default CLI agent
+		defaultCLI := detectAvailableCLI()
+		if defaultCLI == "" {
+			defaultCLI = "claude-code" // fallback
+		}
 		cfg := &config.Config{
-			Repo:          repo,
-			Agent:         "claude-code",
-			Schema:        workflow.DefaultSchemaPath,
-			CVPath:        "src/cv.tex",
-			ReferencePath: "reference/",
-			Project:       owner + "/1",
+			Repo:            repo,
+			Agent:           "claude-code",
+			DefaultCLIAgent: defaultCLI,
+			Schema:          workflow.DefaultSchemaPath,
+			CVPath:          "src/cv.tex",
+			ReferencePath:   "reference/",
+			Project:         owner + "/1",
 		}
 		if err := config.Save(cfg); err != nil {
 			return fmt.Errorf("failed to save config: %w", err)
@@ -219,6 +225,53 @@ func runInit(cmd *cobra.Command, args []string) error {
 
 	_ = config.Set("agent", selectedAgent)
 	fmt.Printf("  Using %s\n\n", style.C(style.Cyan, selectedAgent))
+
+	// Step 2.5: Default CLI Agent (for -i mode)
+	cliAgents := []agentOption{}
+	if isCommandAvailable("claude") {
+		cliAgents = append(cliAgents, agentOption{"claude-code", ""})
+	}
+	if isCommandAvailable("gemini") {
+		cliAgents = append(cliAgents, agentOption{"gemini-cli", ""})
+	}
+
+	if len(cliAgents) > 0 {
+		defaultCLI := cfg.DefaultCLIAgent
+		if defaultCLI == "" {
+			defaultCLI = cliAgents[0].name
+		}
+
+		currentCLIIdx := 0
+		for i, a := range cliAgents {
+			if a.name == defaultCLI {
+				currentCLIIdx = i
+				break
+			}
+		}
+
+		fmt.Printf("%s Default CLI Agent (for -i mode)\n", style.C(style.Green, "?"))
+		for i, a := range cliAgents {
+			marker := "   "
+			if i == currentCLIIdx {
+				marker = "  " + style.C(style.Green, "→")
+			}
+			fmt.Printf("%s%s %s\n", marker, style.C(style.Cyan, fmt.Sprintf("%d)", i+1)), a.name)
+		}
+		fmt.Printf("\n  Choice %s: ", style.C(style.Cyan, fmt.Sprintf("[%d]", currentCLIIdx+1)))
+
+		input, _ := reader.ReadString('\n')
+		input = strings.TrimSpace(input)
+
+		selectedCLI := defaultCLI
+		if input != "" {
+			if idx, err := strconv.Atoi(input); err == nil && idx >= 1 && idx <= len(cliAgents) {
+				selectedCLI = cliAgents[idx-1].name
+			}
+		}
+
+		_ = config.Set("default_cli_agent", selectedCLI)
+		fmt.Printf("  Using %s for interactive mode\n\n", style.C(style.Cyan, selectedCLI))
+	}
 
 	// Step 3: CV path (for match command)
 	cvPath := cfg.CVPath

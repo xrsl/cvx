@@ -123,3 +123,26 @@ func sanitizeBranchName(s string) string {
 
 	return strings.Trim(s, "-")
 }
+
+// detectAvailableCLI checks which CLI tool is available in PATH
+// Priority: claude-code > gemini-cli
+// Returns empty string if none found
+func detectAvailableCLI() string {
+	// Check claude-code first (preferred)
+	if isCommandAvailable("claude") {
+		return "claude-code"
+	}
+
+	// Check gemini-cli second
+	if isCommandAvailable("gemini") {
+		return "gemini-cli"
+	}
+
+	return ""
+}
+
+// isCommandAvailable checks if a command is available in PATH
+func isCommandAvailable(cmd string) bool {
+	_, err := exec.LookPath(cmd)
+	return err == nil
+}

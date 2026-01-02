@@ -113,74 +113,48 @@ cvx build [issue-number] [flags]
 
 ### Build Modes
 
-`cvx build` supports three different modes:
+`cvx build` supports two modes:
 
-#### 1. Python Agent Mode (Recommended)
+#### 1. Python Agent Mode (Default)
 
-Triggered when using `-m` flag **without** `--call-api-directly`. This mode:
+Uses `-m` flag to specify model:
 
-- Uses structured YAML output (`src/cv.yaml`, `src/letter.yaml`)
-- Validates output against `schema/schema.json`
-- Provides automatic caching and multi-provider fallback
-- Runs via `uv` (Astral's Python package manager)
+- Structured YAML output (`src/cv.yaml`, `src/letter.yaml`)
+- Validates against `schema/schema.json`
+- Automatic caching and multi-provider fallback
 - Requires: [uv](https://docs.astral.sh/uv/) installed
 
 ```bash
-cvx build -m claude-sonnet-4         # Use Python agent with Claude
-cvx build -m gemini-2.5-flash        # Use Python agent with Gemini
-cvx build -m sonnet-4 --dry-run      # Preview without calling AI
-cvx build -m sonnet-4 --no-cache     # Skip cache
+cvx build -m sonnet-4            # Python agent with Claude
+cvx build -m flash               # Python agent with Gemini
+cvx build -m sonnet-4 --dry-run  # Preview without AI call
+cvx build -m sonnet-4 --no-cache # Skip cache
 ```
 
-**How it works:**
+#### 2. Interactive CLI Mode
 
-1. Fetches job posting from GitHub issue
-2. Reads current CV and letter from YAML files
-3. Computes cache key (job + CV + letter + schema + model)
-4. Checks cache or calls Python agent via `uvx`
-5. Python agent generates structured JSON using Pydantic AI
-6. Validates output against schema
-7. Writes updated YAML files
+Uses `-i` flag. Auto-detects claude-code or gemini-cli:
 
-#### 2. CLI Agent Mode
-
-Default mode when no `-m` flag is provided. Uses Claude Code or Gemini CLI:
-
-- Edits LaTeX files directly (`src/cv.tex`, `src/letter.tex`)
-- Supports interactive sessions with `-i`
+- Direct LaTeX editing (`src/cv.tex`, `src/letter.tex`)
+- Interactive sessions
 - Session persistence per issue
+- Auto-detects CLI (priority: claude-code > gemini-cli)
 
 ```bash
-cvx build                            # Use default CLI agent
-cvx build -a claude                  # Use Claude CLI
-cvx build -a gemini                  # Use Gemini CLI
-cvx build -i                         # Interactive session
-cvx build -c "emphasize Python"      # Continue with feedback
-```
-
-#### 3. Direct API Mode (Legacy)
-
-Triggered with `--call-api-directly` flag. Directly calls AI APIs:
-
-```bash
-cvx build -m sonnet-4 --call-api-directly
-cvx build -m flash --call-api-directly
+cvx build -i                     # Auto-detect CLI, interactive
+cvx build 42 -i                  # Interactive for issue #42
+cvx build -i -c "focus on ML"    # Interactive with context
 ```
 
 ### Flags
 
-| Flag                  | Short | Description                                                               |
-| --------------------- | ----- | ------------------------------------------------------------------------- |
-| `--agent`             | `-a`  | CLI agent: claude-code, gemini-cli                                        |
-| `--model`             | `-m`  | Model: sonnet-4, sonnet-4-5, opus-4, opus-4-5, flash, pro, flash-3, pro-3 |
-| `--call-api-directly` |       | Use direct API mode (requires `--model`)                                  |
-| `--context`           | `-c`  | Feedback or additional context                                            |
-| `--interactive`       | `-i`  | Interactive session (CLI agent mode only)                                 |
-| `--open`              | `-o`  | Open combined.pdf in VSCode after build                                   |
-| `--commit`            |       | Commit changes on the issue branch                                        |
-| `--push`              |       | Push commits to remote (requires `--commit`)                              |
-| `--dry-run`           |       | Print plan without calling agent (Python agent mode only)                 |
-| `--no-cache`          |       | Skip cache read/write (Python agent mode only)                            |
+| Flag            | Short | Description                                                               |
+| --------------- | ----- | ------------------------------------------------------------------------- |
+| `--model`       | `-m`  | Model: sonnet-4, sonnet-4-5, opus-4, opus-4-5, flash, pro, flash-3, pro-3 |
+| `--interactive` | `-i`  | Interactive CLI mode (auto-detects claude-code or gemini-cli)             |
+| `--context`     | `-c`  | Feedback or additional context                                            |
+| `--dry-run`     |       | Preview without AI call (Python agent mode only)                          |
+| `--no-cache`    |       | Skip cache (Python agent mode only)                                       |
 
 If issue-number is omitted, it's inferred from the current branch name.
 
@@ -189,30 +163,18 @@ If issue-number is omitted, it's inferred from the current branch name.
 **Python Agent Mode:**
 
 ```bash
-cvx build -m claude-sonnet-4         # Use Python agent with Claude
-cvx build -m gemini-2.5-flash        # Use Python agent with Gemini
-cvx build -m sonnet-4 --dry-run      # Preview cache key and plan
-cvx build -m sonnet-4 --no-cache     # Force fresh AI generation
-cvx build -m flash --commit --push   # Build, commit, and push
+cvx build -m sonnet-4            # Structured YAML with caching
+cvx build -m flash               # Use Gemini
+cvx build -m sonnet-4 --dry-run  # Preview without AI call
+cvx build -m sonnet-4 --no-cache # Skip cache
 ```
 
-**CLI Agent Mode:**
+**Interactive CLI Mode:**
 
 ```bash
-cvx build                            # Infer issue from branch
-cvx build 42                         # Build for issue #42
-cvx build -i                         # Interactive session
-cvx build -a claude                  # Use Claude CLI
-cvx build -a gemini                  # Use Gemini CLI
-cvx build -c "emphasize Python"      # Continue with feedback
-cvx build --commit --push            # Build, commit, and push
-```
-
-**Direct API Mode:**
-
-```bash
-cvx build -m sonnet-4 --call-api-directly
-cvx build -m flash --call-api-directly
+cvx build -i                     # Auto-detect CLI, infer issue
+cvx build 42 -i                  # Interactive for issue #42
+cvx build -i -c "focus on ML"    # Interactive with context
 ```
 
 ### Python Agent Schema

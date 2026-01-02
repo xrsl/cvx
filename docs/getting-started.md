@@ -18,9 +18,10 @@ The wizard will:
 
 1. **Link your GitHub repo** - auto-detected from git remote
 2. **Select AI agent** - Claude CLI, Gemini CLI, or API
-3. **Set CV path** - for match analysis
-4. **Set experience file** - reference for tailoring
-5. **Create/link GitHub Project** - with job-tracking statuses
+3. **Select default CLI agent** - for interactive mode (`-i`)
+4. **Set CV path** - for match analysis
+5. **Set experience file** - reference for tailoring
+6. **Create/link GitHub Project** - with job-tracking statuses
 
 ## First Job Application
 
@@ -81,18 +82,19 @@ cvx build -m gemini-2.5-flash     # Python agent with Gemini
 
 ### CLI Agent Mode
 
-Use interactive or headless CLI agents:
+Use interactive CLI with auto-detected tools:
 
 ```bash
-cvx build                # Default CLI agent
-cvx build -a claude      # Claude CLI
-cvx build -i             # Interactive mode
+cvx build -i                     # Auto-detect CLI, interactive mode
+cvx build 42 -i                  # Interactive for issue #42
+cvx build -m sonnet-4 -i         # Interactive with specific model
 ```
 
 **Benefits:**
 
 - Direct LaTeX editing
 - Interactive sessions
+- Auto-detects claude-code or gemini-cli
 - Flexible document generation
 
 ## Other Commands

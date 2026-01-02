@@ -26,47 +26,39 @@ import (
 var buildCmd = &cobra.Command{
 	Use:   "build [issue-number]",
 	Short: "Build tailored CV and cover letter",
-	Long: `Build tailored application materials for a job posting.
+	Long: `Build tailored CV and cover letter for a job posting.
 
-Generates tailored CV and cover letter based on the job posting.
-If issue-number is not provided, it will be inferred from the current branch name.
+Two build modes:
+  1. Python Agent (default): Structured YAML with caching and validation
+  2. Interactive CLI: Real-time editing with auto-detected CLI tools
 
 Examples:
-  cvx build                           # Infer issue from branch
-  cvx build 42                        # Build for issue #42
-  cvx build -o                        # Build and open PDF
-  cvx build -c "emphasize Python"     # Continue with feedback
-  cvx build -i                        # Interactive session
-  cvx build --commit                  # Build and commit changes
-  cvx build --commit --push           # Build, commit, and push`,
+  cvx build -m sonnet-4          # Python agent mode
+  cvx build -m flash             # Python agent with Gemini
+  cvx build -m sonnet-4 --dry-run  # Preview without AI call
+  cvx build -m sonnet-4 --no-cache # Skip cache
+
+  cvx build -i                   # Interactive mode, auto-detect CLI
+  cvx build 42 -i                # Interactive for issue #42
+  cvx build -i -c "focus on ML"  # Interactive with context`,
 	Args: cobra.MaximumNArgs(1),
 	RunE: runBuild,
 }
 
 var (
-	buildAgentFlag           string
-	buildModelFlag           string
-	buildContextFlag         string
-	buildInteractiveFlag     bool
-	buildOpenFlag            bool
-	buildCommitFlag          bool
-	buildNoCacheFlag         bool
-	buildDryRunFlag          bool
-	buildPushFlag            bool
-	buildCallAPIDirectlyFlag bool
+	buildModelFlag       string
+	buildContextFlag     string
+	buildInteractiveFlag bool
+	buildNoCacheFlag     bool
+	buildDryRunFlag      bool
 )
 
 func init() {
-	buildCmd.Flags().StringVarP(&buildAgentFlag, "agent", "a", "", "CLI agent: claude-code, gemini-cli")
 	buildCmd.Flags().StringVarP(&buildModelFlag, "model", "m", "", "Model: sonnet-4, sonnet-4-5, opus-4, opus-4-5, flash, pro, flash-3, pro-3")
-	buildCmd.Flags().BoolVar(&buildCallAPIDirectlyFlag, "call-api-directly", false, "Explicitly call API directly (requires --model)")
+	buildCmd.Flags().BoolVarP(&buildInteractiveFlag, "interactive", "i", false, "Interactive CLI mode (auto-detects claude-code or gemini-cli)")
 	buildCmd.Flags().StringVarP(&buildContextFlag, "context", "c", "", "Feedback or additional context")
-	buildCmd.Flags().BoolVarP(&buildInteractiveFlag, "interactive", "i", false, "Interactive session")
-	buildCmd.Flags().BoolVarP(&buildOpenFlag, "open", "o", false, "Open combined.pdf in VSCode after build")
-	buildCmd.Flags().BoolVar(&buildCommitFlag, "commit", false, "Commit changes on the issue branch")
-	buildCmd.Flags().BoolVar(&buildPushFlag, "push", false, "Push commits to remote (requires --commit)")
-	buildCmd.Flags().BoolVar(&buildNoCacheFlag, "no-cache", false, "Skip cache read/write")
-	buildCmd.Flags().BoolVar(&buildDryRunFlag, "dry-run", false, "Print plan without calling agent")
+	buildCmd.Flags().BoolVar(&buildNoCacheFlag, "no-cache", false, "Skip cache (Python agent mode only)")
+	buildCmd.Flags().BoolVar(&buildDryRunFlag, "dry-run", false, "Preview without AI call (Python agent mode only)")
 	rootCmd.AddCommand(buildCmd)
 }
 
@@ -81,46 +73,39 @@ func runBuild(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	// NEW: If -m flag is used without --call-api-directly, use Python agent
-	if buildModelFlag != "" && !buildCallAPIDirectlyFlag {
-		// Set model for Python agent via environment variable
-		if err := os.Setenv("AI_MODEL", buildModelFlag); err != nil {
-			return fmt.Errorf("failed to set AI_MODEL env var: %w", err)
-		}
-		return runBuildWithPythonAgent(cfg, issueNum)
+	// Flag validation
+	if buildInteractiveFlag && buildModelFlag != "" {
+		return fmt.Errorf("cannot use -i and -m together (choose one mode)")
+	}
+	if buildInteractiveFlag && (buildDryRunFlag || buildNoCacheFlag) {
+		return fmt.Errorf("--dry-run and --no-cache only work with -m mode")
 	}
 
-	agentSetting, err := resolveAgent(cfg)
-	if err != nil {
-		return err
-	}
-	cfg.Agent = agentSetting
-
-	if err := ensureIssueBranch(cfg.Repo, issueNum); err != nil {
-		return err
-	}
-
+	// Interactive CLI mode
 	if buildInteractiveFlag {
+		agentSetting, err := resolveAgent(cfg)
+		if err != nil {
+			return err
+		}
+		cfg.Agent = agentSetting
+
+		if err := ensureIssueBranch(cfg.Repo, issueNum); err != nil {
+			return err
+		}
+
 		return runBuildInteractive(cfg, issueNum)
 	}
 
-	if err := runBuildNonInteractive(cmd.Context(), cfg, agentSetting, issueNum); err != nil {
-		return err
+	// Python Agent Mode (requires -m)
+	if buildModelFlag == "" {
+		return fmt.Errorf("model not specified. Use -m (e.g., cvx build -m sonnet-4)")
 	}
 
-	if err := buildPDF(); err != nil {
-		return err
+	if err := os.Setenv("AI_MODEL", buildModelFlag); err != nil {
+		return fmt.Errorf("failed to set AI_MODEL: %w", err)
 	}
 
-	if err := commitAndPush(cfg.Repo, issueNum); err != nil {
-		return err
-	}
-
-	if buildOpenFlag {
-		return openCombinedPDF()
-	}
-
-	return nil
+	return runBuildWithPythonAgent(cfg, issueNum)
 }
 
 func resolveIssueNumber(args []string) (string, error) {
@@ -145,68 +130,42 @@ func resolveIssueNumber(args []string) (string, error) {
 }
 
 func resolveAgent(cfg *config.Config) (string, error) {
-	var agentSetting string
+	var baseAgent string
 
-	if buildCallAPIDirectlyFlag {
-		// API mode - requires explicit model
-		if buildInteractiveFlag {
-			return "", fmt.Errorf("interactive mode not supported with --call-api-directly")
+	// Priority 1: Use configured default CLI agent if available
+	if cfg.DefaultCLIAgent != "" {
+		// Check if the configured CLI is actually available
+		cliName := ""
+		switch cfg.DefaultCLIAgent {
+		case "claude-code":
+			cliName = "claude"
+		case "gemini-cli":
+			cliName = "gemini"
 		}
-		if buildModelFlag == "" {
-			return "", fmt.Errorf("--call-api-directly requires --model")
+		if cliName != "" && isCommandAvailable(cliName) {
+			baseAgent = cfg.DefaultCLIAgent
 		}
+	}
 
-		modelConfig, hasModel := ai.GetModel(buildModelFlag)
-		if !hasModel {
-			return "", fmt.Errorf("unsupported model: %s (supported: %v)", buildModelFlag, ai.SupportedModelNames())
-		}
+	// Priority 2: Auto-detect if no config or configured CLI not available
+	if baseAgent == "" {
+		baseAgent = detectAvailableCLI()
+	}
 
-		agentSetting = modelConfig.APIName
-
-	} else {
-		// CLI agent mode
-		baseAgent := ""
-		if buildAgentFlag != "" {
-			if !ai.IsCLIAgentSupported(buildAgentFlag) {
-				return "", fmt.Errorf("unsupported CLI agent: %s (supported: claude-code, gemini-cli). Use --call-api-directly for API access", buildAgentFlag)
-			}
-			baseAgent = buildAgentFlag
-		} else if cfg.Agent != "" {
+	// Priority 3: Fallback to config.Agent if it's a CLI agent
+	if baseAgent == "" {
+		if cfg.Agent != "" && ai.IsCLIAgentSupported(cfg.Agent) {
 			baseAgent = cfg.Agent
 		} else {
-			baseAgent = ai.DefaultAgent()
-		}
-
-		// Apply model if specified
-		if buildModelFlag != "" {
-			modelConfig, hasModel := ai.GetModel(buildModelFlag)
-			if !hasModel {
-				return "", fmt.Errorf("unsupported model: %s (supported: %v)", buildModelFlag, ai.SupportedModelNames())
-			}
-			agentSetting = baseAgent + ":" + modelConfig.CLIName
-		} else {
-			agentSetting = baseAgent
+			return "", fmt.Errorf("no CLI tool found. Install claude-code or gemini-cli")
 		}
 	}
 
-	if !ai.IsAgentSupported(agentSetting) {
-		return "", fmt.Errorf("unsupported agent/model: %s", agentSetting)
+	if !ai.IsAgentSupported(baseAgent) {
+		return "", fmt.Errorf("unsupported agent: %s", baseAgent)
 	}
 
-	return agentSetting, nil
-}
-
-func commitAndPush(repo, issueNum string) error {
-	if !buildCommitFlag {
-		return nil
-	}
-	if err := commitBuildChanges(repo, issueNum); err != nil {
-		return err
-	}
-	if buildPushFlag {
-		return pushChanges()
-	}
-	return nil
+	return baseAgent, nil
 }
 
 func runBuildInteractive(cfg *config.Config, issueNum string) error {
@@ -264,11 +223,6 @@ func runBuildInteractive(cfg *config.Config, issueNum string) error {
 			_ = saveSession(issueNum+"-build", newSessionID)
 			fmt.Printf("%s Session saved for issue %s\n", style.C(style.Green, "✓"), style.C(style.Cyan, "#"+issueNum))
 		}
-	}
-
-	// Open PDF if requested
-	if buildOpenFlag {
-		return openCombinedPDF()
 	}
 
 	return nil
