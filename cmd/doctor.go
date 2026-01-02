@@ -36,7 +36,7 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 	}
 
 	// Check 2: Python available via uv
-	cmd2 := exec.Command("uv", "python", "--version")
+	cmd2 := exec.Command("uv", "python", "list")
 	if err := cmd2.Run(); err != nil {
 		fmt.Printf("%s Python not available via uv\n", style.C(style.Red, "✗"))
 		fmt.Printf("  Fix: uv python install\n")
