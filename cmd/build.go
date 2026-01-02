@@ -652,11 +652,45 @@ func readYAMLLetter(path string) (map[string]interface{}, error) {
 	return wrapper.Letter, nil
 }
 
+// removeNilValues recursively removes nil values from maps and slices
+// This prevents "null" from appearing in YAML output
+func removeNilValues(data interface{}) interface{} {
+	switch v := data.(type) {
+	case map[string]interface{}:
+		result := make(map[string]interface{})
+		for key, val := range v {
+			if val != nil {
+				cleaned := removeNilValues(val)
+				if cleaned != nil {
+					result[key] = cleaned
+				}
+			}
+		}
+		return result
+	case []interface{}:
+		result := make([]interface{}, 0, len(v))
+		for _, val := range v {
+			if val != nil {
+				cleaned := removeNilValues(val)
+				if cleaned != nil {
+					result = append(result, cleaned)
+				}
+			}
+		}
+		return result
+	default:
+		return v
+	}
+}
+
 // writeYAMLCV writes cv data back to cv.yaml
 func writeYAMLCV(path string, cv map[string]interface{}) error {
+	// Remove nil values to avoid "null" in YAML
+	cleaned := removeNilValues(cv).(map[string]interface{})
+
 	wrapper := struct {
 		CV map[string]interface{} `yaml:"cv"`
-	}{CV: cv}
+	}{CV: cleaned}
 
 	data, err := yaml.Marshal(&wrapper)
 	if err != nil {
@@ -667,9 +701,12 @@ func writeYAMLCV(path string, cv map[string]interface{}) error {
 
 // writeYAMLLetter writes letter data back to letter.yaml
 func writeYAMLLetter(path string, letter map[string]interface{}) error {
+	// Remove nil values to avoid "null" in YAML
+	cleaned := removeNilValues(letter).(map[string]interface{})
+
 	wrapper := struct {
 		Letter map[string]interface{} `yaml:"letter"`
-	}{Letter: letter}
+	}{Letter: cleaned}
 
 	data, err := yaml.Marshal(&wrapper)
 	if err != nil {

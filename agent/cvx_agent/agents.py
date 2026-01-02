@@ -76,7 +76,8 @@ def build_cv_and_letter(input_data: dict, max_retries=2) -> dict:
                     user_prompt=prompt,
                     output_type=Model
                 )
-                output_dict = result.output.model_dump()
+                # Exclude None values to avoid nulls in YAML output
+                output_dict = result.output.model_dump(exclude_none=True)
                 return output_dict
             except Exception as e:
                 print(f"Attempt {attempt+1} failed with {model_name}: {e}")
