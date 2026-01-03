@@ -50,7 +50,7 @@ Examples:
 }
 
 func init() {
-	adviseCmd.Flags().StringVarP(&adviseAgentFlag, "agent", "a", "", "CLI agent: claude-code, gemini-cli")
+	adviseCmd.Flags().StringVarP(&adviseAgentFlag, "agent", "a", "", "CLI agent: claude, gemini")
 	adviseCmd.Flags().StringVarP(&adviseModelFlag, "model", "m", "", "Model: sonnet-4, sonnet-4-5, opus-4, opus-4-5, flash, pro, flash-3, pro-3")
 	adviseCmd.Flags().BoolVar(&adviseCallAPIDirectlyFlag, "call-api-directly", false, "Explicitly call API directly (requires --model)")
 	adviseCmd.Flags().StringVarP(&adviseContextFlag, "context", "c", "", "Additional context for analysis")
@@ -88,13 +88,13 @@ func runAdvise(cmd *cobra.Command, args []string) error {
 		baseAgent := ""
 		if adviseAgentFlag != "" {
 			if !ai.IsCLIAgentSupported(adviseAgentFlag) {
-				return fmt.Errorf("unsupported CLI agent: %s (supported: claude-code, gemini-cli). Use --call-api-directly for API access", adviseAgentFlag)
+				return fmt.Errorf("unsupported CLI agent: %s (supported: claude, gemini). Use --call-api-directly for API access", adviseAgentFlag)
 			}
 			baseAgent = adviseAgentFlag
 		} else if cfg.Agent.Default != "" {
 			baseAgent = cfg.Agent.Default
 		} else {
-			baseAgent = ai.DefaultAgent()
+			return fmt.Errorf("no CLI agent configured. Run: cvx init")
 		}
 
 		// Apply model if specified

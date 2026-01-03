@@ -60,9 +60,9 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 	cfg, err := config.Load()
 	if err == nil && cfg.Agent.Default != "" {
 		cmdName := ""
-		if strings.HasPrefix(cfg.Agent.Default, "claude-code") {
+		if strings.HasPrefix(cfg.Agent.Default, "claude") {
 			cmdName = "claude"
-		} else if strings.HasPrefix(cfg.Agent.Default, "gemini-cli") {
+		} else if strings.HasPrefix(cfg.Agent.Default, "gemini") {
 			cmdName = "gemini"
 		}
 

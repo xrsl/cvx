@@ -444,11 +444,11 @@ func buildAgentList() []agentOption {
 	var agents []agentOption
 
 	if ai.IsClaudeCLIAvailable() {
-		agents = append(agents, agentOption{"claude-code", ""})
+		agents = append(agents, agentOption{"claude", ""})
 	}
 
 	if ai.IsGeminiCLIAvailable() {
-		agents = append(agents, agentOption{"gemini-cli", ""})
+		agents = append(agents, agentOption{"gemini", ""})
 	}
 
 	return agents

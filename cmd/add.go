@@ -52,7 +52,7 @@ Examples:
 }
 
 func init() {
-	addCmd.Flags().StringVarP(&agentFlag, "agent", "a", "", "CLI agent: claude-code, gemini-cli")
+	addCmd.Flags().StringVarP(&agentFlag, "agent", "a", "", "CLI agent: claude, gemini")
 	addCmd.Flags().StringVarP(&modelFlag, "model", "m", "", "Model: sonnet-4, sonnet-4-5, opus-4, opus-4-5, flash, pro, flash-3, pro-3")
 	addCmd.Flags().BoolVar(&callAPIDirectlyFlag, "call-api-directly", false, "Explicitly call API directly (requires --model)")
 	addCmd.Flags().StringVarP(&repoFlag, "repo", "r", "", "GitHub repo (overrides config)")
@@ -181,14 +181,14 @@ func resolveAddCLIAgent(cfg *config.Config) (string, error) {
 func resolveAddBaseAgent(cfg *config.Config) (string, error) {
 	if agentFlag != "" {
 		if !ai.IsCLIAgentSupported(agentFlag) {
-			return "", fmt.Errorf("unsupported CLI agent: %s (supported: claude-code, gemini-cli). Use --call-api-directly for API access", agentFlag)
+			return "", fmt.Errorf("unsupported CLI agent: %s (supported: claude, gemini). Use --call-api-directly for API access", agentFlag)
 		}
 		return agentFlag, nil
 	}
 	if cfg.Agent.Default != "" {
 		return cfg.Agent.Default, nil
 	}
-	return ai.DefaultAgent(), nil
+	return "", fmt.Errorf("no CLI agent configured. Run: cvx init")
 }
 
 func resolveAddSchema(cfg *config.Config) (*schema.Schema, error) {

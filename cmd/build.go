@@ -58,7 +58,7 @@ var (
 
 func init() {
 	buildCmd.Flags().StringVarP(&buildModelFlag, "model", "m", "", "Model: sonnet-4, sonnet-4-5, opus-4, opus-4-5, flash, pro, flash-3, pro-3")
-	buildCmd.Flags().BoolVarP(&buildInteractiveFlag, "interactive", "i", false, "Interactive CLI mode (auto-detects claude-code or gemini-cli)")
+	buildCmd.Flags().BoolVarP(&buildInteractiveFlag, "interactive", "i", false, "Interactive CLI mode (auto-detects claude or gemini)")
 	buildCmd.Flags().StringVarP(&buildContextFlag, "context", "c", "", "Feedback or additional context")
 	buildCmd.Flags().StringVarP(&buildSchemaFlag, "schema", "s", "", "Schema path (defaults to build_schema_path from config)")
 	buildCmd.Flags().BoolVar(&buildNoCacheFlag, "no-cache", false, "Skip cache (Python agent mode only)")
@@ -170,7 +170,7 @@ func runBuildInteractive(cfg *config.Config, issueNum string) error {
 		}
 
 		// Use -i for gemini (prompt-interactive), -p for claude
-		if agent == "gemini-cli" || strings.HasPrefix(agent, "gemini-cli:") {
+		if agent == "gemini" || strings.HasPrefix(agent, "gemini:") {
 			execCmd = exec.Command("gemini", "-i", prompt)
 		} else {
 			execCmd = exec.Command("claude", "-p", prompt)
@@ -203,7 +203,7 @@ func runBuildNonInteractive(ctx context.Context, cfg *config.Config, agent, issu
 		return fmt.Errorf("error fetching issue: %w", err)
 	}
 
-	// Path 1: CLI agent (headless) - claude-code/gemini-cli handles tool use internally
+	// Path 1: CLI agent (headless) - claude/gemini handles tool use internally
 	if ai.IsAgentCLI(agent) {
 		return runBuildWithCLI(cfg, agent, issueNum, issueBody)
 	}
@@ -213,10 +213,10 @@ func runBuildNonInteractive(ctx context.Context, cfg *config.Config, agent, issu
 	return runBuildWithAPI(ctx, cfg, agent, issueBody)
 }
 
-// runBuildWithCLI shells out to claude-code/gemini-cli CLI in headless mode
+// runBuildWithCLI shells out to claude/gemini CLI in headless mode
 func runBuildWithCLI(cfg *config.Config, agent, issueNum, issueBody string) error {
 	var cliName string
-	if agent == "gemini-cli" || strings.HasPrefix(agent, "gemini-cli:") {
+	if agent == "gemini" || strings.HasPrefix(agent, "gemini:") {
 		cliName = "gemini"
 	} else {
 		cliName = "claude"

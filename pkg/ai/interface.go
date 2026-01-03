@@ -21,36 +21,24 @@ type CachingClient interface {
 	GenerateContentWithSystem(ctx context.Context, systemPrompt, userPrompt string) (string, error)
 }
 
-// DefaultAgent returns the best available agent
-// Prefers claude-code, then gemini-cli, then API agents
-func DefaultAgent() string {
-	if IsClaudeCLIAvailable() {
-		return "claude-code"
-	}
-	if IsGeminiCLIAvailable() {
-		return "gemini-cli"
-	}
-	return gemini.DefaultAgent
-}
-
 // NewClient creates an AI client based on agent prefix
 func NewClient(agent string) (Client, error) {
 	switch {
-	case agent == "claude-code" || strings.HasPrefix(agent, "claude-code:"):
+	case agent == "claude" || strings.HasPrefix(agent, "claude:"):
 		if !IsClaudeCLIAvailable() {
 			return nil, fmt.Errorf("claude CLI not found in PATH")
 		}
-		// Parse "claude-code:sonnet-4.5" → "sonnet-4.5"
+		// Parse "claude:sonnet-4.5" → "sonnet-4.5"
 		subAgent := ""
 		if idx := strings.Index(agent, ":"); idx != -1 {
 			subAgent = agent[idx+1:]
 		}
 		return NewClaudeCLI(subAgent), nil
-	case agent == "gemini-cli" || strings.HasPrefix(agent, "gemini-cli:"):
+	case agent == "gemini" || strings.HasPrefix(agent, "gemini:"):
 		if !IsGeminiCLIAvailable() {
 			return nil, fmt.Errorf("gemini CLI not found in PATH")
 		}
-		// Parse "gemini-cli:flash" → "flash"
+		// Parse "gemini:flash" → "flash"
 		subAgent := ""
 		if idx := strings.Index(agent, ":"); idx != -1 {
 			subAgent = agent[idx+1:]
@@ -61,16 +49,16 @@ func NewClient(agent string) (Client, error) {
 	case strings.HasPrefix(agent, "claude-"):
 		return claude.NewClient(agent)
 	default:
-		return nil, fmt.Errorf("unknown agent: %s (use claude-code, gemini-cli, gemini-*, or claude-*)", agent)
+		return nil, fmt.Errorf("unknown agent: %s (use claude, gemini, gemini-*, or claude-*)", agent)
 	}
 }
 
 // IsAgentSupported checks if an agent is supported by any provider
 func IsAgentSupported(agent string) bool {
 	switch {
-	case agent == "claude-code" || strings.HasPrefix(agent, "claude-code:"):
+	case agent == "claude" || strings.HasPrefix(agent, "claude:"):
 		return IsClaudeCLIAvailable()
-	case agent == "gemini-cli" || strings.HasPrefix(agent, "gemini-cli:"):
+	case agent == "gemini" || strings.HasPrefix(agent, "gemini:"):
 		return IsGeminiCLIAvailable()
 	case strings.HasPrefix(agent, "gemini-"):
 		return gemini.IsAgentSupported(agent)
@@ -81,18 +69,18 @@ func IsAgentSupported(agent string) bool {
 	}
 }
 
-// IsAgentCLI returns true if the agent is a CLI agent (claude-code, gemini-cli)
+// IsAgentCLI returns true if the agent is a CLI agent (claude, gemini)
 func IsAgentCLI(agent string) bool {
-	return agent == "claude-code" || strings.HasPrefix(agent, "claude-code:") ||
-		agent == "gemini-cli" || strings.HasPrefix(agent, "gemini-cli:")
+	return agent == "claude" || strings.HasPrefix(agent, "claude:") ||
+		agent == "gemini" || strings.HasPrefix(agent, "gemini:")
 }
 
 // IsCLIAgentSupported checks if a CLI agent is available
 func IsCLIAgentSupported(agent string) bool {
 	switch {
-	case agent == "claude-code" || strings.HasPrefix(agent, "claude-code:"):
+	case agent == "claude" || strings.HasPrefix(agent, "claude:"):
 		return IsClaudeCLIAvailable()
-	case agent == "gemini-cli" || strings.HasPrefix(agent, "gemini-cli:"):
+	case agent == "gemini" || strings.HasPrefix(agent, "gemini:"):
 		return IsGeminiCLIAvailable()
 	default:
 		return false
@@ -115,10 +103,10 @@ func IsModelSupported(model string) bool {
 func SupportedAgents() []string {
 	agents := []string{}
 	if IsClaudeCLIAvailable() {
-		agents = append(agents, "claude-code")
+		agents = append(agents, "claude")
 	}
 	if IsGeminiCLIAvailable() {
-		agents = append(agents, "gemini-cli")
+		agents = append(agents, "gemini")
 	}
 	agents = append(agents, gemini.SupportedAgents...)
 	agents = append(agents, claude.SupportedAgents...)
@@ -129,10 +117,10 @@ func SupportedAgents() []string {
 func SupportedCLIAgents() []string {
 	agents := []string{}
 	if IsClaudeCLIAvailable() {
-		agents = append(agents, "claude-code")
+		agents = append(agents, "claude")
 	}
 	if IsGeminiCLIAvailable() {
-		agents = append(agents, "gemini-cli")
+		agents = append(agents, "gemini")
 	}
 	return agents
 }
