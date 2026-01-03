@@ -118,7 +118,7 @@ func TestWriteYAMLCV(t *testing.T) {
 	}
 
 	// Write CV
-	if err := writeYAMLCV(cvPath, cv); err != nil {
+	if err := writeYAMLCV(cvPath, cv, ""); err != nil {
 		t.Fatalf("writeYAMLCV failed: %v", err)
 	}
 
@@ -161,7 +161,7 @@ func TestWriteYAMLLetter(t *testing.T) {
 		},
 	}
 
-	if err := writeYAMLLetter(letterPath, letter); err != nil {
+	if err := writeYAMLLetter(letterPath, letter, ""); err != nil {
 		t.Fatalf("writeYAMLLetter failed: %v", err)
 	}
 
@@ -204,7 +204,7 @@ func TestReadWriteRoundTrip(t *testing.T) {
 	}
 
 	// Write
-	if err := writeYAMLCV(cvPath, original); err != nil {
+	if err := writeYAMLCV(cvPath, original, ""); err != nil {
 		t.Fatalf("Write failed: %v", err)
 	}
 

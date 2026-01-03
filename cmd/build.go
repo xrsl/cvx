@@ -3,6 +3,7 @@ package cmd
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"io/fs"
@@ -646,7 +647,7 @@ func removeNilValues(data interface{}) interface{} {
 }
 
 // writeYAMLCV writes cv data back to cv.yaml
-func writeYAMLCV(path string, cv map[string]interface{}) error {
+func writeYAMLCV(path string, cv map[string]interface{}, schemaPath string) error {
 	// Remove nil values to avoid "null" in YAML
 	cleaned := removeNilValues(cv).(map[string]interface{})
 
@@ -658,11 +659,24 @@ func writeYAMLCV(path string, cv map[string]interface{}) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(path, data, 0o644)
+
+	// Prepend schema comment for IDE support (if schema path provided)
+	finalData := data
+	if schemaPath != "" {
+		// Calculate relative path from YAML file to schema
+		relPath, err := filepath.Rel(filepath.Dir(path), schemaPath)
+		if err != nil {
+			relPath = schemaPath // fallback to absolute path
+		}
+		schemaComment := fmt.Sprintf("# yaml-language-server: $schema=%s\n", relPath)
+		finalData = append([]byte(schemaComment), data...)
+	}
+
+	return os.WriteFile(path, finalData, 0o644)
 }
 
 // writeYAMLLetter writes letter data back to letter.yaml
-func writeYAMLLetter(path string, letter map[string]interface{}) error {
+func writeYAMLLetter(path string, letter map[string]interface{}, schemaPath string) error {
 	// Remove nil values to avoid "null" in YAML
 	cleaned := removeNilValues(letter).(map[string]interface{})
 
@@ -674,7 +688,20 @@ func writeYAMLLetter(path string, letter map[string]interface{}) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(path, data, 0o644)
+
+	// Prepend schema comment for IDE support (if schema path provided)
+	finalData := data
+	if schemaPath != "" {
+		// Calculate relative path from YAML file to schema
+		relPath, err := filepath.Rel(filepath.Dir(path), schemaPath)
+		if err != nil {
+			relPath = schemaPath // fallback to absolute path
+		}
+		schemaComment := fmt.Sprintf("# yaml-language-server: $schema=%s\n", relPath)
+		finalData = append([]byte(schemaComment), data...)
+	}
+
+	return os.WriteFile(path, finalData, 0o644)
 }
 
 // callPythonAgent calls the Python agent subprocess with JSON stdin/stdout
@@ -735,9 +762,70 @@ func extractAgentToCache() (string, error) {
 	return cacheDir, nil
 }
 
+// regenerateModels regenerates models.py from schema.json in the agent directory
+// Only regenerates if the schema has changed since last generation
+func regenerateModels(agentDir, schemaPath string) {
+	if schemaPath == "" || agentDir == "" {
+		return // skip if no schema provided
+	}
+
+	// Check if schema exists
+	schemaData, err := os.ReadFile(schemaPath)
+	if err != nil {
+		return // skip if schema doesn't exist
+	}
+
+	// Compute schema hash
+	schemaHash := fmt.Sprintf("%x", sha256.Sum256(schemaData))
+	hashPath := filepath.Join(agentDir, ".schema_hash")
+
+	// Check if models.py needs regeneration
+	if existingHash, err := os.ReadFile(hashPath); err == nil {
+		if string(existingHash) == schemaHash {
+			// Schema hasn't changed, skip regeneration
+			return
+		}
+	}
+
+	modelsPath := filepath.Join(agentDir, "cvx_agent", "models.py")
+
+	// Convert schemaPath to absolute path if it's relative
+	absSchemaPath := schemaPath
+	if !filepath.IsAbs(schemaPath) {
+		absSchemaPath, err = filepath.Abs(schemaPath)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: failed to get absolute path for schema: %v\n", err)
+			return
+		}
+	}
+
+	// Run datamodel-codegen via uv run from the agent directory
+	cmd := exec.Command(
+		"uv", "run",
+		"datamodel-codegen",
+		"--input", absSchemaPath,
+		"--input-file-type", "jsonschema",
+		"--output", modelsPath,
+		"--output-model-type", "pydantic_v2.BaseModel",
+	)
+	cmd.Dir = agentDir
+
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+
+	if err := cmd.Run(); err != nil {
+		// Just log warning, don't fail the build
+		fmt.Fprintf(os.Stderr, "Warning: failed to regenerate models.py: %v\n%s\n", err, stderr.String())
+		return
+	}
+
+	// Save the schema hash
+	_ = os.WriteFile(hashPath, []byte(schemaHash), 0o644)
+}
+
 // Go boundary: subprocess management, JSON marshaling
 // Python boundary: AI calls, validation, caching
-func callPythonAgent(jobPosting string, cv, letter map[string]interface{}) (cvOut, letterOut map[string]interface{}, err error) {
+func callPythonAgent(jobPosting string, cv, letter map[string]interface{}, schemaPath string) (cvOut, letterOut map[string]interface{}, err error) {
 	// Check if uv is available
 	if _, err := exec.LookPath("uv"); err != nil {
 		return nil, nil, fmt.Errorf("uv is not installed. Please install uv: https://docs.astral.sh/uv/")
@@ -748,6 +836,9 @@ func callPythonAgent(jobPosting string, cv, letter map[string]interface{}) (cvOu
 	if err != nil {
 		return nil, nil, err
 	}
+
+	// Regenerate models.py from project schema
+	regenerateModels(agentDir, schemaPath)
 
 	// Prepare input JSON
 	input := map[string]interface{}{
@@ -880,7 +971,7 @@ func runBuildWithPythonAgent(cfg *config.Config, issueNum string) error {
 			letterOut = cached["letter"].(map[string]interface{})
 		} else {
 			fmt.Printf("%s Cache read failed, calling agent\n", style.C(style.Yellow, "⚠"))
-			cvOut, letterOut, err = callPythonAgent(issueBody, cv, letter)
+			cvOut, letterOut, err = callPythonAgent(issueBody, cv, letter, schemaPath)
 			if err != nil {
 				return err
 			}
@@ -893,7 +984,7 @@ func runBuildWithPythonAgent(cfg *config.Config, issueNum string) error {
 			fmt.Printf("%s Calling Python agent...\n", style.C(style.Cyan, "⧗"))
 		}
 		var err error
-		cvOut, letterOut, err = callPythonAgent(issueBody, cv, letter)
+		cvOut, letterOut, err = callPythonAgent(issueBody, cv, letter, schemaPath)
 		if err != nil {
 			return err
 		}
@@ -907,12 +998,12 @@ func runBuildWithPythonAgent(cfg *config.Config, issueNum string) error {
 	}
 
 	// 9. Write output YAML
-	if err := writeYAMLCV(cvPath, cvOut); err != nil {
+	if err := writeYAMLCV(cvPath, cvOut, schemaPath); err != nil {
 		return fmt.Errorf("failed to write %s: %w", cvPath, err)
 	}
 	fmt.Printf("%s Wrote %s\n", style.C(style.Green, "✓"), cvPath)
 
-	if err := writeYAMLLetter(letterPath, letterOut); err != nil {
+	if err := writeYAMLLetter(letterPath, letterOut, schemaPath); err != nil {
 		return fmt.Errorf("failed to write %s: %w", letterPath, err)
 	}
 	fmt.Printf("%s Wrote %s\n", style.C(style.Green, "✓"), letterPath)
