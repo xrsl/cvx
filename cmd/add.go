@@ -185,8 +185,8 @@ func resolveAddBaseAgent(cfg *config.Config) (string, error) {
 		}
 		return agentFlag, nil
 	}
-	if cfg.Agent != "" {
-		return cfg.Agent, nil
+	if cfg.DefaultCLIAgent != "" {
+		return cfg.DefaultCLIAgent, nil
 	}
 	return ai.DefaultAgent(), nil
 }
@@ -194,7 +194,7 @@ func resolveAddBaseAgent(cfg *config.Config) (string, error) {
 func resolveAddSchema(cfg *config.Config) (*schema.Schema, error) {
 	schemaPath := schemaFlag
 	if schemaPath == "" {
-		schemaPath = cfg.Schema
+		schemaPath = cfg.AddSchemaPath
 	}
 
 	sch, err := schema.Load(schemaPath)

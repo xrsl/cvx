@@ -12,29 +12,29 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/xrsl/cvx/pkg/ai"
+	"github.com/xrsl/cvx/pkg/utils"
 )
 
 type Config struct {
-	Repo           string `mapstructure:"repo" yaml:"repo,omitempty"`
-	Agent          string `mapstructure:"agent" yaml:"agent,omitempty"`
+	Repo            string `mapstructure:"repo" yaml:"repo,omitempty"`
 	DefaultCLIAgent string `mapstructure:"default_cli_agent" yaml:"default_cli_agent,omitempty"`
-	Schema         string `mapstructure:"schema" yaml:"schema,omitempty"`
-	CVPath         string `mapstructure:"cv_path" yaml:"cv_path,omitempty"`
-	ReferencePath  string `mapstructure:"reference_path" yaml:"reference_path,omitempty"`
-	Project        string `mapstructure:"project" yaml:"project,omitempty"` // owner/number format
-	CVYAMLPath     string `mapstructure:"cv_yaml_path" yaml:"cv_yaml_path,omitempty"`
-	LetterYAMLPath string `mapstructure:"letter_yaml_path" yaml:"letter_yaml_path,omitempty"`
+	AddSchemaPath   string `mapstructure:"add_schema_path" yaml:"add_schema_path,omitempty"`
+	BuildSchemaPath string `mapstructure:"build_schema_path" yaml:"build_schema_path,omitempty"`
+	ReferencePath   string `mapstructure:"reference_path" yaml:"reference_path,omitempty"`
+	Project         string `mapstructure:"project" yaml:"project,omitempty"` // owner/number format
+	CVYAMLPath      string `mapstructure:"cv_yaml_path" yaml:"cv_yaml_path,omitempty"`
+	LetterYAMLPath  string `mapstructure:"letter_yaml_path" yaml:"letter_yaml_path,omitempty"`
 }
 
-// AgentCLI returns the CLI agent name derived from the agent setting
+// AgentCLI returns the CLI agent name derived from the default_cli_agent setting
 func (c *Config) AgentCLI() string {
-	if strings.HasPrefix(c.Agent, "gemini") {
+	if strings.HasPrefix(c.DefaultCLIAgent, "gemini") {
 		return "gemini"
 	}
-	if c.Agent == "claude-code" || strings.HasPrefix(c.Agent, "claude-code:") {
+	if c.DefaultCLIAgent == "claude-code" || strings.HasPrefix(c.DefaultCLIAgent, "claude-code:") {
 		return "claude"
 	}
-	if c.Agent == "gemini-cli" || strings.HasPrefix(c.Agent, "gemini-cli:") {
+	if c.DefaultCLIAgent == "gemini-cli" || strings.HasPrefix(c.DefaultCLIAgent, "gemini-cli:") {
 		return "gemini"
 	}
 	return "claude"
@@ -91,7 +91,7 @@ func init() {
 	v.SetConfigFile(configFile)
 
 	// Defaults
-	v.SetDefault("agent", "claude-code")
+	v.SetDefault("default_cli_agent", "claude-code")
 
 	// Environment variables
 	v.SetEnvPrefix("CVX")
@@ -106,16 +106,16 @@ func Path() string {
 	return configFile
 }
 
-// validateAgent checks if the configured agent is valid
+// validateCLIAgent checks if the configured CLI agent is valid
 // Only CLI agents (claude-code, gemini-cli) are allowed in config files
-func validateAgent(agent string) error {
+func validateCLIAgent(agent string) error {
 	if agent == "" {
 		return nil // Empty is ok, will use default
 	}
 
 	// Check if it's a CLI agent
 	if !ai.IsAgentCLI(agent) {
-		return fmt.Errorf("config contains API agent '%s'. Only CLI agents (claude-code, gemini-cli) allowed in config. Use --call-api-directly for API access", agent)
+		return fmt.Errorf("config contains invalid agent '%s'. Only CLI agents (claude-code, gemini-cli) allowed", agent)
 	}
 
 	return nil
@@ -127,8 +127,8 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
 	}
 
-	// Validate agent setting
-	if err := validateAgent(cfg.Agent); err != nil {
+	// Validate CLI agent setting
+	if err := validateCLIAgent(cfg.DefaultCLIAgent); err != nil {
 		return nil, err
 	}
 
@@ -137,7 +137,7 @@ func Load() (*Config, error) {
 
 func Get(key string) (string, error) {
 	switch key {
-	case "repo", "agent", "default_cli_agent", "schema", "cv_path", "reference_path", "cv_yaml_path", "letter_yaml_path":
+	case "repo", "default_cli_agent", "add_schema_path", "build_schema_path", "reference_path", "cv_yaml_path", "letter_yaml_path":
 		return v.GetString(key), nil
 	default:
 		return "", fmt.Errorf("unknown config key: %s", key)
@@ -153,18 +153,16 @@ func Set(key, value string) error {
 	switch key {
 	case "repo":
 		cfg.Repo = value
-	case "agent":
-		// Validate agent before setting
-		if err := validateAgent(value); err != nil {
+	case "default_cli_agent":
+		// Validate CLI agent before setting
+		if err := validateCLIAgent(value); err != nil {
 			return err
 		}
-		cfg.Agent = value
-	case "default_cli_agent":
 		cfg.DefaultCLIAgent = value
-	case "schema":
-		cfg.Schema = value
-	case "cv_path":
-		cfg.CVPath = value
+	case "add_schema_path":
+		cfg.AddSchemaPath = value
+	case "build_schema_path":
+		cfg.BuildSchemaPath = value
 	case "reference_path":
 		cfg.ReferencePath = value
 	case "cv_yaml_path":
@@ -172,7 +170,7 @@ func Set(key, value string) error {
 	case "letter_yaml_path":
 		cfg.LetterYAMLPath = value
 	default:
-		return fmt.Errorf("unknown config key: %s (valid: repo, agent, default_cli_agent, schema, cv_path, reference_path, cv_yaml_path, letter_yaml_path)", key)
+		return fmt.Errorf("unknown config key: %s (valid: repo, default_cli_agent, add_schema_path, build_schema_path, reference_path, cv_yaml_path, letter_yaml_path)", key)
 	}
 
 	v.Set(key, value) // keep viper in sync
@@ -192,10 +190,9 @@ func writeConfig(cfg *Config) error {
 func All() (map[string]string, error) {
 	return map[string]string{
 		"repo":              v.GetString("repo"),
-		"agent":             v.GetString("agent"),
 		"default_cli_agent": v.GetString("default_cli_agent"),
-		"schema":            v.GetString("schema"),
-		"cv_path":           v.GetString("cv_path"),
+		"add_schema_path":   v.GetString("add_schema_path"),
+		"build_schema_path": v.GetString("build_schema_path"),
 		"reference_path":    v.GetString("reference_path"),
 		"cv_yaml_path":      v.GetString("cv_yaml_path"),
 		"letter_yaml_path":  v.GetString("letter_yaml_path"),
@@ -232,6 +229,11 @@ func SaveProject(owner string, number int, cache ProjectCache) error {
 var cacheFile = ".cvx/cache.yaml"
 
 func saveProjectCache(cache ProjectCache) error {
+	// Ensure .cvx/.gitignore exists
+	if err := utils.EnsureCvxGitignore(); err != nil {
+		return err
+	}
+
 	cacheDir := filepath.Dir(cacheFile)
 	if err := os.MkdirAll(cacheDir, 0o755); err != nil {
 		return err
@@ -284,5 +286,5 @@ func ResetForTest(testPath string) {
 	cacheFile = testPath + "/.cvx/cache.yaml"
 	v = viper.New()
 	v.SetConfigFile(configFile)
-	v.SetDefault("agent", "claude-code")
+	v.SetDefault("default_cli_agent", "claude-code")
 }

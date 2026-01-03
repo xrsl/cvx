@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+
+	"github.com/xrsl/cvx/pkg/utils"
 )
 
 // CacheKey computes a deterministic SHA256 hash of build inputs
@@ -59,6 +61,11 @@ func Read(key string) (map[string]interface{}, error) {
 // Write writes output to cache for a given key
 func Write(key string, cvOut, letterOut map[string]interface{}) error {
 	path := CachePath(key)
+
+	// Ensure .cvx/.gitignore exists
+	if err := utils.EnsureCvxGitignore(); err != nil {
+		return fmt.Errorf("failed to create .cvx/.gitignore: %w", err)
+	}
 
 	// Create directory if needed
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {

@@ -14,8 +14,8 @@ func TestLoadDefaults(t *testing.T) {
 		t.Fatalf("Load() error: %v", err)
 	}
 
-	if c.Agent != "claude-code" {
-		t.Errorf("Expected default agent 'claude-code', got '%s'", c.Agent)
+	if c.DefaultCLIAgent != "claude-code" {
+		t.Errorf("Expected default agent 'claude-code', got '%s'", c.DefaultCLIAgent)
 	}
 }
 
@@ -27,7 +27,7 @@ func TestSetAndGet(t *testing.T) {
 	if err := Set("repo", "owner/repo"); err != nil {
 		t.Fatalf("Set repo error: %v", err)
 	}
-	if err := Set("agent", "claude-code"); err != nil {
+	if err := Set("default_cli_agent", "claude-code"); err != nil {
 		t.Fatalf("Set agent error: %v", err)
 	}
 
@@ -40,7 +40,7 @@ func TestSetAndGet(t *testing.T) {
 		t.Errorf("Expected repo 'owner/repo', got '%s'", repo)
 	}
 
-	agent, err := Get("agent")
+	agent, err := Get("default_cli_agent")
 	if err != nil {
 		t.Fatalf("Get agent error: %v", err)
 	}

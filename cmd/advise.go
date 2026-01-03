@@ -18,6 +18,7 @@ import (
 	"github.com/xrsl/cvx/pkg/config"
 	"github.com/xrsl/cvx/pkg/gh"
 	"github.com/xrsl/cvx/pkg/style"
+	"github.com/xrsl/cvx/pkg/utils"
 	"github.com/xrsl/cvx/pkg/workflow"
 )
 
@@ -90,8 +91,8 @@ func runAdvise(cmd *cobra.Command, args []string) error {
 				return fmt.Errorf("unsupported CLI agent: %s (supported: claude-code, gemini-cli). Use --call-api-directly for API access", adviseAgentFlag)
 			}
 			baseAgent = adviseAgentFlag
-		} else if cfg.Agent != "" {
-			baseAgent = cfg.Agent
+		} else if cfg.DefaultCLIAgent != "" {
+			baseAgent = cfg.DefaultCLIAgent
 		} else {
 			baseAgent = ai.DefaultAgent()
 		}
@@ -113,8 +114,6 @@ func runAdvise(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("unsupported agent/model: %s", agentSetting)
 	}
 
-	// Override config agent for this run
-	cfg.Agent = agentSetting
 
 	// Get CLI agent name from agent setting
 	agent := cfg.AgentCLI()
@@ -141,7 +140,7 @@ func runAdviseURL(ctx context.Context, cfg *config.Config, agent, url string) er
 	var result string
 
 	// Use API client with caching when agent is not CLI-based
-	if !ai.IsAgentCLI(cfg.Agent) {
+	if !ai.IsAgentCLI(cfg.DefaultCLIAgent) {
 		systemPrompt, userPrompt, err := buildAdvisePromptParts(cfg, url, "")
 		if err != nil {
 			return err
@@ -150,7 +149,7 @@ func runAdviseURL(ctx context.Context, cfg *config.Config, agent, url string) er
 			userPrompt = fmt.Sprintf("%s\n\nAdditional context: %s", userPrompt, adviseContextFlag)
 		}
 
-		result, err = runAdviseWithAPI(ctx, cfg.Agent, systemPrompt, userPrompt)
+		result, err = runAdviseWithAPI(ctx, cfg.DefaultCLIAgent, systemPrompt, userPrompt)
 		if err != nil {
 			return err
 		}
@@ -165,7 +164,7 @@ func runAdviseURL(ctx context.Context, cfg *config.Config, agent, url string) er
 		}
 
 		args := buildCLIArgs(agent, prompt, "", false)
-		spinnerMsg := fmt.Sprintf("Analyzing job posting using 🤖 %s...", cfg.Agent)
+		spinnerMsg := fmt.Sprintf("Analyzing job posting using 🤖 %s...", cfg.DefaultCLIAgent)
 		output, err := runAgentWithSpinner(agent, args, spinnerMsg)
 		if err != nil {
 			return fmt.Errorf("agent error: %w", err)
@@ -291,7 +290,7 @@ func runAdviseAnalysis(ctx context.Context, cfg *config.Config, agent, issueNum,
 	var result string
 
 	// Use API client with caching when agent is not CLI-based
-	if !ai.IsAgentCLI(cfg.Agent) {
+	if !ai.IsAgentCLI(cfg.DefaultCLIAgent) {
 		fmt.Printf("Running analysis for issue #%s...\n", issueNum)
 
 		systemPrompt, userPrompt, err := buildAdvisePromptParts(cfg, "", issueBody)
@@ -302,7 +301,7 @@ func runAdviseAnalysis(ctx context.Context, cfg *config.Config, agent, issueNum,
 			userPrompt = fmt.Sprintf("%s\n\nAdditional context: %s", userPrompt, adviseContextFlag)
 		}
 
-		result, err = runAdviseWithAPI(ctx, cfg.Agent, systemPrompt, userPrompt)
+		result, err = runAdviseWithAPI(ctx, cfg.DefaultCLIAgent, systemPrompt, userPrompt)
 		if err != nil {
 			return err
 		}
@@ -329,7 +328,7 @@ func runAdviseAnalysis(ctx context.Context, cfg *config.Config, agent, issueNum,
 		}
 
 		// Build spinner message with agent name and model
-		spinnerMsg := fmt.Sprintf("Analyzing job match using 🤖 %s...", cfg.Agent)
+		spinnerMsg := fmt.Sprintf("Analyzing job match using 🤖 %s...", cfg.DefaultCLIAgent)
 
 		output, err := runAgentWithSpinner(agent, args, spinnerMsg)
 		if err != nil {
@@ -395,10 +394,10 @@ func buildAdvisePromptParts(cfg *config.Config, url, issueBody string) (system, 
 	}
 
 	data := struct {
-		CVPath        string
+		CVYAMLPath    string
 		ReferencePath string
 	}{
-		CVPath:        cfg.CVPath,
+		CVYAMLPath:    cfg.CVYAMLPath,
 		ReferencePath: cfg.ReferencePath,
 	}
 
@@ -447,6 +446,9 @@ func getSession(key string) (string, bool) {
 }
 
 func saveSession(key, sessionID string) error {
+	// Ensure .cvx/.gitignore exists
+	_ = utils.EnsureCvxGitignore()
+
 	_ = os.MkdirAll(filepath.Join(".cvx", "sessions"), 0o755)
 	sessionFile := filepath.Join(".cvx", "sessions", key+".sid")
 	return os.WriteFile(sessionFile, []byte(sessionID), 0o644)

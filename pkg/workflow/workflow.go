@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/xrsl/cvx/pkg/schema"
+	"github.com/xrsl/cvx/pkg/utils"
 )
 
 //go:embed defaults/add.md
@@ -30,18 +31,15 @@ func Init(schemaPath string) error {
 		schemaPath = DefaultSchemaPath
 	}
 
+	// Ensure .cvx/.gitignore exists
+	if err := utils.EnsureCvxGitignore(); err != nil {
+		return err
+	}
+
 	// Create directories
 	dirs := []string{".cvx/workflows", ".cvx/sessions", ".cvx/matches", ".github/ISSUE_TEMPLATE"}
 	for _, dir := range dirs {
 		if err := os.MkdirAll(dir, 0o755); err != nil {
-			return err
-		}
-	}
-
-	// Gitignore sessions (local only)
-	sessionsGitignore := ".cvx/sessions/.gitignore"
-	if _, err := os.Stat(sessionsGitignore); os.IsNotExist(err) {
-		if err := os.WriteFile(sessionsGitignore, []byte("*\n!.gitignore\n"), 0o644); err != nil {
 			return err
 		}
 	}
@@ -115,6 +113,11 @@ func LoadAdd() (string, error) {
 
 // ResetWorkflows overwrites workflow files with defaults
 func ResetWorkflows() error {
+	// Ensure .cvx/.gitignore exists
+	if err := utils.EnsureCvxGitignore(); err != nil {
+		return err
+	}
+
 	if err := os.MkdirAll(".cvx/workflows", 0o755); err != nil {
 		return err
 	}

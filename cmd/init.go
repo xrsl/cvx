@@ -90,17 +90,13 @@ func runInit(cmd *cobra.Command, args []string) error {
 		if parts := strings.Split(repo, "/"); len(parts) == 2 {
 			owner = parts[0]
 		}
-		// Auto-detect default CLI agent
-		defaultCLI := detectAvailableCLI()
-		if defaultCLI == "" {
-			defaultCLI = "claude-code" // fallback
-		}
 		cfg := &config.Config{
 			Repo:            repo,
-			Agent:           "claude-code",
-			DefaultCLIAgent: defaultCLI,
-			Schema:          workflow.DefaultSchemaPath,
-			CVPath:          "src/cv.tex",
+			DefaultCLIAgent: "claude-code",
+			AddSchemaPath:   workflow.DefaultSchemaPath,
+			BuildSchemaPath: "schema/schema.json",
+			CVYAMLPath:      "src/cv.yaml",
+			LetterYAMLPath:  "src/letter.yaml",
 			ReferencePath:   "reference/",
 			Project:         owner + "/1",
 		}
@@ -124,7 +120,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 
 		// Ensure workflow files are up to date
 		cfg, _ := config.Load()
-		schemaPath := cfg.Schema
+		schemaPath := cfg.AddSchemaPath
 		if schemaPath == "" {
 			schemaPath = workflow.DefaultSchemaPath
 		}
@@ -183,10 +179,10 @@ func runInit(cmd *cobra.Command, args []string) error {
 	}
 	_ = config.Set("repo", repo)
 
-	// Step 2: AI Agent
+	// Step 2: CLI Agent
 	agents := buildAgentList()
 	defaultAgent := agents[0].name
-	currentAgent := cfg.Agent
+	currentAgent := cfg.DefaultCLIAgent
 	if currentAgent == "" {
 		currentAgent = defaultAgent
 	}
@@ -199,7 +195,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	fmt.Printf("%s AI Agent\n", style.C(style.Green, "?"))
+	fmt.Printf("%s CLI Agent\n", style.C(style.Green, "?"))
 	for i, a := range agents {
 		marker := "   "
 		if i == currentIdx {
@@ -223,71 +219,38 @@ func runInit(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	_ = config.Set("agent", selectedAgent)
+	_ = config.Set("default_cli_agent", selectedAgent)
 	fmt.Printf("  Using %s\n\n", style.C(style.Cyan, selectedAgent))
 
-	// Step 2.5: Default CLI Agent (for -i mode)
-	cliAgents := []agentOption{}
-	if isCommandAvailable("claude") {
-		cliAgents = append(cliAgents, agentOption{"claude-code", ""})
+	// Step 3: CV YAML path (for build command)
+	cvYAMLPath := cfg.CVYAMLPath
+	if cvYAMLPath == "" {
+		cvYAMLPath = "src/cv.yaml"
 	}
-	if isCommandAvailable("gemini") {
-		cliAgents = append(cliAgents, agentOption{"gemini-cli", ""})
-	}
-
-	if len(cliAgents) > 0 {
-		defaultCLI := cfg.DefaultCLIAgent
-		if defaultCLI == "" {
-			defaultCLI = cliAgents[0].name
-		}
-
-		currentCLIIdx := 0
-		for i, a := range cliAgents {
-			if a.name == defaultCLI {
-				currentCLIIdx = i
-				break
-			}
-		}
-
-		fmt.Printf("%s Default CLI Agent (for -i mode)\n", style.C(style.Green, "?"))
-		for i, a := range cliAgents {
-			marker := "   "
-			if i == currentCLIIdx {
-				marker = "  " + style.C(style.Green, "→")
-			}
-			fmt.Printf("%s%s %s\n", marker, style.C(style.Cyan, fmt.Sprintf("%d)", i+1)), a.name)
-		}
-		fmt.Printf("\n  Choice %s: ", style.C(style.Cyan, fmt.Sprintf("[%d]", currentCLIIdx+1)))
-
-		input, _ := reader.ReadString('\n')
-		input = strings.TrimSpace(input)
-
-		selectedCLI := defaultCLI
-		if input != "" {
-			if idx, err := strconv.Atoi(input); err == nil && idx >= 1 && idx <= len(cliAgents) {
-				selectedCLI = cliAgents[idx-1].name
-			}
-		}
-
-		_ = config.Set("default_cli_agent", selectedCLI)
-		fmt.Printf("  Using %s for interactive mode\n\n", style.C(style.Cyan, selectedCLI))
-	}
-
-	// Step 3: CV path (for match command)
-	cvPath := cfg.CVPath
-	if cvPath == "" {
-		cvPath = "src/cv.tex"
-	}
-	fmt.Printf("%s CV file path %s: ", style.C(style.Green, "?"), style.C(style.Cyan, "["+cvPath+"]"))
+	fmt.Printf("%s CV YAML path (for build command) %s: ", style.C(style.Green, "?"), style.C(style.Cyan, "["+cvYAMLPath+"]"))
 	input, _ = reader.ReadString('\n')
 	input = strings.TrimSpace(input)
 	if input != "" {
-		cvPath = input
+		cvYAMLPath = input
 	}
-	_ = config.Set("cv_path", cvPath)
+	_ = config.Set("cv_yaml_path", cvYAMLPath)
 	fmt.Println()
 
-	// Step 4: Reference directory path
+	// Step 5: Letter YAML path (for build -m)
+	letterYAMLPath := cfg.LetterYAMLPath
+	if letterYAMLPath == "" {
+		letterYAMLPath = "src/letter.yaml"
+	}
+	fmt.Printf("%s Letter YAML path (for build command) %s: ", style.C(style.Green, "?"), style.C(style.Cyan, "["+letterYAMLPath+"]"))
+	input, _ = reader.ReadString('\n')
+	input = strings.TrimSpace(input)
+	if input != "" {
+		letterYAMLPath = input
+	}
+	_ = config.Set("letter_yaml_path", letterYAMLPath)
+	fmt.Println()
+
+	// Step 6: Reference directory path
 	refPath := cfg.ReferencePath
 	if refPath == "" {
 		refPath = "reference/"
@@ -301,21 +264,35 @@ func runInit(cmd *cobra.Command, args []string) error {
 	_ = config.Set("reference_path", refPath)
 	fmt.Println()
 
-	// Step 5: Job ad schema path
-	schemaPath := cfg.Schema
-	if schemaPath == "" {
-		schemaPath = workflow.DefaultSchemaPath
+	// Step 7: Job ad schema path (for add command)
+	addSchemaPath := cfg.AddSchemaPath
+	if addSchemaPath == "" {
+		addSchemaPath = workflow.DefaultSchemaPath
 	}
-	fmt.Printf("%s Job ad schema (issue template) path %s: ", style.C(style.Green, "?"), style.C(style.Cyan, "["+schemaPath+"]"))
+	fmt.Printf("%s Job ad schema (for add command) %s: ", style.C(style.Green, "?"), style.C(style.Cyan, "["+addSchemaPath+"]"))
 	input, _ = reader.ReadString('\n')
 	input = strings.TrimSpace(input)
 	if input != "" {
-		schemaPath = input
+		addSchemaPath = input
 	}
-	_ = config.Set("schema", schemaPath)
+	_ = config.Set("add_schema_path", addSchemaPath)
 	fmt.Println()
 
-	// Step 6: GitHub Project
+	// Step 8: Build schema path (for build command)
+	buildSchemaPath := cfg.BuildSchemaPath
+	if buildSchemaPath == "" {
+		buildSchemaPath = "schema/schema.json"
+	}
+	fmt.Printf("%s Build schema (for build command) %s: ", style.C(style.Green, "?"), style.C(style.Cyan, "["+buildSchemaPath+"]"))
+	input, _ = reader.ReadString('\n')
+	input = strings.TrimSpace(input)
+	if input != "" {
+		buildSchemaPath = input
+	}
+	_ = config.Set("build_schema_path", buildSchemaPath)
+	fmt.Println()
+
+	// Step 9: GitHub Project
 	if cfg.Project == "" {
 		fmt.Printf("%s GitHub Project %s: ", style.C(style.Green, "?"), style.C(style.Cyan, "(number to use existing, 'new' to create, enter to skip)"))
 		input, _ := reader.ReadString('\n')
@@ -366,7 +343,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 	}
 
 	// Initialize .cvx directory structure
-	if err := workflow.Init(schemaPath); err != nil {
+	if err := workflow.Init(addSchemaPath); err != nil {
 		fmt.Printf("  Warning: Could not initialize .cvx/ directory: %v\n", err)
 	}
 
@@ -473,19 +450,6 @@ func buildAgentList() []agentOption {
 		agents = append(agents, agentOption{"gemini-cli", ""})
 	}
 
-	for _, a := range ai.SupportedAgents() {
-		if a == "claude-code" || a == "gemini-cli" {
-			continue
-		}
-		note := ""
-		if strings.HasPrefix(a, "gemini-") {
-			note = "GEMINI_API_KEY"
-		} else if strings.HasPrefix(a, "claude-") {
-			note = "ANTHROPIC_API_KEY"
-		}
-		agents = append(agents, agentOption{a, note})
-	}
-
 	return agents
 }
 
@@ -500,13 +464,6 @@ func validateConfig(cfg *config.Config) {
 	if cfg.Repo != "" {
 		if _, err := cli.RepoView(cfg.Repo, []string{"name"}); err != nil {
 			warn(fmt.Sprintf("repo %s not accessible", cfg.Repo))
-		}
-	}
-
-	// Check cv_path exists
-	if cfg.CVPath != "" {
-		if _, err := os.Stat(cfg.CVPath); os.IsNotExist(err) {
-			warn(fmt.Sprintf("cv_path %s does not exist", cfg.CVPath))
 		}
 	}
 
@@ -536,9 +493,9 @@ func validateConfig(cfg *config.Config) {
 	}
 
 	// Check schema exists (if not default)
-	if cfg.Schema != "" && cfg.Schema != workflow.DefaultSchemaPath {
-		if _, err := os.Stat(cfg.Schema); os.IsNotExist(err) {
-			warn(fmt.Sprintf("schema %s does not exist", cfg.Schema))
+	if cfg.AddSchemaPath != "" && cfg.AddSchemaPath != workflow.DefaultSchemaPath {
+		if _, err := os.Stat(cfg.AddSchemaPath); os.IsNotExist(err) {
+			warn(fmt.Sprintf("add_schema_path %s does not exist", cfg.AddSchemaPath))
 		}
 	}
 }

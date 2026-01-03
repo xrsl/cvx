@@ -28,3 +28,22 @@ func FileExists(path string) bool {
 	}
 	return !info.IsDir()
 }
+
+// EnsureCvxGitignore creates .cvx/.gitignore to keep .cvx/ out of git
+func EnsureCvxGitignore() error {
+	gitignorePath := ".cvx/.gitignore"
+
+	// Skip if already exists
+	if FileExists(gitignorePath) {
+		return nil
+	}
+
+	// Create .cvx directory if needed
+	if err := os.MkdirAll(".cvx", 0o755); err != nil {
+		return err
+	}
+
+	// Create .gitignore that ignores everything
+	content := "*\n"
+	return os.WriteFile(gitignorePath, []byte(content), 0o644)
+}
