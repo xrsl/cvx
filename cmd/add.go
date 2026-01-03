@@ -128,7 +128,7 @@ func runAdd(cmd *cobra.Command, args []string) error {
 func resolveAddRepo(cfg *config.Config) (string, error) {
 	repo := repoFlag
 	if repo == "" {
-		repo = cfg.Repo
+		repo = cfg.GitHub.Repo
 	}
 	if repo == "" && !dryRunFlag {
 		return "", fmt.Errorf("no repo configured. Run: cvx init")
@@ -185,8 +185,8 @@ func resolveAddBaseAgent(cfg *config.Config) (string, error) {
 		}
 		return agentFlag, nil
 	}
-	if cfg.DefaultCLIAgent != "" {
-		return cfg.DefaultCLIAgent, nil
+	if cfg.Agent.Default != "" {
+		return cfg.Agent.Default, nil
 	}
 	return ai.DefaultAgent(), nil
 }
@@ -194,7 +194,7 @@ func resolveAddBaseAgent(cfg *config.Config) (string, error) {
 func resolveAddSchema(cfg *config.Config) (*schema.Schema, error) {
 	schemaPath := schemaFlag
 	if schemaPath == "" {
-		schemaPath = cfg.AddSchemaPath
+		schemaPath = cfg.Schema.JobAd
 	}
 
 	sch, err := schema.Load(schemaPath)

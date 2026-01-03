@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/pelletier/go-toml/v2"
 	"github.com/spf13/viper"
 	"gopkg.in/yaml.v3"
 
@@ -15,48 +16,68 @@ import (
 	"github.com/xrsl/cvx/pkg/utils"
 )
 
-type Config struct {
-	Repo            string `mapstructure:"repo" yaml:"repo,omitempty"`
-	DefaultCLIAgent string `mapstructure:"default_cli_agent" yaml:"default_cli_agent,omitempty"`
-	AddSchemaPath   string `mapstructure:"add_schema_path" yaml:"add_schema_path,omitempty"`
-	BuildSchemaPath string `mapstructure:"build_schema_path" yaml:"build_schema_path,omitempty"`
-	ReferencePath   string `mapstructure:"reference_path" yaml:"reference_path,omitempty"`
-	Project         string `mapstructure:"project" yaml:"project,omitempty"` // owner/number format
-	CVYAMLPath      string `mapstructure:"cv_yaml_path" yaml:"cv_yaml_path,omitempty"`
-	LetterYAMLPath  string `mapstructure:"letter_yaml_path" yaml:"letter_yaml_path,omitempty"`
+type GitHubConfig struct {
+	Repo    string `toml:"repo" mapstructure:"repo"`
+	Project string `toml:"project" mapstructure:"project"`
 }
 
-// AgentCLI returns the CLI agent name derived from the default_cli_agent setting
+type AgentConfig struct {
+	Default string `toml:"default" mapstructure:"default"`
+}
+
+type SchemaConfig struct {
+	JobAd string `toml:"job-ad" mapstructure:"job-ad"`
+}
+
+type PathsConfig struct {
+	Reference string `toml:"reference" mapstructure:"reference"`
+}
+
+type CVConfig struct {
+	Source string `toml:"source" mapstructure:"source"`
+	Output string `toml:"output" mapstructure:"output"`
+	Schema string `toml:"schema" mapstructure:"schema"`
+}
+
+type LetterConfig struct {
+	Source string `toml:"source" mapstructure:"source"`
+	Output string `toml:"output" mapstructure:"output"`
+	Schema string `toml:"schema" mapstructure:"schema"`
+}
+
+type Config struct {
+	GitHub GitHubConfig `toml:"github" mapstructure:"github"`
+	Agent  AgentConfig  `toml:"agent" mapstructure:"agent"`
+	Schema SchemaConfig `toml:"schema" mapstructure:"schema"`
+	Paths  PathsConfig  `toml:"paths" mapstructure:"paths"`
+	CV     CVConfig     `toml:"cv" mapstructure:"cv"`
+	Letter LetterConfig `toml:"letter" mapstructure:"letter"`
+}
+
 func (c *Config) AgentCLI() string {
-	if strings.HasPrefix(c.DefaultCLIAgent, "gemini") {
+	if c.Agent.Default == "gemini" || strings.HasPrefix(c.Agent.Default, "gemini:") {
 		return "gemini"
 	}
-	if c.DefaultCLIAgent == "claude-code" || strings.HasPrefix(c.DefaultCLIAgent, "claude-code:") {
+	if c.Agent.Default == "claude" || strings.HasPrefix(c.Agent.Default, "claude:") {
 		return "claude"
-	}
-	if c.DefaultCLIAgent == "gemini-cli" || strings.HasPrefix(c.DefaultCLIAgent, "gemini-cli:") {
-		return "gemini"
 	}
 	return "claude"
 }
 
-// ProjectOwner returns the owner from project string (owner/number)
 func (c *Config) ProjectOwner() string {
-	parts := strings.Split(c.Project, "/")
+	parts := strings.Split(c.GitHub.Project, "/")
 	if len(parts) == 2 {
 		return parts[0]
 	}
-	// Fall back to repo owner
-	parts = strings.Split(c.Repo, "/")
+	parts = strings.Split(c.GitHub.Repo, "/")
 	if len(parts) == 2 {
 		return parts[0]
 	}
 	return ""
 }
 
-// ProjectNumber returns the number from project string (owner/number)
 func (c *Config) ProjectNumber() int {
-	parts := strings.Split(c.Project, "/")
+	parts := strings.Split(c.GitHub.Project, "/")
 	if len(parts) == 2 {
 		if n, err := strconv.Atoi(parts[1]); err == nil {
 			return n
@@ -66,13 +87,12 @@ func (c *Config) ProjectNumber() int {
 }
 
 type FieldIDs struct {
-	Status      string `mapstructure:"status" yaml:"status,omitempty"`
-	Company     string `mapstructure:"company" yaml:"company,omitempty"`
-	Deadline    string `mapstructure:"deadline" yaml:"deadline,omitempty"`
-	AppliedDate string `mapstructure:"applied_date" yaml:"applied_date,omitempty"`
+	Status      string `yaml:"status,omitempty"`
+	Company     string `yaml:"company,omitempty"`
+	Deadline    string `yaml:"deadline,omitempty"`
+	AppliedDate string `yaml:"applied_date,omitempty"`
 }
 
-// ProjectCache stores internal project IDs (not user-facing)
 type ProjectCache struct {
 	ID       string            `yaml:"id"`
 	Number   int               `yaml:"number"`
@@ -82,23 +102,18 @@ type ProjectCache struct {
 }
 
 var (
-	configFile = ".cvx-config.yaml"
+	configFile = "cvx.toml"
+	cacheFile  = ".cvx/cache.yaml"
 	v          *viper.Viper
 )
 
 func init() {
 	v = viper.New()
 	v.SetConfigFile(configFile)
-
-	// Defaults
-	v.SetDefault("default_cli_agent", "claude-code")
-
-	// Environment variables
+	v.SetConfigType("toml")
+	v.SetDefault("agent.default", "claude")
 	v.SetEnvPrefix("CVX")
-	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 	v.AutomaticEnv()
-
-	// Try to read config file (ignore if not exists)
 	_ = v.ReadInConfig()
 }
 
@@ -106,148 +121,55 @@ func Path() string {
 	return configFile
 }
 
-// validateCLIAgent checks if the configured CLI agent is valid
-// Only CLI agents (claude-code, gemini-cli) are allowed in config files
-func validateCLIAgent(agent string) error {
-	if agent == "" {
-		return nil // Empty is ok, will use default
-	}
-
-	// Check if it's a CLI agent
-	if !ai.IsAgentCLI(agent) {
-		return fmt.Errorf("config contains invalid agent '%s'. Only CLI agents (claude-code, gemini-cli) allowed", agent)
-	}
-
-	return nil
-}
-
 func Load() (*Config, error) {
 	var cfg Config
 	if err := v.Unmarshal(&cfg); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
 	}
-
-	// Validate CLI agent setting
-	if err := validateCLIAgent(cfg.DefaultCLIAgent); err != nil {
-		return nil, err
+	if cfg.Agent.Default != "" && !ai.IsAgentCLI(cfg.Agent.Default) {
+		return nil, fmt.Errorf("invalid agent '%s'. Only CLI agents allowed", cfg.Agent.Default)
 	}
-
 	return &cfg, nil
 }
 
-func Get(key string) (string, error) {
-	switch key {
-	case "repo", "default_cli_agent", "add_schema_path", "build_schema_path", "reference_path", "cv_yaml_path", "letter_yaml_path":
-		return v.GetString(key), nil
-	default:
-		return "", fmt.Errorf("unknown config key: %s", key)
-	}
-}
-
-func Set(key, value string) error {
-	cfg, err := Load()
-	if err != nil {
-		cfg = &Config{}
-	}
-
-	switch key {
-	case "repo":
-		cfg.Repo = value
-	case "default_cli_agent":
-		// Validate CLI agent before setting
-		if err := validateCLIAgent(value); err != nil {
-			return err
-		}
-		cfg.DefaultCLIAgent = value
-	case "add_schema_path":
-		cfg.AddSchemaPath = value
-	case "build_schema_path":
-		cfg.BuildSchemaPath = value
-	case "reference_path":
-		cfg.ReferencePath = value
-	case "cv_yaml_path":
-		cfg.CVYAMLPath = value
-	case "letter_yaml_path":
-		cfg.LetterYAMLPath = value
-	default:
-		return fmt.Errorf("unknown config key: %s (valid: repo, default_cli_agent, add_schema_path, build_schema_path, reference_path, cv_yaml_path, letter_yaml_path)", key)
-	}
-
-	v.Set(key, value) // keep viper in sync
-	return writeConfig(cfg)
-}
-
-func writeConfig(cfg *Config) error {
+func Save(c *Config) error {
 	var buf bytes.Buffer
-	enc := yaml.NewEncoder(&buf)
-	enc.SetIndent(2)
-	if err := enc.Encode(cfg); err != nil {
+	enc := toml.NewEncoder(&buf)
+	if err := enc.Encode(c); err != nil {
 		return err
 	}
-	return os.WriteFile(configFile, buf.Bytes(), 0o644)
+	// Convert single quotes to double quotes
+	output := strings.ReplaceAll(buf.String(), "'", "\"")
+	return os.WriteFile(configFile, []byte(output), 0o644)
 }
 
-func All() (map[string]string, error) {
-	return map[string]string{
-		"repo":              v.GetString("repo"),
-		"default_cli_agent": v.GetString("default_cli_agent"),
-		"add_schema_path":   v.GetString("add_schema_path"),
-		"build_schema_path": v.GetString("build_schema_path"),
-		"reference_path":    v.GetString("reference_path"),
-		"cv_yaml_path":      v.GetString("cv_yaml_path"),
-		"letter_yaml_path":  v.GetString("letter_yaml_path"),
-	}, nil
-}
-
-// Save saves the full config
-func Save(c *Config) error {
-	return writeConfig(c)
-}
-
-// SaveProject saves project configuration
-// Project string (owner/number) goes to config file
-// Internal IDs go to cache file in .cvx/cache.yaml
 func SaveProject(owner string, number int, cache ProjectCache) error {
 	cfg, err := Load()
 	if err != nil {
 		cfg = &Config{}
 	}
-
-	// Save as owner/number format
-	cfg.Project = fmt.Sprintf("%s/%d", owner, number)
-	v.Set("project", cfg.Project)
-
-	// Save internal IDs to cache
+	cfg.GitHub.Project = fmt.Sprintf("%s/%d", owner, number)
 	cache.Number = number
 	if err := saveProjectCache(cache); err != nil {
 		return fmt.Errorf("failed to save project cache: %w", err)
 	}
-
-	return writeConfig(cfg)
+	return Save(cfg)
 }
 
-var cacheFile = ".cvx/cache.yaml"
-
 func saveProjectCache(cache ProjectCache) error {
-	// Ensure .cvx/.gitignore exists
 	if err := utils.EnsureCvxGitignore(); err != nil {
 		return err
 	}
-
-	cacheDir := filepath.Dir(cacheFile)
-	if err := os.MkdirAll(cacheDir, 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(cacheFile), 0o755); err != nil {
 		return err
 	}
-	var buf bytes.Buffer
-	enc := yaml.NewEncoder(&buf)
-	enc.SetIndent(2)
-	if err := enc.Encode(map[string]ProjectCache{"project": cache}); err != nil {
+	data, err := yaml.Marshal(map[string]ProjectCache{"project": cache})
+	if err != nil {
 		return err
 	}
-	return os.WriteFile(cacheFile, buf.Bytes(), 0o644)
+	return os.WriteFile(cacheFile, data, 0o644)
 }
 
-// LoadProjectCache loads cached project IDs
 func LoadProjectCache() (*ProjectCache, error) {
 	data, err := os.ReadFile(cacheFile)
 	if err != nil {
@@ -262,29 +184,25 @@ func LoadProjectCache() (*ProjectCache, error) {
 	return &cache.Project, nil
 }
 
-// LoadWithCache loads config and returns it along with cached project data
 func LoadWithCache() (*Config, *ProjectCache, error) {
 	cfg, err := Load()
 	if err != nil {
 		return nil, nil, err
 	}
-
-	// Try to load cached project IDs
 	projectNum := cfg.ProjectNumber()
 	if projectNum > 0 {
 		if cache, err := LoadProjectCache(); err == nil && cache.Number == projectNum {
 			return cfg, cache, nil
 		}
 	}
-
 	return cfg, nil, nil
 }
 
-// ResetForTest resets viper for testing (only use in tests)
 func ResetForTest(testPath string) {
-	configFile = testPath + "/.cvx-config.yaml"
+	configFile = testPath + "/cvx.toml"
 	cacheFile = testPath + "/.cvx/cache.yaml"
 	v = viper.New()
 	v.SetConfigFile(configFile)
-	v.SetDefault("default_cli_agent", "claude-code")
+	v.SetConfigType("toml")
+	v.SetDefault("agent.default", "claude")
 }

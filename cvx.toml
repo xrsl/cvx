@@ -1,0 +1,22 @@
+[github]
+  repo = "xrsl/cvx"
+  project = "xrsl/1"
+
+[agent]
+  default = "claude-code"
+
+[schema]
+  job-ad = ".github/ISSUE_TEMPLATE/job-ad-schema.yaml"
+
+[paths]
+  reference = "reference/"
+
+[cv]
+  source = "src/cv.yaml"
+  output = "out/cv.pdf"
+  schema = "schema/schema.json"
+
+[letter]
+  source = "src/letter.yaml"
+  output = "out/letter.pdf"
+  schema = "schema/schema.json"

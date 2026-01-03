@@ -88,7 +88,7 @@ func runList(cmd *cobra.Command, args []string) error {
 	// Resolve repo (flag > config)
 	repo := listRepoFlag
 	if repo == "" {
-		repo = cfg.Repo
+		repo = cfg.GitHub.Repo
 	}
 	if repo == "" {
 		return fmt.Errorf("no repo configured. Run: cvx init")
@@ -316,7 +316,7 @@ func runListApps(cfg *config.Config) error {
 	// Resolve repo (flag > config)
 	repo := listRepoFlag
 	if repo == "" {
-		repo = cfg.Repo
+		repo = cfg.GitHub.Repo
 	}
 	if repo == "" {
 		return fmt.Errorf("no repo configured. Run: cvx init")

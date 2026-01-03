@@ -91,8 +91,8 @@ func runAdvise(cmd *cobra.Command, args []string) error {
 				return fmt.Errorf("unsupported CLI agent: %s (supported: claude-code, gemini-cli). Use --call-api-directly for API access", adviseAgentFlag)
 			}
 			baseAgent = adviseAgentFlag
-		} else if cfg.DefaultCLIAgent != "" {
-			baseAgent = cfg.DefaultCLIAgent
+		} else if cfg.Agent.Default != "" {
+			baseAgent = cfg.Agent.Default
 		} else {
 			baseAgent = ai.DefaultAgent()
 		}
@@ -140,7 +140,7 @@ func runAdviseURL(ctx context.Context, cfg *config.Config, agent, url string) er
 	var result string
 
 	// Use API client with caching when agent is not CLI-based
-	if !ai.IsAgentCLI(cfg.DefaultCLIAgent) {
+	if !ai.IsAgentCLI(cfg.Agent.Default) {
 		systemPrompt, userPrompt, err := buildAdvisePromptParts(cfg, url, "")
 		if err != nil {
 			return err
@@ -149,7 +149,7 @@ func runAdviseURL(ctx context.Context, cfg *config.Config, agent, url string) er
 			userPrompt = fmt.Sprintf("%s\n\nAdditional context: %s", userPrompt, adviseContextFlag)
 		}
 
-		result, err = runAdviseWithAPI(ctx, cfg.DefaultCLIAgent, systemPrompt, userPrompt)
+		result, err = runAdviseWithAPI(ctx, cfg.Agent.Default, systemPrompt, userPrompt)
 		if err != nil {
 			return err
 		}
@@ -164,7 +164,7 @@ func runAdviseURL(ctx context.Context, cfg *config.Config, agent, url string) er
 		}
 
 		args := buildCLIArgs(agent, prompt, "", false)
-		spinnerMsg := fmt.Sprintf("Analyzing job posting using 🤖 %s...", cfg.DefaultCLIAgent)
+		spinnerMsg := fmt.Sprintf("Analyzing job posting using 🤖 %s...", cfg.Agent.Default)
 		output, err := runAgentWithSpinner(agent, args, spinnerMsg)
 		if err != nil {
 			return fmt.Errorf("agent error: %w", err)
@@ -269,7 +269,7 @@ func runAdviseIssue(ctx context.Context, cfg *config.Config, agent, issueNum str
 		// Post as comment
 		fmt.Printf("Posting analysis to issue #%s...\n", issueNum)
 		cli := gh.New()
-		if err := cli.IssueComment(cfg.Repo, issueNum, string(content)); err != nil {
+		if err := cli.IssueComment(cfg.GitHub.Repo, issueNum, string(content)); err != nil {
 			return fmt.Errorf("error posting comment: %w", err)
 		}
 		fmt.Printf("%sissue #%s\n", style.Success("Analysis posted as comment to"), issueNum)
@@ -282,7 +282,7 @@ func runAdviseIssue(ctx context.Context, cfg *config.Config, agent, issueNum str
 
 func runAdviseAnalysis(ctx context.Context, cfg *config.Config, agent, issueNum, sessionKey string, hasSession bool, sessionID string) error {
 	// Fetch issue body for context
-	issueBody, err := fetchIssueBody(cfg.Repo, issueNum)
+	issueBody, err := fetchIssueBody(cfg.GitHub.Repo, issueNum)
 	if err != nil {
 		return fmt.Errorf("error fetching issue: %w", err)
 	}
@@ -290,7 +290,7 @@ func runAdviseAnalysis(ctx context.Context, cfg *config.Config, agent, issueNum,
 	var result string
 
 	// Use API client with caching when agent is not CLI-based
-	if !ai.IsAgentCLI(cfg.DefaultCLIAgent) {
+	if !ai.IsAgentCLI(cfg.Agent.Default) {
 		fmt.Printf("Running analysis for issue #%s...\n", issueNum)
 
 		systemPrompt, userPrompt, err := buildAdvisePromptParts(cfg, "", issueBody)
@@ -301,7 +301,7 @@ func runAdviseAnalysis(ctx context.Context, cfg *config.Config, agent, issueNum,
 			userPrompt = fmt.Sprintf("%s\n\nAdditional context: %s", userPrompt, adviseContextFlag)
 		}
 
-		result, err = runAdviseWithAPI(ctx, cfg.DefaultCLIAgent, systemPrompt, userPrompt)
+		result, err = runAdviseWithAPI(ctx, cfg.Agent.Default, systemPrompt, userPrompt)
 		if err != nil {
 			return err
 		}
@@ -328,7 +328,7 @@ func runAdviseAnalysis(ctx context.Context, cfg *config.Config, agent, issueNum,
 		}
 
 		// Build spinner message with agent name and model
-		spinnerMsg := fmt.Sprintf("Analyzing job match using 🤖 %s...", cfg.DefaultCLIAgent)
+		spinnerMsg := fmt.Sprintf("Analyzing job match using 🤖 %s...", cfg.Agent.Default)
 
 		output, err := runAgentWithSpinner(agent, args, spinnerMsg)
 		if err != nil {
@@ -397,8 +397,8 @@ func buildAdvisePromptParts(cfg *config.Config, url, issueBody string) (system, 
 		CVYAMLPath    string
 		ReferencePath string
 	}{
-		CVYAMLPath:    cfg.CVYAMLPath,
-		ReferencePath: cfg.ReferencePath,
+		CVYAMLPath:    cfg.CV.Source,
+		ReferencePath: cfg.Paths.Reference,
 	}
 
 	var buf bytes.Buffer

@@ -42,7 +42,7 @@ func runRm(cmd *cobra.Command, args []string) error {
 	// Resolve repo (flag > config)
 	repo := rmRepoFlag
 	if repo == "" {
-		repo = cfg.Repo
+		repo = cfg.GitHub.Repo
 	}
 	if repo == "" {
 		return fmt.Errorf("no repo configured. Run: cvx init")

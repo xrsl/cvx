@@ -74,7 +74,7 @@ func runApprove(cmd *cobra.Command, args []string) error {
 	}
 
 	// Get issue details for commit message and tag
-	branchName, company, title, err := getIssueBranchName(cfg.Repo, issueNum)
+	branchName, company, title, err := getIssueBranchName(cfg.GitHub.Repo, issueNum)
 	if err != nil {
 		return err
 	}
@@ -189,7 +189,7 @@ func updateProjectStatus(cfg *config.Config, cache *config.ProjectCache, issueNu
 				}
 			}
 		}
-	}`, getRepoOwner(cfg.Repo), getRepoName(cfg.Repo), issueNum)
+	}`, getRepoOwner(cfg.GitHub.Repo), getRepoName(cfg.GitHub.Repo), issueNum)
 
 	output, err := cli.GraphQL(query)
 	if err != nil {

@@ -14,58 +14,38 @@ func TestLoadDefaults(t *testing.T) {
 		t.Fatalf("Load() error: %v", err)
 	}
 
-	if c.DefaultCLIAgent != "claude-code" {
-		t.Errorf("Expected default agent 'claude-code', got '%s'", c.DefaultCLIAgent)
+	if c.Agent.Default != "claude" {
+		t.Errorf("Expected default agent 'claude', got '%s'", c.Agent.Default)
 	}
 }
 
-func TestSetAndGet(t *testing.T) {
+func TestSaveAndLoad(t *testing.T) {
 	tmpDir := t.TempDir()
 	ResetForTest(tmpDir)
 
-	// Set values
-	if err := Set("repo", "owner/repo"); err != nil {
-		t.Fatalf("Set repo error: %v", err)
-	}
-	if err := Set("default_cli_agent", "claude-code"); err != nil {
-		t.Fatalf("Set agent error: %v", err)
+	cfg := &Config{
+		GitHub: GitHubConfig{Repo: "owner/repo", Project: "owner/1"},
+		Agent:  AgentConfig{Default: "claude"},
+		Schema: SchemaConfig{JobAd: ".github/ISSUE_TEMPLATE/job-ad.yaml"},
+		Paths:  PathsConfig{Reference: "reference/"},
+		CV:     CVConfig{Source: "src/cv.yaml", Output: "out/cv.pdf", Schema: "schema/schema.json"},
+		Letter: LetterConfig{Source: "src/letter.yaml", Output: "out/letter.pdf", Schema: "schema/schema.json"},
 	}
 
-	// Get values
-	repo, err := Get("repo")
+	if err := Save(cfg); err != nil {
+		t.Fatalf("Save error: %v", err)
+	}
+
+	loaded, err := Load()
 	if err != nil {
-		t.Fatalf("Get repo error: %v", err)
-	}
-	if repo != "owner/repo" {
-		t.Errorf("Expected repo 'owner/repo', got '%s'", repo)
+		t.Fatalf("Load error: %v", err)
 	}
 
-	agent, err := Get("default_cli_agent")
-	if err != nil {
-		t.Fatalf("Get agent error: %v", err)
+	if loaded.GitHub.Repo != "owner/repo" {
+		t.Errorf("Expected repo 'owner/repo', got '%s'", loaded.GitHub.Repo)
 	}
-	if agent != "claude-code" {
-		t.Errorf("Expected agent 'claude-code', got '%s'", agent)
-	}
-}
-
-func TestSetInvalidKey(t *testing.T) {
-	tmpDir := t.TempDir()
-	ResetForTest(tmpDir)
-
-	err := Set("invalid_key", "value")
-	if err == nil {
-		t.Error("Expected error for invalid key, got nil")
-	}
-}
-
-func TestGetInvalidKey(t *testing.T) {
-	tmpDir := t.TempDir()
-	ResetForTest(tmpDir)
-
-	_, err := Get("invalid_key")
-	if err == nil {
-		t.Error("Expected error for invalid key, got nil")
+	if loaded.Agent.Default != "claude" {
+		t.Errorf("Expected agent 'claude', got '%s'", loaded.Agent.Default)
 	}
 }
 
@@ -87,7 +67,6 @@ func TestSaveProject(t *testing.T) {
 		t.Fatalf("SaveProject error: %v", err)
 	}
 
-	// Check user-facing config (only number and owner)
 	c, err := Load()
 	if err != nil {
 		t.Fatalf("Load error: %v", err)
@@ -99,7 +78,6 @@ func TestSaveProject(t *testing.T) {
 		t.Errorf("Expected project owner 'testowner', got '%s'", c.ProjectOwner())
 	}
 
-	// Check full config with cache (includes internal IDs)
 	_, projectCache, err := LoadWithCache()
 	if err != nil {
 		t.Fatalf("LoadWithCache error: %v", err)
@@ -120,17 +98,22 @@ func TestSaveProject(t *testing.T) {
 
 func TestConfigPath(t *testing.T) {
 	path := Path()
-	if path == "" {
-		t.Error("Path() returned empty string")
+	if path == "cvx.toml" {
+		return
 	}
+	t.Errorf("Expected path 'cvx.toml', got '%s'", path)
 }
 
 func TestConfigFileCreated(t *testing.T) {
 	tmpDir := t.TempDir()
 	ResetForTest(tmpDir)
 
-	if err := Set("repo", "test/repo"); err != nil {
-		t.Fatalf("Set error: %v", err)
+	cfg := &Config{
+		GitHub: GitHubConfig{Repo: "test/repo"},
+	}
+
+	if err := Save(cfg); err != nil {
+		t.Fatalf("Save error: %v", err)
 	}
 
 	if _, err := os.Stat(Path()); os.IsNotExist(err) {

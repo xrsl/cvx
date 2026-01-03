@@ -25,10 +25,10 @@ var initCmd = &cobra.Command{
 	Long: `Initialize cvx configuration and directory structure.
 
 Creates:
-  .cvx-config.yaml     Configuration file
-  .cvx/workflows/      Workflow definitions
-  .cvx/sessions/       Agent session files
-  .cvx/matches/        Match analysis outputs
+  cvx.toml            Configuration file
+  .cvx/workflows/     Workflow definitions
+  .cvx/sessions/      Agent session files
+  .cvx/matches/       Match analysis outputs
 
 Run this once per repository to set up cvx.`,
 	RunE: runInit,
@@ -85,20 +85,17 @@ func runInit(cmd *cobra.Command, args []string) error {
 		if repo == "" {
 			return fmt.Errorf("could not infer repo from git remote")
 		}
-		// Extract owner for project
 		owner := ""
 		if parts := strings.Split(repo, "/"); len(parts) == 2 {
 			owner = parts[0]
 		}
 		cfg := &config.Config{
-			Repo:            repo,
-			DefaultCLIAgent: "claude-code",
-			AddSchemaPath:   workflow.DefaultSchemaPath,
-			BuildSchemaPath: "schema/schema.json",
-			CVYAMLPath:      "src/cv.yaml",
-			LetterYAMLPath:  "src/letter.yaml",
-			ReferencePath:   "reference/",
-			Project:         owner + "/1",
+			GitHub: config.GitHubConfig{Repo: repo, Project: owner + "/1"},
+			Agent:  config.AgentConfig{Default: "claude"},
+			Schema: config.SchemaConfig{JobAd: workflow.DefaultSchemaPath},
+			Paths:  config.PathsConfig{Reference: "reference/"},
+			CV:     config.CVConfig{Source: "src/cv.yaml", Output: "out/cv.pdf", Schema: "schema/schema.json"},
+			Letter: config.LetterConfig{Source: "src/letter.yaml", Output: "out/letter.pdf", Schema: "schema/schema.json"},
 		}
 		if err := config.Save(cfg); err != nil {
 			return fmt.Errorf("failed to save config: %w", err)
@@ -117,10 +114,8 @@ func runInit(cmd *cobra.Command, args []string) error {
 	if configExists == nil && cvxDirExists == nil {
 		fmt.Printf("%s Already initialized\n", style.C(style.Green, "✓"))
 		fmt.Printf("  Config: %s\n\n", style.C(style.Gray, config.Path()))
-
-		// Ensure workflow files are up to date
 		cfg, _ := config.Load()
-		schemaPath := cfg.AddSchemaPath
+		schemaPath := cfg.Schema.JobAd
 		if schemaPath == "" {
 			schemaPath = workflow.DefaultSchemaPath
 		}
@@ -131,11 +126,14 @@ func runInit(cmd *cobra.Command, args []string) error {
 	}
 
 	cfg, _ := config.Load()
+	if cfg == nil {
+		cfg = &config.Config{}
+	}
 
 	fmt.Printf("\n%s\n\n", style.C(style.Gray, "Press Enter to accept defaults shown in brackets."))
 
 	// Step 1: Repository
-	repo := cfg.Repo
+	repo := cfg.GitHub.Repo
 	if repo == "" {
 		repo = inferRepo()
 	}
@@ -163,7 +161,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 		parts := strings.Split(repo, "/")
 		if len(parts) != 2 {
 			fmt.Println("  Invalid format (expected owner/repo)")
-			repo = cfg.Repo
+			repo = cfg.GitHub.Repo
 			continue
 		}
 
@@ -171,18 +169,18 @@ func runInit(cmd *cobra.Command, args []string) error {
 		cli := gh.New()
 		if _, err := cli.RepoView(repo, []string{"name"}); err != nil {
 			fmt.Println("repository not found or no access")
-			repo = cfg.Repo
+			repo = cfg.GitHub.Repo
 			continue
 		}
 		fmt.Printf("%s\n\n", style.C(style.Green, "✓"))
 		break
 	}
-	_ = config.Set("repo", repo)
+	cfg.GitHub.Repo = repo
 
 	// Step 2: CLI Agent
 	agents := buildAgentList()
 	defaultAgent := agents[0].name
-	currentAgent := cfg.DefaultCLIAgent
+	currentAgent := cfg.Agent.Default
 	if currentAgent == "" {
 		currentAgent = defaultAgent
 	}
@@ -219,39 +217,51 @@ func runInit(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	_ = config.Set("default_cli_agent", selectedAgent)
+	cfg.Agent.Default = selectedAgent
 	fmt.Printf("  Using %s\n\n", style.C(style.Cyan, selectedAgent))
 
-	// Step 3: CV YAML path (for build command)
-	cvYAMLPath := cfg.CVYAMLPath
-	if cvYAMLPath == "" {
-		cvYAMLPath = "src/cv.yaml"
+	// Step 3: CV source path
+	cvSource := cfg.CV.Source
+	if cvSource == "" {
+		cvSource = "src/cv.yaml"
 	}
-	fmt.Printf("%s CV YAML path (for build command) %s: ", style.C(style.Green, "?"), style.C(style.Cyan, "["+cvYAMLPath+"]"))
+	fmt.Printf("%s CV source %s: ", style.C(style.Green, "?"), style.C(style.Cyan, "["+cvSource+"]"))
 	input, _ = reader.ReadString('\n')
 	input = strings.TrimSpace(input)
 	if input != "" {
-		cvYAMLPath = input
+		cvSource = input
 	}
-	_ = config.Set("cv_yaml_path", cvYAMLPath)
+	cfg.CV.Source = cvSource
+	if cfg.CV.Output == "" {
+		cfg.CV.Output = "out/cv.pdf"
+	}
+	if cfg.CV.Schema == "" {
+		cfg.CV.Schema = "schema/schema.json"
+	}
 	fmt.Println()
 
-	// Step 5: Letter YAML path (for build -m)
-	letterYAMLPath := cfg.LetterYAMLPath
-	if letterYAMLPath == "" {
-		letterYAMLPath = "src/letter.yaml"
+	// Step 4: Letter source path
+	letterSource := cfg.Letter.Source
+	if letterSource == "" {
+		letterSource = "src/letter.yaml"
 	}
-	fmt.Printf("%s Letter YAML path (for build command) %s: ", style.C(style.Green, "?"), style.C(style.Cyan, "["+letterYAMLPath+"]"))
+	fmt.Printf("%s Letter source %s: ", style.C(style.Green, "?"), style.C(style.Cyan, "["+letterSource+"]"))
 	input, _ = reader.ReadString('\n')
 	input = strings.TrimSpace(input)
 	if input != "" {
-		letterYAMLPath = input
+		letterSource = input
 	}
-	_ = config.Set("letter_yaml_path", letterYAMLPath)
+	cfg.Letter.Source = letterSource
+	if cfg.Letter.Output == "" {
+		cfg.Letter.Output = "out/letter.pdf"
+	}
+	if cfg.Letter.Schema == "" {
+		cfg.Letter.Schema = "schema/schema.json"
+	}
 	fmt.Println()
 
-	// Step 6: Reference directory path
-	refPath := cfg.ReferencePath
+	// Step 5: Reference directory
+	refPath := cfg.Paths.Reference
 	if refPath == "" {
 		refPath = "reference/"
 	}
@@ -261,39 +271,25 @@ func runInit(cmd *cobra.Command, args []string) error {
 	if input != "" {
 		refPath = input
 	}
-	_ = config.Set("reference_path", refPath)
+	cfg.Paths.Reference = refPath
 	fmt.Println()
 
-	// Step 7: Job ad schema path (for add command)
-	addSchemaPath := cfg.AddSchemaPath
-	if addSchemaPath == "" {
-		addSchemaPath = workflow.DefaultSchemaPath
+	// Step 6: Job ad schema
+	jobAdSchema := cfg.Schema.JobAd
+	if jobAdSchema == "" {
+		jobAdSchema = workflow.DefaultSchemaPath
 	}
-	fmt.Printf("%s Job ad schema (for add command) %s: ", style.C(style.Green, "?"), style.C(style.Cyan, "["+addSchemaPath+"]"))
+	fmt.Printf("%s Job ad schema %s: ", style.C(style.Green, "?"), style.C(style.Cyan, "["+jobAdSchema+"]"))
 	input, _ = reader.ReadString('\n')
 	input = strings.TrimSpace(input)
 	if input != "" {
-		addSchemaPath = input
+		jobAdSchema = input
 	}
-	_ = config.Set("add_schema_path", addSchemaPath)
+	cfg.Schema.JobAd = jobAdSchema
 	fmt.Println()
 
-	// Step 8: Build schema path (for build command)
-	buildSchemaPath := cfg.BuildSchemaPath
-	if buildSchemaPath == "" {
-		buildSchemaPath = "schema/schema.json"
-	}
-	fmt.Printf("%s Build schema (for build command) %s: ", style.C(style.Green, "?"), style.C(style.Cyan, "["+buildSchemaPath+"]"))
-	input, _ = reader.ReadString('\n')
-	input = strings.TrimSpace(input)
-	if input != "" {
-		buildSchemaPath = input
-	}
-	_ = config.Set("build_schema_path", buildSchemaPath)
-	fmt.Println()
-
-	// Step 9: GitHub Project
-	if cfg.Project == "" {
+	// Step 7: GitHub Project
+	if cfg.GitHub.Project == "" {
 		fmt.Printf("%s GitHub Project %s: ", style.C(style.Green, "?"), style.C(style.Cyan, "(number to use existing, 'new' to create, enter to skip)"))
 		input, _ := reader.ReadString('\n')
 		input = strings.TrimSpace(strings.ToLower(input))
@@ -339,11 +335,16 @@ func runInit(cmd *cobra.Command, args []string) error {
 		}
 		fmt.Println()
 	} else {
-		fmt.Printf("%s GitHub Project %s linked\n\n", style.C(style.Green, "✓"), cfg.Project)
+		fmt.Printf("%s GitHub Project %s linked\n\n", style.C(style.Green, "✓"), cfg.GitHub.Project)
+	}
+
+	// Save config
+	if err := config.Save(cfg); err != nil {
+		return fmt.Errorf("failed to save config: %w", err)
 	}
 
 	// Initialize .cvx directory structure
-	if err := workflow.Init(addSchemaPath); err != nil {
+	if err := workflow.Init(cfg.Schema.JobAd); err != nil {
 		fmt.Printf("  Warning: Could not initialize .cvx/ directory: %v\n", err)
 	}
 
@@ -460,42 +461,37 @@ func validateConfig(cfg *config.Config) {
 
 	cli := gh.New()
 
-	// Check repo access
-	if cfg.Repo != "" {
-		if _, err := cli.RepoView(cfg.Repo, []string{"name"}); err != nil {
-			warn(fmt.Sprintf("repo %s not accessible", cfg.Repo))
+	if cfg.GitHub.Repo != "" {
+		if _, err := cli.RepoView(cfg.GitHub.Repo, []string{"name"}); err != nil {
+			warn(fmt.Sprintf("repo %s not accessible", cfg.GitHub.Repo))
 		}
 	}
 
-	// Check reference_path exists
-	if cfg.ReferencePath != "" {
-		if _, err := os.Stat(cfg.ReferencePath); os.IsNotExist(err) {
-			warn(fmt.Sprintf("reference_path %s does not exist", cfg.ReferencePath))
+	if cfg.Paths.Reference != "" {
+		if _, err := os.Stat(cfg.Paths.Reference); os.IsNotExist(err) {
+			warn(fmt.Sprintf("reference path %s does not exist", cfg.Paths.Reference))
 		}
 	}
 
-	// Check project exists (Projects v2 via GraphQL)
-	if cfg.Project != "" {
+	if cfg.GitHub.Project != "" {
 		owner := cfg.ProjectOwner()
 		number := cfg.ProjectNumber()
 		if number > 0 {
 			query := fmt.Sprintf(`query { user(login: "%s") { projectV2(number: %d) { id } } }`, owner, number)
 			out, err := cli.GraphQLWithJQ(query, ".data.user.projectV2.id")
 			if err != nil || strings.TrimSpace(string(out)) == "" || strings.TrimSpace(string(out)) == "null" {
-				// Try org project
 				query = fmt.Sprintf(`query { organization(login: "%s") { projectV2(number: %d) { id } } }`, owner, number)
 				out, err = cli.GraphQLWithJQ(query, ".data.organization.projectV2.id")
 				if err != nil || strings.TrimSpace(string(out)) == "" || strings.TrimSpace(string(out)) == "null" {
-					warn(fmt.Sprintf("project %s not found", cfg.Project))
+					warn(fmt.Sprintf("project %s not found", cfg.GitHub.Project))
 				}
 			}
 		}
 	}
 
-	// Check schema exists (if not default)
-	if cfg.AddSchemaPath != "" && cfg.AddSchemaPath != workflow.DefaultSchemaPath {
-		if _, err := os.Stat(cfg.AddSchemaPath); os.IsNotExist(err) {
-			warn(fmt.Sprintf("add_schema_path %s does not exist", cfg.AddSchemaPath))
+	if cfg.Schema.JobAd != "" && cfg.Schema.JobAd != workflow.DefaultSchemaPath {
+		if _, err := os.Stat(cfg.Schema.JobAd); os.IsNotExist(err) {
+			warn(fmt.Sprintf("job-ad schema %s does not exist", cfg.Schema.JobAd))
 		}
 	}
 }

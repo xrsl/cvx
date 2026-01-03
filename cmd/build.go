@@ -91,11 +91,11 @@ func runBuild(cmd *cobra.Command, args []string) error {
 
 	// Interactive CLI mode
 	if buildInteractiveFlag {
-		if cfg.DefaultCLIAgent == "" {
+		if cfg.Agent.Default == "" {
 			return fmt.Errorf("no CLI agent configured. Run 'cvx init' to configure")
 		}
 
-		if err := ensureIssueBranch(cfg.Repo, issueNum); err != nil {
+		if err := ensureIssueBranch(cfg.GitHub.Repo, issueNum); err != nil {
 			return err
 		}
 
@@ -155,7 +155,7 @@ func runBuildInteractive(cfg *config.Config, issueNum string) error {
 		fmt.Printf("%s Starting build session for issue %s\n", style.C(style.Green, "▶"), style.C(style.Cyan, "#"+issueNum))
 
 		// Fetch issue body
-		issueBody, err := fetchIssueBody(cfg.Repo, issueNum)
+		issueBody, err := fetchIssueBody(cfg.GitHub.Repo, issueNum)
 		if err != nil {
 			return fmt.Errorf("error fetching issue: %w", err)
 		}
@@ -198,7 +198,7 @@ func runBuildInteractive(cfg *config.Config, issueNum string) error {
 
 func runBuildNonInteractive(ctx context.Context, cfg *config.Config, agent, issueNum string) error {
 	// Fetch issue body
-	issueBody, err := fetchIssueBody(cfg.Repo, issueNum)
+	issueBody, err := fetchIssueBody(cfg.GitHub.Repo, issueNum)
 	if err != nil {
 		return fmt.Errorf("error fetching issue: %w", err)
 	}
@@ -459,8 +459,8 @@ func buildBuildPromptParts(cfg *config.Config, issueBody string) (system, user s
 		CVYAMLPath    string
 		ReferencePath string
 	}{
-		CVYAMLPath:    cfg.CVYAMLPath,
-		ReferencePath: cfg.ReferencePath,
+		CVYAMLPath:    cfg.CV.Source,
+		ReferencePath: cfg.Paths.Reference,
 	}
 
 	var buf bytes.Buffer
@@ -489,8 +489,8 @@ func buildBuildPrompt(cfg *config.Config, issueBody string) (string, error) {
 		CVYAMLPath    string
 		ReferencePath string
 	}{
-		CVYAMLPath:    cfg.CVYAMLPath,
-		ReferencePath: cfg.ReferencePath,
+		CVYAMLPath:    cfg.CV.Source,
+		ReferencePath: cfg.Paths.Reference,
 	}
 
 	var buf bytes.Buffer
@@ -889,17 +889,17 @@ func runBuildWithPythonAgent(cfg *config.Config, issueNum string) error {
 		style.C(style.Green, "▶"), style.C(style.Cyan, "#"+issueNum))
 
 	// 1. Fetch job posting from GitHub
-	issueBody, err := fetchIssueBody(cfg.Repo, issueNum)
+	issueBody, err := fetchIssueBody(cfg.GitHub.Repo, issueNum)
 	if err != nil {
 		return fmt.Errorf("error fetching issue: %w", err)
 	}
 
 	// 2. Read YAML files
-	cvPath := cfg.CVYAMLPath
+	cvPath := cfg.CV.Source
 	if cvPath == "" {
 		cvPath = "src/cv.yaml"
 	}
-	letterPath := cfg.LetterYAMLPath
+	letterPath := cfg.Letter.Source
 	if letterPath == "" {
 		letterPath = "src/letter.yaml"
 	}
@@ -918,7 +918,7 @@ func runBuildWithPythonAgent(cfg *config.Config, issueNum string) error {
 	schemaContent := ""
 	schemaPath := buildSchemaFlag
 	if schemaPath == "" {
-		schemaPath = cfg.BuildSchemaPath
+		schemaPath = cfg.CV.Schema
 	}
 	if schemaPath == "" {
 		schemaPath = "schema/schema.json" // fallback default

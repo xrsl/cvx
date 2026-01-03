@@ -78,7 +78,7 @@ func runView(cmd *cobra.Command, args []string) error {
 	// Fetch issue details
 	cli := gh.New()
 	issueNumInt, _ := strconv.Atoi(issueNum)
-	issueData, err := cli.IssueView(cfg.Repo, issueNumInt, []string{"title", "body"})
+	issueData, err := cli.IssueView(cfg.GitHub.Repo, issueNumInt, []string{"title", "body"})
 	if err != nil {
 		return fmt.Errorf("error fetching issue #%s: %w", issueNum, err)
 	}

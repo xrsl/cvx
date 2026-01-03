@@ -58,22 +58,21 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 
 	// Check 4: Configured CLI agent availability
 	cfg, err := config.Load()
-	if err == nil && cfg.DefaultCLIAgent != "" {
-		// Determine which command to check based on agent
+	if err == nil && cfg.Agent.Default != "" {
 		cmdName := ""
-		if strings.HasPrefix(cfg.DefaultCLIAgent, "claude-code") {
+		if strings.HasPrefix(cfg.Agent.Default, "claude-code") {
 			cmdName = "claude"
-		} else if strings.HasPrefix(cfg.DefaultCLIAgent, "gemini-cli") {
+		} else if strings.HasPrefix(cfg.Agent.Default, "gemini-cli") {
 			cmdName = "gemini"
 		}
 
 		if cmdName != "" {
 			if _, err := exec.LookPath(cmdName); err != nil {
-				fmt.Printf("%s %s not found in PATH\n", style.C(style.Red, "✗"), cfg.DefaultCLIAgent)
+				fmt.Printf("%s %s not found in PATH\n", style.C(style.Red, "✗"), cfg.Agent.Default)
 				fmt.Printf("  Install %s CLI to use interactive features\n", cmdName)
 				allGood = false
 			} else {
-				fmt.Printf("%s %s available\n", style.C(style.Green, "✓"), cfg.DefaultCLIAgent)
+				fmt.Printf("%s %s available\n", style.C(style.Green, "✓"), cfg.Agent.Default)
 			}
 		}
 	}
