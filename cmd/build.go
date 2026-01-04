@@ -19,7 +19,6 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/xrsl/cvx/pkg/ai"
-	"github.com/xrsl/cvx/pkg/cache"
 	"github.com/xrsl/cvx/pkg/config"
 	"github.com/xrsl/cvx/pkg/style"
 	"github.com/xrsl/cvx/pkg/workflow"
@@ -31,40 +30,30 @@ var buildCmd = &cobra.Command{
 	Long: `Build tailored CV and cover letter for a job posting.
 
 Two build modes:
-  1. Python Agent (default): Structured YAML with caching and validation
-  2. Interactive CLI: Real-time editing with auto-detected CLI tools
+  1. Interactive CLI (default): Real-time editing with auto-detected CLI tools
+  2. Python Agent: Structured output with validation
 
 Examples:
-  cvx build -m sonnet-4          # Python agent mode
-  cvx build -m flash             # Python agent with Gemini
-  cvx build -m sonnet-4 --dry-run  # Preview without AI call
-  cvx build -m sonnet-4 --no-cache # Skip cache
+  cvx build                      # Interactive mode (default)
+  cvx build 42                   # Interactive for issue #42
+  cvx build -c "focus on ML"     # Interactive with context
 
-  cvx build -i                   # Interactive mode, auto-detect CLI
-  cvx build 42 -i                # Interactive for issue #42
-  cvx build -i -c "focus on ML"  # Interactive with context`,
+  cvx build -m sonnet-4          # Python agent mode
+  cvx build -m flash             # Python agent with Gemini`,
 	Args: cobra.MaximumNArgs(1),
 	RunE: runBuild,
 }
 
 var (
-	buildModelFlag        string
-	buildContextFlag      string
-	buildSchemaFlag       string
-	buildInteractiveFlag  bool
-	buildNoCacheFlag      bool
-	buildRefreshCacheFlag bool
-	buildDryRunFlag       bool
+	buildModelFlag   string
+	buildContextFlag string
+	buildSchemaFlag  string
 )
 
 func init() {
-	buildCmd.Flags().StringVarP(&buildModelFlag, "model", "m", "", "Model: sonnet-4, sonnet-4-5, opus-4, opus-4-5, flash, pro, flash-3, pro-3")
-	buildCmd.Flags().BoolVarP(&buildInteractiveFlag, "interactive", "i", false, "Interactive CLI mode (auto-detects claude or gemini)")
+	buildCmd.Flags().StringVarP(&buildModelFlag, "model", "m", "", "Use Python agent mode with specified model (sonnet-4, flash, etc.)")
 	buildCmd.Flags().StringVarP(&buildContextFlag, "context", "c", "", "Feedback or additional context")
-	buildCmd.Flags().StringVarP(&buildSchemaFlag, "schema", "s", "", "Schema path (defaults to build_schema_path from config)")
-	buildCmd.Flags().BoolVar(&buildNoCacheFlag, "no-cache", false, "Skip cache (Python agent mode only)")
-	buildCmd.Flags().BoolVar(&buildRefreshCacheFlag, "refresh-cache", false, "Recompute and overwrite cache (Python agent mode only)")
-	buildCmd.Flags().BoolVar(&buildDryRunFlag, "dry-run", false, "Preview without AI call (Python agent mode only)")
+	buildCmd.Flags().StringVarP(&buildSchemaFlag, "schema", "s", "", "Schema path (defaults to schema from config)")
 	rootCmd.AddCommand(buildCmd)
 }
 
@@ -79,40 +68,24 @@ func runBuild(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	// Flag validation
-	if buildInteractiveFlag && buildModelFlag != "" {
-		return fmt.Errorf("cannot use -i and -m together (choose one mode)")
-	}
-	if buildInteractiveFlag && (buildDryRunFlag || buildNoCacheFlag || buildRefreshCacheFlag) {
-		return fmt.Errorf("--dry-run, --no-cache, and --refresh-cache only work with -m mode")
-	}
-	if buildNoCacheFlag && buildRefreshCacheFlag {
-		return fmt.Errorf("cannot use --no-cache and --refresh-cache together")
-	}
-
-	// Interactive CLI mode
-	if buildInteractiveFlag {
-		if cfg.Agent.Default == "" {
-			return fmt.Errorf("no CLI agent configured. Run 'cvx init' to configure")
+	// Python Agent Mode (use -m flag)
+	if buildModelFlag != "" {
+		if err := os.Setenv("AI_MODEL", buildModelFlag); err != nil {
+			return fmt.Errorf("failed to set AI_MODEL: %w", err)
 		}
-
-		if err := ensureIssueBranch(cfg.GitHub.Repo, issueNum); err != nil {
-			return err
-		}
-
-		return runBuildInteractive(cfg, issueNum)
+		return runBuildWithPythonAgent(cfg, issueNum)
 	}
 
-	// Python Agent Mode (requires -m)
-	if buildModelFlag == "" {
-		return fmt.Errorf("model not specified. Use -m (e.g., cvx build -m sonnet-4)")
+	// Interactive CLI mode (default)
+	if cfg.Agent.Default == "" {
+		return fmt.Errorf("no CLI agent configured. Run 'cvx init' to configure")
 	}
 
-	if err := os.Setenv("AI_MODEL", buildModelFlag); err != nil {
-		return fmt.Errorf("failed to set AI_MODEL: %w", err)
+	if err := ensureIssueBranch(cfg.GitHub.Repo, issueNum); err != nil {
+		return err
 	}
 
-	return runBuildWithPythonAgent(cfg, issueNum)
+	return runBuildInteractive(cfg, issueNum)
 }
 
 func resolveIssueNumber(args []string) (string, error) {
@@ -948,7 +921,6 @@ func runBuildWithPythonAgent(cfg *config.Config, issueNum string) error {
 	}
 
 	// 3. Read schema if available
-	schemaContent := ""
 	schemaPath := buildSchemaFlag
 	if schemaPath == "" {
 		schemaPath = cfg.CV.Schema
@@ -956,81 +928,15 @@ func runBuildWithPythonAgent(cfg *config.Config, issueNum string) error {
 	if schemaPath == "" {
 		schemaPath = "schema/schema.json" // fallback default
 	}
-	if data, err := os.ReadFile(schemaPath); err == nil {
-		schemaContent = string(data)
-	}
 
-	// 4. Compute cache key using canonical JSON
-	cvJSON, err := json.Marshal(cv)
+	// 4. Call Python agent
+	fmt.Printf("%s Calling Python agent...\n", style.C(style.Cyan, "⧗"))
+	cvOut, letterOut, err := callPythonAgent(issueBody, cv, letter, schemaPath)
 	if err != nil {
-		return fmt.Errorf("failed to marshal CV to JSON: %w", err)
-	}
-	letterJSON, err := json.Marshal(letter)
-	if err != nil {
-		return fmt.Errorf("failed to marshal letter to JSON: %w", err)
+		return err
 	}
 
-	// Convert issue number to int for cache key
-	var issueNumInt int
-	if _, err := fmt.Sscanf(issueNum, "%d", &issueNumInt); err != nil {
-		return fmt.Errorf("invalid issue number %q: %w", issueNum, err)
-	}
-
-	cacheKey := cache.CacheKey(issueNumInt, issueBody, string(cvJSON), string(letterJSON), schemaContent, buildModelFlag)
-
-	// 5. Handle --dry-run
-	if buildDryRunFlag {
-		fmt.Printf("%s Dry run mode\n", style.C(style.Cyan, "►"))
-		fmt.Printf("  Model: %s\n", buildModelFlag)
-		fmt.Printf("  Cache key: %s\n", cacheKey[:16]+"...")
-		if cache.Exists(cacheKey) && !buildNoCacheFlag && !buildRefreshCacheFlag {
-			fmt.Printf("  Cache: %s (hit)\n", style.C(style.Green, "✓"))
-		} else {
-			fmt.Printf("  Cache: %s (miss)\n", style.C(style.Yellow, "○"))
-		}
-		fmt.Printf("  Agent command: uvx --from <agent-dir> cvx-agent\n")
-		return nil
-	}
-
-	// 6. Check cache (unless --no-cache or --refresh-cache)
-	var cvOut, letterOut map[string]interface{}
-	useCache := !buildNoCacheFlag && !buildRefreshCacheFlag
-
-	if useCache && cache.Exists(cacheKey) {
-		fmt.Printf("%s Cache hit\n", style.C(style.Green, "✓"))
-		cached, err := cache.Read(cacheKey)
-		if err == nil {
-			cvOut = cached["cv"].(map[string]interface{})
-			letterOut = cached["letter"].(map[string]interface{})
-		} else {
-			fmt.Printf("%s Cache read failed, calling agent\n", style.C(style.Yellow, "⚠"))
-			cvOut, letterOut, err = callPythonAgent(issueBody, cv, letter, schemaPath)
-			if err != nil {
-				return err
-			}
-		}
-	} else {
-		// 7. Call Python agent
-		if buildRefreshCacheFlag {
-			fmt.Printf("%s Refreshing cache, calling Python agent...\n", style.C(style.Cyan, "⧗"))
-		} else {
-			fmt.Printf("%s Calling Python agent...\n", style.C(style.Cyan, "⧗"))
-		}
-		var err error
-		cvOut, letterOut, err = callPythonAgent(issueBody, cv, letter, schemaPath)
-		if err != nil {
-			return err
-		}
-
-		// 8. Write to cache (unless --no-cache)
-		if !buildNoCacheFlag {
-			if err := cache.Write(cacheKey, cvOut, letterOut); err != nil {
-				fmt.Printf("%s Failed to write cache: %v\n", style.C(style.Yellow, "⚠"), err)
-			}
-		}
-	}
-
-	// 9. Write output YAML
+	// 5. Write output files
 	if err := writeYAMLCV(cvPath, cvOut, schemaPath); err != nil {
 		return fmt.Errorf("failed to write %s: %w", cvPath, err)
 	}
