@@ -83,7 +83,7 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 	fmt.Printf("%s Checking API credentials\n\n", style.C(style.Blue, "→"))
 
 	hasAnthropicKey := os.Getenv("ANTHROPIC_API_KEY") != ""
-	hasGoogleKey := os.Getenv("GOOGLE_API_KEY") != ""
+	hasGeminiKey := os.Getenv("GEMINI_API_KEY") != ""
 	hasOpenAIKey := os.Getenv("OPENAI_API_KEY") != ""
 
 	if hasAnthropicKey {
@@ -92,10 +92,10 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 		fmt.Printf("%s ANTHROPIC_API_KEY not set (required for Claude)\n", style.C(style.Yellow, "⚠"))
 	}
 
-	if hasGoogleKey {
-		fmt.Printf("%s GOOGLE_API_KEY set\n", style.C(style.Green, "✓"))
+	if hasGeminiKey {
+		fmt.Printf("%s GEMINI_API_KEY set\n", style.C(style.Green, "✓"))
 	} else {
-		fmt.Printf("%s GOOGLE_API_KEY not set (required for Gemini)\n", style.C(style.Yellow, "⚠"))
+		fmt.Printf("%s GEMINI_API_KEY not set (required for Gemini)\n", style.C(style.Yellow, "⚠"))
 	}
 
 	if hasOpenAIKey {
@@ -106,7 +106,7 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 
 	fmt.Println()
 
-	if allGood && (hasAnthropicKey || hasGoogleKey) {
+	if allGood && (hasAnthropicKey || hasGeminiKey) {
 		fmt.Printf("%s Setup OK\n", style.C(style.Green, "✓"))
 		return nil
 	}

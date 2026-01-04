@@ -28,9 +28,11 @@ def get_agent(model_name: str) -> Agent:
     Supports Google, OpenAI, and Anthropic.
     """
     model_name_lower = model_name.lower()
-    if "gemini" in model_name_lower:
+    # Check for Gemini models
+    if "gemini" in model_name_lower or "flash" in model_name_lower or "pro" in model_name_lower:
         model = GoogleModel(model_name)
-    elif "claude" in model_name_lower:
+    # Check for Claude models (including shorthand names like sonnet-4, opus-4, haiku-4)
+    elif "claude" in model_name_lower or "sonnet" in model_name_lower or "opus" in model_name_lower or "haiku" in model_name_lower:
         model = AnthropicModel(model_name)
     else:
         model = OpenAIChatModel(model_name)
