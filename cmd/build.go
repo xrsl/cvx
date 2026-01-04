@@ -666,7 +666,14 @@ func writeYAMLCV(path string, cv map[string]interface{}, schemaPath string) erro
 		if err != nil {
 			relPath = schemaPath // fallback to absolute path
 		}
-		schemaComment := fmt.Sprintf("# yaml-language-server: $schema=%s\n", relPath)
+
+		// Use different comment format for TOML vs YAML
+		var schemaComment string
+		if strings.HasSuffix(path, ".toml") {
+			schemaComment = fmt.Sprintf("#:schema %s\n", relPath)
+		} else {
+			schemaComment = fmt.Sprintf("# yaml-language-server: $schema=%s\n", relPath)
+		}
 		finalData = append([]byte(schemaComment), data...)
 	}
 
@@ -703,7 +710,14 @@ func writeYAMLLetter(path string, letter map[string]interface{}, schemaPath stri
 		if err != nil {
 			relPath = schemaPath // fallback to absolute path
 		}
-		schemaComment := fmt.Sprintf("# yaml-language-server: $schema=%s\n", relPath)
+
+		// Use different comment format for TOML vs YAML
+		var schemaComment string
+		if strings.HasSuffix(path, ".toml") {
+			schemaComment = fmt.Sprintf("#:schema %s\n", relPath)
+		} else {
+			schemaComment = fmt.Sprintf("# yaml-language-server: $schema=%s\n", relPath)
+		}
 		finalData = append([]byte(schemaComment), data...)
 	}
 
@@ -795,24 +809,40 @@ func regenerateModels(agentDir, schemaPath string) {
 
 	modelsPath := filepath.Join(agentDir, "cvx_agent", "models.py")
 
-	// Convert schemaPath to absolute path if it's relative
-	absSchemaPath := schemaPath
-	if !filepath.IsAbs(schemaPath) {
-		absSchemaPath, err = filepath.Abs(schemaPath)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Warning: failed to get absolute path for schema: %v\n", err)
-			return
-		}
+	// Preprocess schema: remove '#' prefixes from definitions
+	// This fixes the infinite recursion issue with datamodel-codegen
+	var schema map[string]interface{}
+	if err := json.Unmarshal(schemaData, &schema); err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: failed to parse schema: %v\n", err)
+		return
 	}
+
+	// Clean the schema to work with datamodel-codegen
+	cleanSchema(schema)
+
+	// Write cleaned schema to temp file
+	cleanedData, err := json.MarshalIndent(schema, "", "  ")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: failed to marshal cleaned schema: %v\n", err)
+		return
+	}
+
+	tmpSchemaPath := filepath.Join(agentDir, ".schema_cleaned.json")
+	if err := os.WriteFile(tmpSchemaPath, cleanedData, 0o644); err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: failed to write cleaned schema: %v\n", err)
+		return
+	}
+	defer func() { _ = os.Remove(tmpSchemaPath) }() // cleanup temp file
 
 	// Run datamodel-codegen via uv run from the agent directory
 	cmd := exec.Command(
 		"uv", "run",
 		"datamodel-codegen",
-		"--input", absSchemaPath,
+		"--input", tmpSchemaPath,
 		"--input-file-type", "jsonschema",
 		"--output", modelsPath,
 		"--output-model-type", "pydantic_v2.BaseModel",
+		"--disable-warnings",
 	)
 	cmd.Dir = agentDir
 
@@ -827,6 +857,43 @@ func regenerateModels(agentDir, schemaPath string) {
 
 	// Save the schema hash
 	_ = os.WriteFile(hashPath, []byte(schemaHash), 0o644)
+}
+
+// cleanSchema removes '#' prefixes from definition names to fix datamodel-codegen issues
+func cleanSchema(schema map[string]interface{}) {
+	// Process $defs: rename keys to remove '#' prefix
+	if defs, ok := schema["$defs"].(map[string]interface{}); ok {
+		newDefs := make(map[string]interface{})
+		for key, value := range defs {
+			cleanKey := strings.TrimPrefix(key, "#")
+			newDefs[cleanKey] = value
+		}
+		schema["$defs"] = newDefs
+	}
+
+	// Recursively fix all $ref values
+	fixRefs(schema)
+}
+
+// fixRefs recursively replaces $ref values to remove '#' prefixes
+func fixRefs(v interface{}) {
+	switch val := v.(type) {
+	case map[string]interface{}:
+		// Check if this object has a $ref
+		if ref, ok := val["$ref"].(string); ok {
+			// Replace #/$defs/#Name with #/$defs/Name
+			val["$ref"] = strings.ReplaceAll(ref, "#/$defs/#", "#/$defs/")
+		}
+		// Recurse into all values
+		for _, child := range val {
+			fixRefs(child)
+		}
+	case []interface{}:
+		// Recurse into array elements
+		for _, child := range val {
+			fixRefs(child)
+		}
+	}
 }
 
 // Go boundary: subprocess management, JSON marshaling
@@ -882,7 +949,9 @@ func callPythonAgent(jobPosting string, cv, letter map[string]interface{}, schem
 
 	// Validate output has required fields
 	if output.CV == nil || output.Letter == nil {
-		return nil, nil, fmt.Errorf("invalid output: missing cv or letter fields")
+		// Debug: show what we actually got
+		fmt.Fprintf(os.Stderr, "Debug: Python agent output:\n%s\n", stdout.String())
+		return nil, nil, fmt.Errorf("invalid output: missing cv or letter fields (cv=%v, letter=%v)", output.CV == nil, output.Letter == nil)
 	}
 
 	return output.CV, output.Letter, nil
