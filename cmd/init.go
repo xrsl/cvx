@@ -16,114 +16,32 @@ import (
 	"github.com/xrsl/cvx/pkg/gh"
 	"github.com/xrsl/cvx/pkg/project"
 	"github.com/xrsl/cvx/pkg/style"
-	"github.com/xrsl/cvx/pkg/workflow"
 )
+
+const defaultSchemaPath = ".github/ISSUE_TEMPLATE/job-ad-schema.yaml"
 
 var initCmd = &cobra.Command{
 	Use:   "init",
-	Short: "Initialize cvx for this repository",
-	Long: `Initialize cvx configuration and directory structure.
-
-Creates:
-  cvx.toml            Configuration file
-  .cvx/workflows/     Workflow definitions
-  .cvx/sessions/      Agent session files
-  .cvx/matches/       Match analysis outputs
+	Short: "Initialize cvx configuration",
+	Long: `Initialize cvx configuration file (cvx.toml).
 
 Run this once per repository to set up cvx.`,
 	RunE: runInit,
 }
 
-var (
-	initResetWorkflowsFlag bool
-	initDeleteFlag         bool
-	initQuietFlag          bool
-	initCheckFlag          bool
-)
-
 func init() {
-	initCmd.Flags().BoolVarP(&initResetWorkflowsFlag, "reset-workflows", "r", false, "Reset workflows to defaults")
-	initCmd.Flags().BoolVarP(&initDeleteFlag, "delete", "d", false, "Remove .cvx/ and config file")
-	initCmd.Flags().BoolVarP(&initQuietFlag, "quiet", "q", false, "Non-interactive with defaults")
-	initCmd.Flags().BoolVarP(&initCheckFlag, "check", "c", false, "Validate config resources exist")
 	rootCmd.AddCommand(initCmd)
 }
 
 func runInit(cmd *cobra.Command, args []string) error {
-	// Handle --delete flag
-	if initDeleteFlag {
-		_ = os.RemoveAll(".cvx")
-		_ = os.Remove(config.Path())
-		fmt.Printf("%s Deleted\n", style.C(style.Green, "✓"))
-		return nil
-	}
-
-	// Handle --check flag
-	if initCheckFlag {
-		cfg, _, err := config.LoadWithCache()
-		if err != nil {
-			return fmt.Errorf("no config found: %w", err)
-		}
-		validateConfig(cfg)
+	// Check if already initialized
+	if _, err := os.Stat(config.Path()); err == nil {
+		fmt.Printf("%s Already initialized\n", style.C(style.Green, "✓"))
+		fmt.Printf("  Config: %s\n\n", style.C(style.Gray, config.Path()))
 		return nil
 	}
 
 	reader := bufio.NewReader(os.Stdin)
-
-	// Handle --reset-workflows flag
-	if initResetWorkflowsFlag {
-		if err := workflow.ResetWorkflows(); err != nil {
-			return fmt.Errorf("failed to reset workflows: %w", err)
-		}
-		fmt.Printf("%s Workflows reset to defaults\n", style.C(style.Green, "✓"))
-		return nil
-	}
-
-	// Handle --quiet flag
-	if initQuietFlag {
-		repo := inferRepo()
-		if repo == "" {
-			return fmt.Errorf("could not infer repo from git remote")
-		}
-		owner := ""
-		if parts := strings.Split(repo, "/"); len(parts) == 2 {
-			owner = parts[0]
-		}
-		cfg := &config.Config{
-			GitHub: config.GitHubConfig{Repo: repo, Project: owner + "/1"},
-			Agent:  config.AgentConfig{Default: "claude"},
-			Schema: config.SchemaConfig{JobAd: workflow.DefaultSchemaPath},
-			Paths:  config.PathsConfig{Reference: "reference/"},
-			CV:     config.CVConfig{Source: "src/cv.yaml", Output: "out/cv.pdf", Schema: "schema/schema.json"},
-			Letter: config.LetterConfig{Source: "src/letter.yaml", Output: "out/letter.pdf", Schema: "schema/schema.json"},
-		}
-		if err := config.Save(cfg); err != nil {
-			return fmt.Errorf("failed to save config: %w", err)
-		}
-		if err := workflow.Init(workflow.DefaultSchemaPath); err != nil {
-			return fmt.Errorf("failed to init workflows: %w", err)
-		}
-		fmt.Printf("%s Initialized with defaults\n", style.C(style.Green, "✓"))
-		return nil
-	}
-
-	// Check if already initialized
-	_, configExists := os.Stat(config.Path())
-	_, cvxDirExists := os.Stat(".cvx")
-
-	if configExists == nil && cvxDirExists == nil {
-		fmt.Printf("%s Already initialized\n", style.C(style.Green, "✓"))
-		fmt.Printf("  Config: %s\n\n", style.C(style.Gray, config.Path()))
-		cfg, _ := config.Load()
-		schemaPath := cfg.Schema.JobAd
-		if schemaPath == "" {
-			schemaPath = workflow.DefaultSchemaPath
-		}
-		if err := workflow.Init(schemaPath); err != nil {
-			fmt.Printf("  Warning: %v\n", err)
-		}
-		return nil
-	}
 
 	cfg, _ := config.Load()
 	if cfg == nil {
@@ -277,7 +195,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 	// Step 6: Job ad schema
 	jobAdSchema := cfg.Schema.JobAd
 	if jobAdSchema == "" {
-		jobAdSchema = workflow.DefaultSchemaPath
+		jobAdSchema = defaultSchemaPath
 	}
 	fmt.Printf("%s Job ad schema %s: ", style.C(style.Green, "?"), style.C(style.Cyan, "["+jobAdSchema+"]"))
 	input, _ = reader.ReadString('\n')
@@ -343,14 +261,10 @@ func runInit(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to save config: %w", err)
 	}
 
-	// Initialize .cvx directory structure
-	if err := workflow.Init(cfg.Schema.JobAd); err != nil {
-		fmt.Printf("  Warning: Could not initialize .cvx/ directory: %v\n", err)
-	}
-
-	fmt.Printf("%s\n", style.C(style.Green, style.Bold+"Ready!"))
+	fmt.Printf("\n%s Configuration saved to %s\n", style.C(style.Green, "✓"), config.Path())
+	fmt.Printf("\n%s Next steps:\n", style.C(style.Blue, "→"))
 	fmt.Printf("  %s    Add a job posting\n", style.C(style.Cyan, "cvx add <job-url>"))
-	fmt.Printf("  %s   Analyze job match\n\n", style.C(style.Cyan, "cvx advise <issue>"))
+	fmt.Printf("  %s  Build tailored CV/letter\n\n", style.C(style.Cyan, "cvx build <issue>"))
 	return nil
 }
 
@@ -489,7 +403,7 @@ func validateConfig(cfg *config.Config) {
 		}
 	}
 
-	if cfg.Schema.JobAd != "" && cfg.Schema.JobAd != workflow.DefaultSchemaPath {
+	if cfg.Schema.JobAd != "" && cfg.Schema.JobAd != defaultSchemaPath {
 		if _, err := os.Stat(cfg.Schema.JobAd); os.IsNotExist(err) {
 			warn(fmt.Sprintf("job-ad schema %s does not exist", cfg.Schema.JobAd))
 		}
