@@ -677,7 +677,16 @@ func writeYAMLCV(path string, cv map[string]interface{}, schemaPath string) erro
 		finalData = append([]byte(schemaComment), data...)
 	}
 
-	return os.WriteFile(path, finalData, 0o644)
+	if err := os.WriteFile(path, finalData, 0o644); err != nil {
+		return err
+	}
+
+	// Auto-format TOML files with tombi if available
+	if strings.HasSuffix(path, ".toml") {
+		formatTOML(path)
+	}
+
+	return nil
 }
 
 // writeYAMLLetter writes letter data back to letter.yaml or letter.toml
@@ -721,7 +730,26 @@ func writeYAMLLetter(path string, letter map[string]interface{}, schemaPath stri
 		finalData = append([]byte(schemaComment), data...)
 	}
 
-	return os.WriteFile(path, finalData, 0o644)
+	if err := os.WriteFile(path, finalData, 0o644); err != nil {
+		return err
+	}
+
+	// Auto-format TOML files with tombi if available
+	if strings.HasSuffix(path, ".toml") {
+		formatTOML(path)
+	}
+
+	return nil
+}
+
+// formatTOML formats a TOML file using tombi if available
+func formatTOML(path string) {
+	if _, err := exec.LookPath("tombi"); err != nil {
+		return // tombi not available, skip formatting
+	}
+
+	cmd := exec.Command("tombi", "format", path)
+	_ = cmd.Run() // ignore errors - formatting is best-effort
 }
 
 // callPythonAgent calls the Python agent subprocess with JSON stdin/stdout
