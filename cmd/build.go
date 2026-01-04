@@ -14,6 +14,7 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/pelletier/go-toml/v2"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 
@@ -591,15 +592,23 @@ func readYAMLCV(path string) (map[string]interface{}, error) {
 	}
 
 	var wrapper struct {
-		CV map[string]interface{} `yaml:"cv"`
+		CV map[string]interface{} `yaml:"cv" toml:"cv"`
 	}
-	if err := yaml.Unmarshal(data, &wrapper); err != nil {
-		return nil, err
+
+	// Detect format based on file extension
+	if strings.HasSuffix(path, ".toml") {
+		if err := toml.Unmarshal(data, &wrapper); err != nil {
+			return nil, err
+		}
+	} else {
+		if err := yaml.Unmarshal(data, &wrapper); err != nil {
+			return nil, err
+		}
 	}
 	return wrapper.CV, nil
 }
 
-// readYAMLLetter reads letter.yaml and extracts the letter field
+// readYAMLLetter reads letter.yaml/toml and extracts the letter field
 func readYAMLLetter(path string) (map[string]interface{}, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -607,10 +616,18 @@ func readYAMLLetter(path string) (map[string]interface{}, error) {
 	}
 
 	var wrapper struct {
-		Letter map[string]interface{} `yaml:"letter"`
+		Letter map[string]interface{} `yaml:"letter" toml:"letter"`
 	}
-	if err := yaml.Unmarshal(data, &wrapper); err != nil {
-		return nil, err
+
+	// Detect format based on file extension
+	if strings.HasSuffix(path, ".toml") {
+		if err := toml.Unmarshal(data, &wrapper); err != nil {
+			return nil, err
+		}
+	} else {
+		if err := yaml.Unmarshal(data, &wrapper); err != nil {
+			return nil, err
+		}
 	}
 	return wrapper.Letter, nil
 }
@@ -646,16 +663,24 @@ func removeNilValues(data interface{}) interface{} {
 	}
 }
 
-// writeYAMLCV writes cv data back to cv.yaml
+// writeYAMLCV writes cv data back to cv.yaml or cv.toml
 func writeYAMLCV(path string, cv map[string]interface{}, schemaPath string) error {
-	// Remove nil values to avoid "null" in YAML
+	// Remove nil values to avoid "null" in output
 	cleaned := removeNilValues(cv).(map[string]interface{})
 
 	wrapper := struct {
-		CV map[string]interface{} `yaml:"cv"`
+		CV map[string]interface{} `yaml:"cv" toml:"cv"`
 	}{CV: cleaned}
 
-	data, err := yaml.Marshal(&wrapper)
+	var data []byte
+	var err error
+
+	// Detect format based on file extension
+	if strings.HasSuffix(path, ".toml") {
+		data, err = toml.Marshal(&wrapper)
+	} else {
+		data, err = yaml.Marshal(&wrapper)
+	}
 	if err != nil {
 		return err
 	}
@@ -663,7 +688,7 @@ func writeYAMLCV(path string, cv map[string]interface{}, schemaPath string) erro
 	// Prepend schema comment for IDE support (if schema path provided)
 	finalData := data
 	if schemaPath != "" {
-		// Calculate relative path from YAML file to schema
+		// Calculate relative path from file to schema
 		relPath, err := filepath.Rel(filepath.Dir(path), schemaPath)
 		if err != nil {
 			relPath = schemaPath // fallback to absolute path
@@ -675,16 +700,24 @@ func writeYAMLCV(path string, cv map[string]interface{}, schemaPath string) erro
 	return os.WriteFile(path, finalData, 0o644)
 }
 
-// writeYAMLLetter writes letter data back to letter.yaml
+// writeYAMLLetter writes letter data back to letter.yaml or letter.toml
 func writeYAMLLetter(path string, letter map[string]interface{}, schemaPath string) error {
-	// Remove nil values to avoid "null" in YAML
+	// Remove nil values to avoid "null" in output
 	cleaned := removeNilValues(letter).(map[string]interface{})
 
 	wrapper := struct {
-		Letter map[string]interface{} `yaml:"letter"`
+		Letter map[string]interface{} `yaml:"letter" toml:"letter"`
 	}{Letter: cleaned}
 
-	data, err := yaml.Marshal(&wrapper)
+	var data []byte
+	var err error
+
+	// Detect format based on file extension
+	if strings.HasSuffix(path, ".toml") {
+		data, err = toml.Marshal(&wrapper)
+	} else {
+		data, err = yaml.Marshal(&wrapper)
+	}
 	if err != nil {
 		return err
 	}
@@ -692,7 +725,7 @@ func writeYAMLLetter(path string, letter map[string]interface{}, schemaPath stri
 	// Prepend schema comment for IDE support (if schema path provided)
 	finalData := data
 	if schemaPath != "" {
-		// Calculate relative path from YAML file to schema
+		// Calculate relative path from file to schema
 		relPath, err := filepath.Rel(filepath.Dir(path), schemaPath)
 		if err != nil {
 			relPath = schemaPath // fallback to absolute path
