@@ -48,12 +48,14 @@ var (
 	buildModelFlag   string
 	buildContextFlag string
 	buildSchemaFlag  string
+	buildBranchFlag  bool
 )
 
 func init() {
 	buildCmd.Flags().StringVarP(&buildModelFlag, "model", "m", "", "Use Python agent mode with specified model (sonnet-4, flash, etc.)")
 	buildCmd.Flags().StringVarP(&buildContextFlag, "context", "c", "", "Feedback or additional context")
 	buildCmd.Flags().StringVarP(&buildSchemaFlag, "schema", "s", "", "Schema path (defaults to schema from config)")
+	buildCmd.Flags().BoolVarP(&buildBranchFlag, "branch", "b", false, "Switch to issue branch (creates if not exists, format: issue_number-company_name-role)")
 	rootCmd.AddCommand(buildCmd)
 }
 
@@ -68,6 +70,13 @@ func runBuild(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	// Handle branch switching if requested
+	if buildBranchFlag {
+		if err := ensureIssueBranch(cfg.GitHub.Repo, issueNum); err != nil {
+			return err
+		}
+	}
+
 	// Python Agent Mode (use -m flag)
 	if buildModelFlag != "" {
 		if err := os.Setenv("AI_MODEL", buildModelFlag); err != nil {
@@ -79,10 +88,6 @@ func runBuild(cmd *cobra.Command, args []string) error {
 	// Interactive CLI mode (default)
 	if cfg.Agent.Default == "" {
 		return fmt.Errorf("no CLI agent configured. Run 'cvx init' to configure")
-	}
-
-	if err := ensureIssueBranch(cfg.GitHub.Repo, issueNum); err != nil {
-		return err
 	}
 
 	return runBuildInteractive(cfg, issueNum)
