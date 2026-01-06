@@ -8,6 +8,7 @@ from cvx_agent.models import Model
 from pydantic_ai.models.google import GoogleModel
 from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.models.anthropic import AnthropicModel  # Antropic
+from pydantic_ai.models.groq import GroqModel
 
 load_dotenv()
 
@@ -26,11 +27,14 @@ FALLBACK_MODEL = os.getenv("AI_FALLBACK_MODEL", "gemini-2.5-flash")  # could be 
 def get_agent(model_name: str) -> Agent:
     """
     Return an Agent object for a given model name.
-    Supports Google, OpenAI, and Anthropic.
+    Supports Google, OpenAI, Anthropic, and Groq.
     """
     model_name_lower = model_name.lower()
+    # Check for Groq models (openai/, qwen/, llama, etc.)
+    if "openai/" in model_name_lower or "qwen/" in model_name_lower or "llama" in model_name_lower or "mixtral" in model_name_lower:
+        model = GroqModel(model_name)
     # Check for Gemini models
-    if "gemini" in model_name_lower or "flash" in model_name_lower or "pro" in model_name_lower:
+    elif "gemini" in model_name_lower or "flash" in model_name_lower or "pro" in model_name_lower:
         model = GoogleModel(model_name)
     # Check for Claude models (including shorthand names like sonnet-4, opus-4, haiku-4)
     elif "claude" in model_name_lower or "sonnet" in model_name_lower or "opus" in model_name_lower or "haiku" in model_name_lower:

@@ -37,8 +37,8 @@ func buildModelList() string {
 		entries = append(entries, modelEntry{short: short, long: model.APIName})
 	}
 
-	// Custom sort order: flash, pro, sonnet, opus
-	familyOrder := map[string]int{"flash": 0, "pro": 1, "sonnet": 2, "opus": 3}
+	// Custom sort order: flash, pro, gpt, qwen, sonnet, opus
+	familyOrder := map[string]int{"flash": 0, "pro": 1, "gpt": 2, "qwen": 3, "sonnet": 4, "opus": 5}
 	getFamily := func(name string) string {
 		for family := range familyOrder {
 			if strings.HasPrefix(name, family) {
@@ -1008,6 +1008,16 @@ func callPythonAgent(jobPosting string, cv, letter map[string]interface{}, schem
 	// Call Python agent via uvx
 	cmd := exec.Command("uvx", "--from", agentDir, "cvx-agent")
 	cmd.Stdin = bytes.NewReader(inputJSON)
+
+	// Pass environment variables to subprocess (including API keys)
+	cmd.Env = os.Environ()
+
+	// Groq models use OpenAI-compatible API, so set OPENAI_API_KEY from GROQ_API_KEY if needed
+	if groqKey := os.Getenv("GROQ_API_KEY"); groqKey != "" {
+		if os.Getenv("OPENAI_API_KEY") == "" {
+			cmd.Env = append(cmd.Env, "OPENAI_API_KEY="+groqKey)
+		}
+	}
 
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout

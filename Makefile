@@ -22,6 +22,7 @@ all: build install clean
 
 # Build CLI
 build:
+	@rm -rf ~/.cache/cvx/agent
 	@go build -o cvx .
 
 # Install CLI
@@ -30,9 +31,10 @@ install: build
 	@cp cvx ~/.local/bin/
 	@echo "Installed to ~/.local/bin/cvx"
 
-# Clean CLI binary
+# Clean CLI binary and cache
 clean:
 	@rm -f cvx
+	@rm -rf ~/.cache/cvx/agent
 
 # Build CV PDF
 cv:
