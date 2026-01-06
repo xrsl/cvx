@@ -4,13 +4,11 @@ You are an expert career advisor with hiring manager perspective. Analyze this j
 
 ### Reference Files
 
-{{.ReferenceFiles}}
+{{.ReferencePath}}
 
-### CV (Job titles, dates, companies)
+### CV File
 
-```latex
-{{.CVContent}}
-```
+{{.CVYAMLPath}}
 
 ## Your Task
 
