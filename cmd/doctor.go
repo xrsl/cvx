@@ -61,7 +61,7 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 			fmt.Printf("%s Letter source exists: %s\n", style.C(style.Green, "✓"), letterSource)
 		}
 
-		// Check 4: Schema file exists
+		// Check 5: Schema file exists
 		schemaPath := cfg.CV.Schema
 		if schemaPath == "" {
 			schemaPath = "schema/schema.json"
@@ -71,42 +71,69 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 		} else {
 			fmt.Printf("%s Schema exists: %s\n", style.C(style.Green, "✓"), schemaPath)
 		}
+	}
 
-		// Check 5: GitHub repo configured
-		if cfg.GitHub.Repo == "" {
-			fmt.Printf("%s GitHub repo not configured\n", style.C(style.Yellow, "⚠"))
-		} else {
-			fmt.Printf("%s GitHub repo: %s\n", style.C(style.Green, "✓"), cfg.GitHub.Repo)
-		}
+	// Check 6: gh installed (GitHub CLI)
+	ghInstalled := false
+	if _, err := exec.LookPath("gh"); err != nil {
+		fmt.Printf("%s gh not installed (GitHub CLI)\n", style.C(style.Yellow, "⚠"))
+		fmt.Printf("  Install: https://cli.github.com/\n")
+	} else {
+		fmt.Printf("%s gh installed\n", style.C(style.Green, "✓"))
+		ghInstalled = true
+	}
 
-		// Check 6: Agent configured
-		if cfg.Agent.Default == "" {
-			fmt.Printf("%s No default agent configured\n", style.C(style.Yellow, "⚠"))
-		} else {
-			// Check if CLI agent is available
-			cmdName := ""
-			if strings.HasPrefix(cfg.Agent.Default, "claude") {
-				cmdName = "claude"
-			} else if strings.HasPrefix(cfg.Agent.Default, "gemini") {
-				cmdName = "gemini"
-			}
+	// Check 7: GitHub repo configured
+	if cfg != nil && cfg.GitHub.Repo == "" {
+		fmt.Printf("%s GitHub repo not configured\n", style.C(style.Yellow, "⚠"))
+	} else if cfg != nil {
+		fmt.Printf("%s GitHub repo: %s\n", style.C(style.Green, "✓"), cfg.GitHub.Repo)
+	}
 
-			if cmdName != "" {
-				if _, err := exec.LookPath(cmdName); err != nil {
-					fmt.Printf("%s %s CLI not found (for interactive mode)\n", style.C(style.Yellow, "⚠"), cmdName)
-				} else {
-					fmt.Printf("%s %s CLI available\n", style.C(style.Green, "✓"), cmdName)
+	// Check 8: GitHub project configured and exists
+	if cfg != nil && cfg.GitHub.Project == "" {
+		fmt.Printf("%s GitHub project not configured\n", style.C(style.Yellow, "⚠"))
+	} else if cfg != nil {
+		// First show it's configured
+		fmt.Printf("%s GitHub project: %s\n", style.C(style.Green, "✓"), cfg.GitHub.Project)
+
+		// Then check if it exists (if gh is installed)
+		if ghInstalled {
+			parts := strings.Split(cfg.GitHub.Project, "/")
+			if len(parts) == 2 {
+				checkCmd := exec.Command("gh", "project", "view", parts[1], "--owner", parts[0], "--format", "json")
+				if err := checkCmd.Run(); err != nil {
+					fmt.Printf("%s GitHub project not accessible: %s\n", style.C(style.Yellow, "⚠"), cfg.GitHub.Project)
+					fmt.Printf("  Check authentication: gh auth status\n")
 				}
 			}
 		}
 	}
 
-	// Check 7: uv installed (required for Python agent mode)
+	// Check 9: uv installed (required for Python agent mode)
 	if _, err := exec.LookPath("uv"); err != nil {
 		fmt.Printf("%s uv not installed (required for -m flag)\n", style.C(style.Yellow, "⚠"))
 		fmt.Printf("  Install: https://docs.astral.sh/uv/\n")
 	} else {
 		fmt.Printf("%s uv installed\n", style.C(style.Green, "✓"))
+	}
+
+	// Check 10: Agent CLI available
+	if cfg != nil && cfg.Agent.Default != "" {
+		cmdName := ""
+		if strings.HasPrefix(cfg.Agent.Default, "claude") {
+			cmdName = "claude"
+		} else if strings.HasPrefix(cfg.Agent.Default, "gemini") {
+			cmdName = "gemini"
+		}
+
+		if cmdName != "" {
+			if _, err := exec.LookPath(cmdName); err != nil {
+				fmt.Printf("%s %s CLI not found (for interactive mode)\n", style.C(style.Yellow, "⚠"), cmdName)
+			} else {
+				fmt.Printf("%s %s CLI available\n", style.C(style.Green, "✓"), cmdName)
+			}
+		}
 	}
 
 	fmt.Println()
