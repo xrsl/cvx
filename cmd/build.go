@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
 	"text/template"
 	"time"
@@ -23,6 +24,45 @@ import (
 	"github.com/xrsl/cvx/pkg/style"
 	"github.com/xrsl/cvx/pkg/workflow"
 )
+
+// buildModelList generates a formatted list of supported models for help text
+func buildModelList() string {
+	// Collect model names and sort them for consistent output
+	type modelEntry struct {
+		short string
+		long  string
+	}
+	entries := make([]modelEntry, 0, len(ai.SupportedModelMap))
+	for short, model := range ai.SupportedModelMap {
+		entries = append(entries, modelEntry{short: short, long: model.APIName})
+	}
+
+	// Custom sort order: flash, pro, sonnet, opus
+	familyOrder := map[string]int{"flash": 0, "pro": 1, "sonnet": 2, "opus": 3}
+	getFamily := func(name string) string {
+		for family := range familyOrder {
+			if strings.HasPrefix(name, family) {
+				return family
+			}
+		}
+		return name
+	}
+
+	sort.Slice(entries, func(i, j int) bool {
+		famI, famJ := getFamily(entries[i].short), getFamily(entries[j].short)
+		if familyOrder[famI] != familyOrder[famJ] {
+			return familyOrder[famI] < familyOrder[famJ]
+		}
+		// Within same family, sort by name (version)
+		return entries[i].short < entries[j].short
+	})
+
+	var sb strings.Builder
+	for _, e := range entries {
+		sb.WriteString(fmt.Sprintf("  %-12s → %s\n", e.short, e.long))
+	}
+	return sb.String()
+}
 
 var buildCmd = &cobra.Command{
 	Use:   "build [issue-number]",
@@ -39,7 +79,10 @@ Examples:
   cvx build -c "focus on ML"     # Interactive with context
 
   cvx build -m sonnet-4          # Python agent mode
-  cvx build -m flash             # Python agent with Gemini`,
+  cvx build -m flash-2-5         # Python agent with Gemini
+
+Supported models (short → full name):
+` + buildModelList(),
 	Args: cobra.MaximumNArgs(1),
 	RunE: runBuild,
 }
@@ -79,7 +122,12 @@ func runBuild(cmd *cobra.Command, args []string) error {
 
 	// Python Agent Mode (use -m flag)
 	if buildModelFlag != "" {
-		if err := os.Setenv("AI_MODEL", buildModelFlag); err != nil {
+		// Resolve short model name to full API name
+		modelConfig, ok := ai.GetModel(buildModelFlag)
+		if !ok {
+			return fmt.Errorf("unsupported model: %s (supported: %v)", buildModelFlag, ai.SupportedModelNames())
+		}
+		if err := os.Setenv("AI_MODEL", modelConfig.APIName); err != nil {
 			return fmt.Errorf("failed to set AI_MODEL: %w", err)
 		}
 		return runBuildWithPythonAgent(cfg, issueNum)
@@ -113,7 +161,6 @@ func resolveIssueNumber(args []string) (string, error) {
 	fmt.Printf("Using issue #%s (from branch %s)\n", issueNum, currentBranch)
 	return issueNum, nil
 }
-
 
 func runBuildInteractive(cfg *config.Config, issueNum string) error {
 	agent := cfg.AgentCLI()
@@ -990,11 +1037,42 @@ func callPythonAgent(jobPosting string, cv, letter map[string]interface{}, schem
 	return output.CV, output.Letter, nil
 }
 
+// callPythonAgentWithSpinner wraps callPythonAgent with a spinner
+func callPythonAgentWithSpinner(modelName string, jobPosting string, cv, letter map[string]interface{}, schemaPath string) (cvOut, letterOut map[string]interface{}, err error) {
+	// Start spinner
+	done := make(chan bool)
+	go func() {
+		i := 0
+		for {
+			select {
+			case <-done:
+				fmt.Fprintf(os.Stderr, "\r\033[K")
+				return
+			default:
+				msg := fmt.Sprintf("Building with 🤖 %s...", modelName)
+				fmt.Fprintf(os.Stderr, "\r%s %s", style.C(style.Cyan, spinnerFrames[i%len(spinnerFrames)]), msg)
+				time.Sleep(80 * time.Millisecond)
+				i++
+			}
+		}
+	}()
+
+	cvOut, letterOut, err = callPythonAgent(jobPosting, cv, letter, schemaPath)
+
+	done <- true
+	close(done)
+
+	return cvOut, letterOut, err
+}
+
 // runBuildWithPythonAgent executes the build command using the Python agent
 // This mode is triggered when -m flag is used without --call-api-directly
 func runBuildWithPythonAgent(cfg *config.Config, issueNum string) error {
-	fmt.Printf("%s Building with Python agent for issue %s\n",
-		style.C(style.Green, "▶"), style.C(style.Cyan, "#"+issueNum))
+	// Get full model name from AI_MODEL env var (already set to full API name)
+	modelFullName := os.Getenv("AI_MODEL")
+
+	fmt.Printf("%s Building with 🤖 %s for issue %s\n",
+		style.C(style.Green, "▶"), style.C(style.Cyan, modelFullName), style.C(style.Cyan, "#"+issueNum))
 
 	// 1. Fetch job posting from GitHub
 	issueBody, err := fetchIssueBody(cfg.GitHub.Repo, issueNum)
@@ -1031,9 +1109,8 @@ func runBuildWithPythonAgent(cfg *config.Config, issueNum string) error {
 		schemaPath = "schema/schema.json" // fallback default
 	}
 
-	// 4. Call Python agent
-	fmt.Printf("%s Calling Python agent...\n", style.C(style.Cyan, "⧗"))
-	cvOut, letterOut, err := callPythonAgent(issueBody, cv, letter, schemaPath)
+	// 4. Call Python agent with spinner
+	cvOut, letterOut, err := callPythonAgentWithSpinner(modelFullName, issueBody, cv, letter, schemaPath)
 	if err != nil {
 		return err
 	}
