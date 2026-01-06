@@ -1,4 +1,5 @@
 import os
+import sys
 import json
 from dotenv import load_dotenv
 
@@ -82,6 +83,6 @@ def build_cv_and_letter(input_data: dict, max_retries=2) -> dict:
                 output_dict = result.output.model_dump(exclude_none=False)
                 return output_dict
             except Exception as e:
-                print(f"Attempt {attempt+1} failed with {model_name}: {e}")
+                print(f"Attempt {attempt+1} failed with {model_name}: {e}", file=sys.stderr)
 
     raise RuntimeError("All AI attempts failed")
