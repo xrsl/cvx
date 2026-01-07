@@ -140,7 +140,11 @@ func Save(c *Config) error {
 	}
 	// Convert single quotes to double quotes
 	output := strings.ReplaceAll(buf.String(), "'", "\"")
-	return os.WriteFile(configFile, []byte(output), 0o644)
+	if err := os.WriteFile(configFile, []byte(output), 0o644); err != nil {
+		return err
+	}
+	// Reload viper config after writing
+	return v.ReadInConfig()
 }
 
 func SaveProject(owner string, number int, cache ProjectCache) error {

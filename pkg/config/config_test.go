@@ -97,11 +97,14 @@ func TestSaveProject(t *testing.T) {
 }
 
 func TestConfigPath(t *testing.T) {
+	tmpDir := t.TempDir()
+	ResetForTest(tmpDir)
+
+	expectedPath := tmpDir + "/cvx.toml"
 	path := Path()
-	if path == "cvx.toml" {
-		return
+	if path != expectedPath {
+		t.Errorf("Expected path '%s', got '%s'", expectedPath, path)
 	}
-	t.Errorf("Expected path 'cvx.toml', got '%s'", path)
 }
 
 func TestConfigFileCreated(t *testing.T) {

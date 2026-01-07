@@ -39,3 +39,5 @@ build/
 *.synctex.gz
 *.bbl
 *.blg
+
+TODO.md
