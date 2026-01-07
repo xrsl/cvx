@@ -26,154 +26,174 @@ func init() {
 func runDoctor(cmd *cobra.Command, args []string) error {
 	fmt.Printf("%s Checking cvx setup\n\n", style.C(style.Blue, "→"))
 
-	allGood := true
+	cfg, configOK := checkConfigFiles()
+	_ = checkGitHub(cfg)
+	checkPythonDeps()
+	checkAgentCLI(cfg)
 
-	// Check 1: cvx.toml exists
+	fmt.Println()
+	hasAPIKeys := checkAPICredentials()
+	fmt.Println()
+
+	if configOK && hasAPIKeys {
+		fmt.Printf("%s Setup OK\n", style.C(style.Green, "✓"))
+		return nil
+	}
+
+	if !configOK {
+		return fmt.Errorf("setup issues detected")
+	}
+
+	return nil
+}
+
+func checkConfigFiles() (*config.Config, bool) {
 	cfg, err := config.Load()
 	if err != nil {
 		fmt.Printf("%s cvx.toml not found or invalid\n", style.C(style.Red, "✗"))
 		fmt.Printf("  Run: cvx init\n")
-		allGood = false
-	} else {
-		fmt.Printf("%s cvx.toml configured\n", style.C(style.Green, "✓"))
-
-		// Check 2: CV source file exists
-		cvSource := cfg.CV.Source
-		if cvSource == "" {
-			cvSource = "src/cv.yaml"
-		}
-		if _, err := os.Stat(cvSource); err != nil {
-			fmt.Printf("%s CV source not found: %s\n", style.C(style.Red, "✗"), cvSource)
-			allGood = false
-		} else {
-			fmt.Printf("%s CV source exists: %s\n", style.C(style.Green, "✓"), cvSource)
-		}
-
-		// Check 3: Letter source file exists
-		letterSource := cfg.Letter.Source
-		if letterSource == "" {
-			letterSource = "src/letter.yaml"
-		}
-		if _, err := os.Stat(letterSource); err != nil {
-			fmt.Printf("%s Letter source not found: %s\n", style.C(style.Red, "✗"), letterSource)
-			allGood = false
-		} else {
-			fmt.Printf("%s Letter source exists: %s\n", style.C(style.Green, "✓"), letterSource)
-		}
-
-		// Check 5: Schema file exists
-		schemaPath := cfg.CV.Schema
-		if schemaPath == "" {
-			schemaPath = "schema/schema.json"
-		}
-		if _, err := os.Stat(schemaPath); err != nil {
-			fmt.Printf("%s Schema not found: %s\n", style.C(style.Yellow, "⚠"), schemaPath)
-		} else {
-			fmt.Printf("%s Schema exists: %s\n", style.C(style.Green, "✓"), schemaPath)
-		}
+		return nil, false
 	}
 
-	// Check 6: gh installed (GitHub CLI)
-	ghInstalled := false
+	fmt.Printf("%s cvx.toml configured\n", style.C(style.Green, "✓"))
+
+	allGood := checkSourceFile(cfg.CV.Source, "src/cv.yaml", "CV")
+	allGood = checkSourceFile(cfg.Letter.Source, "src/letter.yaml", "Letter") && allGood
+	checkSchemaFile(cfg.CV.Schema, "schema/schema.json")
+
+	return cfg, allGood
+}
+
+func checkSourceFile(source, defaultPath, label string) bool {
+	if source == "" {
+		source = defaultPath
+	}
+	if _, err := os.Stat(source); err != nil {
+		fmt.Printf("%s %s source not found: %s\n", style.C(style.Red, "✗"), label, source)
+		return false
+	}
+	fmt.Printf("%s %s source exists: %s\n", style.C(style.Green, "✓"), label, source)
+	return true
+}
+
+func checkSchemaFile(schemaPath, defaultPath string) {
+	if schemaPath == "" {
+		schemaPath = defaultPath
+	}
+	if _, err := os.Stat(schemaPath); err != nil {
+		fmt.Printf("%s Schema not found: %s\n", style.C(style.Yellow, "⚠"), schemaPath)
+	} else {
+		fmt.Printf("%s Schema exists: %s\n", style.C(style.Green, "✓"), schemaPath)
+	}
+}
+
+func checkGitHub(cfg *config.Config) bool {
+	ghInstalled := checkGHInstalled()
+	checkGitHubRepo(cfg)
+	checkGitHubProject(cfg, ghInstalled)
+	return ghInstalled
+}
+
+func checkGHInstalled() bool {
 	if _, err := exec.LookPath("gh"); err != nil {
 		fmt.Printf("%s gh not installed (GitHub CLI)\n", style.C(style.Yellow, "⚠"))
 		fmt.Printf("  Install: https://cli.github.com/\n")
-	} else {
-		fmt.Printf("%s gh installed\n", style.C(style.Green, "✓"))
-		ghInstalled = true
+		return false
 	}
+	fmt.Printf("%s gh installed\n", style.C(style.Green, "✓"))
+	return true
+}
 
-	// Check 7: GitHub repo configured
-	if cfg != nil && cfg.GitHub.Repo == "" {
+func checkGitHubRepo(cfg *config.Config) {
+	if cfg == nil {
+		return
+	}
+	if cfg.GitHub.Repo == "" {
 		fmt.Printf("%s GitHub repo not configured\n", style.C(style.Yellow, "⚠"))
-	} else if cfg != nil {
+	} else {
 		fmt.Printf("%s GitHub repo: %s\n", style.C(style.Green, "✓"), cfg.GitHub.Repo)
 	}
+}
 
-	// Check 8: GitHub project configured and exists
-	if cfg != nil && cfg.GitHub.Project == "" {
+func checkGitHubProject(cfg *config.Config, ghInstalled bool) {
+	if cfg == nil {
+		return
+	}
+	if cfg.GitHub.Project == "" {
 		fmt.Printf("%s GitHub project not configured\n", style.C(style.Yellow, "⚠"))
-	} else if cfg != nil {
-		// First show it's configured
-		fmt.Printf("%s GitHub project: %s\n", style.C(style.Green, "✓"), cfg.GitHub.Project)
-
-		// Then check if it exists (if gh is installed)
-		if ghInstalled {
-			parts := strings.Split(cfg.GitHub.Project, "/")
-			if len(parts) == 2 {
-				checkCmd := exec.Command("gh", "project", "view", parts[1], "--owner", parts[0], "--format", "json")
-				if err := checkCmd.Run(); err != nil {
-					fmt.Printf("%s GitHub project not accessible: %s\n", style.C(style.Yellow, "⚠"), cfg.GitHub.Project)
-					fmt.Printf("  Check authentication: gh auth status\n")
-				}
-			}
-		}
+		return
 	}
 
-	// Check 9: uv installed (required for Python agent mode)
+	fmt.Printf("%s GitHub project: %s\n", style.C(style.Green, "✓"), cfg.GitHub.Project)
+
+	if !ghInstalled {
+		return
+	}
+
+	parts := strings.Split(cfg.GitHub.Project, "/")
+	if len(parts) != 2 {
+		return
+	}
+
+	checkCmd := exec.Command("gh", "project", "view", parts[1], "--owner", parts[0], "--format", "json")
+	if err := checkCmd.Run(); err != nil {
+		fmt.Printf("%s GitHub project not accessible: %s\n", style.C(style.Yellow, "⚠"), cfg.GitHub.Project)
+		fmt.Printf("  Check authentication: gh auth status\n")
+	}
+}
+
+func checkPythonDeps() {
 	if _, err := exec.LookPath("uv"); err != nil {
 		fmt.Printf("%s uv not installed (required for -m flag)\n", style.C(style.Yellow, "⚠"))
 		fmt.Printf("  Install: https://docs.astral.sh/uv/\n")
 	} else {
 		fmt.Printf("%s uv installed\n", style.C(style.Green, "✓"))
 	}
+}
 
-	// Check 10: Agent CLI available
-	if cfg != nil && cfg.Agent.Default != "" {
-		cmdName := ""
-		if strings.HasPrefix(cfg.Agent.Default, "claude") {
-			cmdName = "claude"
-		} else if strings.HasPrefix(cfg.Agent.Default, "gemini") {
-			cmdName = "gemini"
-		}
-
-		if cmdName != "" {
-			if _, err := exec.LookPath(cmdName); err != nil {
-				fmt.Printf("%s %s CLI not found (for interactive mode)\n", style.C(style.Yellow, "⚠"), cmdName)
-			} else {
-				fmt.Printf("%s %s CLI available\n", style.C(style.Green, "✓"), cmdName)
-			}
-		}
+func checkAgentCLI(cfg *config.Config) {
+	if cfg == nil || cfg.Agent.Default == "" {
+		return
 	}
 
-	fmt.Println()
+	cmdName := ""
+	if strings.HasPrefix(cfg.Agent.Default, "claude") {
+		cmdName = "claude"
+	} else if strings.HasPrefix(cfg.Agent.Default, "gemini") {
+		cmdName = "gemini"
+	}
 
-	// Check environment variables
+	if cmdName == "" {
+		return
+	}
+
+	if _, err := exec.LookPath(cmdName); err != nil {
+		fmt.Printf("%s %s CLI not found (for interactive mode)\n", style.C(style.Yellow, "⚠"), cmdName)
+	} else {
+		fmt.Printf("%s %s CLI available\n", style.C(style.Green, "✓"), cmdName)
+	}
+}
+
+func checkAPICredentials() bool {
 	fmt.Printf("%s Checking API credentials\n\n", style.C(style.Blue, "→"))
 
-	hasAnthropicKey := os.Getenv("ANTHROPIC_API_KEY") != ""
-	hasGeminiKey := os.Getenv("GEMINI_API_KEY") != ""
-	hasOpenAIKey := os.Getenv("OPENAI_API_KEY") != ""
+	hasAnthropicKey := checkEnvVar("ANTHROPIC_API_KEY", "required for Claude")
+	hasGeminiKey := checkEnvVar("GEMINI_API_KEY", "required for Gemini")
+	checkEnvVar("OPENAI_API_KEY", "optional, for GPT models")
 
-	if hasAnthropicKey {
-		fmt.Printf("%s ANTHROPIC_API_KEY set\n", style.C(style.Green, "✓"))
-	} else {
-		fmt.Printf("%s ANTHROPIC_API_KEY not set (required for Claude)\n", style.C(style.Yellow, "⚠"))
+	return hasAnthropicKey || hasGeminiKey
+}
+
+func checkEnvVar(envVar, description string) bool {
+	if os.Getenv(envVar) != "" {
+		fmt.Printf("%s %s set\n", style.C(style.Green, "✓"), envVar)
+		return true
 	}
 
-	if hasGeminiKey {
-		fmt.Printf("%s GEMINI_API_KEY set\n", style.C(style.Green, "✓"))
-	} else {
-		fmt.Printf("%s GEMINI_API_KEY not set (required for Gemini)\n", style.C(style.Yellow, "⚠"))
+	symbol := style.C(style.Yellow, "⚠")
+	if strings.Contains(description, "optional") {
+		symbol = style.C(style.Yellow, "○")
 	}
-
-	if hasOpenAIKey {
-		fmt.Printf("%s OPENAI_API_KEY set\n", style.C(style.Green, "✓"))
-	} else {
-		fmt.Printf("%s OPENAI_API_KEY not set (optional, for GPT models)\n", style.C(style.Yellow, "○"))
-	}
-
-	fmt.Println()
-
-	if allGood && (hasAnthropicKey || hasGeminiKey) {
-		fmt.Printf("%s Setup OK\n", style.C(style.Green, "✓"))
-		return nil
-	}
-
-	if !allGood {
-		return fmt.Errorf("setup issues detected")
-	}
-
-	// Warnings don't cause exit code
-	return nil
+	fmt.Printf("%s %s not set (%s)\n", symbol, envVar, description)
+	return false
 }

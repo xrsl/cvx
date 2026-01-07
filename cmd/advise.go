@@ -114,7 +114,6 @@ func runAdvise(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("unsupported agent/model: %s", agentSetting)
 	}
 
-
 	// Get CLI agent name from agent setting
 	agent := cfg.AgentCLI()
 
