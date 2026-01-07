@@ -5,17 +5,20 @@
 Initialize cvx for the current repository.
 
 ```bash
-cvx init [flags]
+cvx init
 ```
 
-| Flag                | Short | Description                     |
-| ------------------- | ----- | ------------------------------- |
-| `--quiet`           | `-q`  | Non-interactive with defaults   |
-| `--reset-workflows` | `-r`  | Reset workflows to defaults     |
-| `--check`           | `-c`  | Validate config resources exist |
-| `--delete`          | `-d`  | Remove .cvx/ and config file    |
+Creates `cvx.toml` config file and sets up the project structure.
 
-Creates `.cvx-config.yaml` and `.cvx/` directory structure.
+**What the wizard configures:**
+
+1. **GitHub repository** - auto-detected from git remote
+2. **CLI agent** - Claude or Gemini CLI for interactive mode
+3. **CV source path** - your CV data file (TOML)
+4. **Letter source path** - your letter data file
+5. **Reference directory** - additional context for AI
+6. **Job ad schema** - template for extracted job data
+7. **GitHub Project** - create new or link existing
 
 ---
 
@@ -27,24 +30,26 @@ Add a job application from a URL.
 cvx add <url> [flags]
 ```
 
-| Flag        | Short | Description                                                               |
-| ----------- | ----- | ------------------------------------------------------------------------- |
-| `--agent`   | `-a`  | AI agent: claude-code, gemini-cli, api                                    |
-| `--model`   | `-m`  | Model: sonnet-4, sonnet-4-5, opus-4, opus-4-5, flash, pro, flash-3, pro-3 |
-| `--repo`    | `-r`  | GitHub repo (overrides config)                                            |
-| `--schema`  | `-s`  | Schema file path                                                          |
-| `--body`    | `-b`  | Read job posting from file                                                |
-| `--dry-run` |       | Extract only, don't create issue                                          |
+| Flag       | Short | Description                             |
+| ---------- | ----- | --------------------------------------- |
+| `--agent`  | `-a`  | CLI agent: `claude`, `gemini`           |
+| `--model`  | `-m`  | Model for API mode (calls API directly) |
+| `--repo`   | `-r`  | GitHub repo (overrides config)          |
+| `--schema` | `-s`  | Schema file path                        |
+| `--body`   | `-b`  | Read job posting from file              |
 
 **Examples:**
 
 ```bash
 cvx add https://company.com/job
-cvx add https://company.com/job --dry-run
-cvx add https://company.com/job -a gemini-cli       # Gemini AI agent
-cvx add https://company.com/job -m sonnet-4         # Claude AI agent with sonnet-4 model
-cvx add https://company.com/job -a api -m flash     # Gemini API directly with flash model
+cvx add https://company.com/job -a gemini          # Gemini CLI (uses agent's model)
+cvx add https://company.com/job -m sonnet-4        # Claude API directly
+cvx add https://company.com/job -m flash-2-5       # Gemini API directly
+cvx add https://company.com/job --body             # Use .cvx/body.md
+cvx add https://company.com/job -b job.md          # Use custom file
 ```
+
+**Note:** Using `-a` (agent) uses the CLI tool with its configured model. Using `-m` (model) calls the API directly.
 
 ---
 
@@ -81,25 +86,25 @@ Get career advice on job match quality.
 cvx advise <issue-or-url> [flags]
 ```
 
-| Flag            | Short | Description                                                               |
-| --------------- | ----- | ------------------------------------------------------------------------- |
-| `--agent`       | `-a`  | AI agent: claude-code, gemini-cli, api                                    |
-| `--model`       | `-m`  | Model: sonnet-4, sonnet-4-5, opus-4, opus-4-5, flash, pro, flash-3, pro-3 |
-| `--context`     | `-c`  | Additional context                                                        |
-| `--interactive` | `-i`  | Interactive session                                                       |
-| `--push`        | `-p`  | Post analysis to issue                                                    |
+| Flag                | Short | Description                             |
+| ------------------- | ----- | --------------------------------------- |
+| `--agent`           | `-a`  | CLI agent: `claude`, `gemini`           |
+| `--model`           | `-m`  | Model for API mode (calls API directly) |
+| `--context`         | `-c`  | Additional context                      |
+| `--post-as-comment` |       | Post analysis to issue                  |
 
 **Examples:**
 
 ```bash
-cvx advise 42                        # Analyze issue #42
-cvx advise 42 --push                 # Post as comment
-cvx advise 42 -a gemini-cli          # Gemini AI agent
-cvx advise 42 -m sonnet-4            # Claude AI agent with sonnet-4 model
-cvx advise 42 -a api -m flash        # Gemini API directly with flash model
-cvx advise 42 -c "Focus on backend"
-cvx advise 42 -i                     # Interactive mode
+cvx advise 42                        # Analyze issue #42 (uses default CLI agent)
+cvx advise 42 --post-as-comment      # Post as comment
+cvx advise 42 -a gemini              # Use Gemini CLI (agent's model)
+cvx advise 42 -m sonnet-4            # Use Claude API directly
+cvx advise 42 -c "Focus on backend"  # Add context
+cvx advise https://company.com/job   # Analyze URL directly
 ```
+
+**Note:** Using `-a` (agent) uses the CLI tool with its configured model. Using `-m` (model) calls the API directly.
 
 ---
 
@@ -115,95 +120,61 @@ cvx build [issue-number] [flags]
 
 `cvx build` supports two modes:
 
-#### 1. Python Agent Mode (Default)
+#### 1. Interactive CLI Mode (Default)
 
-Uses `-m` flag to specify model:
+Auto-detects `claude` or `gemini` CLI:
 
-- Structured YAML output (`src/cv.yaml`, `src/letter.yaml`)
-- Validates against `schema/schema.json`
-- Automatic caching and multi-provider fallback
-- Requires: [uv](https://docs.astral.sh/uv/) installed
+- Direct file editing with AI tool use
+- Session persistence per issue
+- Resume previous sessions
+- Uses the model configured within the CLI agent
 
 ```bash
-cvx build -m sonnet-4            # Python agent with Claude
-cvx build -m flash               # Python agent with Gemini
-cvx build -m sonnet-4 --dry-run  # Preview without AI call
-cvx build -m sonnet-4 --no-cache # Skip cache
+cvx build                        # Interactive, infer issue from branch
+cvx build 42                     # Interactive for issue #42
+cvx build -c "focus on ML"       # Interactive with context
 ```
 
-#### 2. Interactive CLI Mode
+#### 2. Python Agent Mode (API)
 
-Uses `-i` flag. Auto-detects claude-code or gemini-cli:
+Uses `-m` flag to call AI provider APIs directly:
 
-- Direct LaTeX editing (`src/cv.tex`, `src/letter.tex`)
-- Interactive sessions
-- Session persistence per issue
-- Auto-detects CLI (priority: claude-code > gemini-cli)
+- Structured TOML output
+- Validates against JSON Schema using Pydantic
+- Multi-provider support (Claude, Gemini, OpenAI, Groq)
+- Automatic fallback on failure
 
 ```bash
-cvx build -i                     # Auto-detect CLI, interactive
-cvx build 42 -i                  # Interactive for issue #42
-cvx build -i -c "focus on ML"    # Interactive with context
+cvx build -m sonnet-4            # Claude API
+cvx build -m flash-2-5           # Gemini API
+cvx build -m qwen3-32b           # Groq API
 ```
 
 ### Flags
 
-| Flag            | Short | Description                                                               |
-| --------------- | ----- | ------------------------------------------------------------------------- |
-| `--model`       | `-m`  | Model: sonnet-4, sonnet-4-5, opus-4, opus-4-5, flash, pro, flash-3, pro-3 |
-| `--interactive` | `-i`  | Interactive CLI mode (auto-detects claude-code or gemini-cli)             |
-| `--context`     | `-c`  | Feedback or additional context                                            |
-| `--dry-run`     |       | Preview without AI call (Python agent mode only)                          |
-| `--no-cache`    |       | Skip cache (Python agent mode only)                                       |
+| Flag        | Short | Description                                    |
+| ----------- | ----- | ---------------------------------------------- |
+| `--model`   | `-m`  | Use Python agent (calls API directly)          |
+| `--context` | `-c`  | Feedback or additional context                 |
+| `--schema`  | `-s`  | Schema path (overrides config)                 |
+| `--branch`  | `-b`  | Switch to issue branch (creates if not exists) |
 
 If issue-number is omitted, it's inferred from the current branch name.
 
-### Examples
+### Supported Models
 
-**Python Agent Mode:**
-
-```bash
-cvx build -m sonnet-4            # Structured YAML with caching
-cvx build -m flash               # Use Gemini
-cvx build -m sonnet-4 --dry-run  # Preview without AI call
-cvx build -m sonnet-4 --no-cache # Skip cache
-```
-
-**Interactive CLI Mode:**
-
-```bash
-cvx build -i                     # Auto-detect CLI, infer issue
-cvx build 42 -i                  # Interactive for issue #42
-cvx build -i -c "focus on ML"    # Interactive with context
-```
-
-### Python Agent Schema
-
-When using Python agent mode, CV and letter data conform to the JSON schema in `schema/schema.json`:
-
-**CV Structure:**
-
-- `name`, `email`, `phone`, `location`
-- `headline`, `expertise_tags`
-- `social_networks` (LinkedIn, GitHub, etc.)
-- `sections`:
-  - `experience` - Work history with highlights
-  - `education` - Academic background
-  - `skills` - Technical and soft skills
-  - `publications` - Research papers
-  - `honors_and_awards` - Achievements
-  - `summary` - Professional summary
-
-**Letter Structure:**
-
-- `sender` - Your contact information
-- `recipient` - Company/hiring manager details
-- `metadata` - Date, position applied
-- `content`:
-  - `salutation` - Opening greeting
-  - `opening` - Introduction paragraph
-  - `body` - Main paragraphs
-  - `closing` - Conclusion and sign-off
+| Short Name     | Full API Name          |
+| -------------- | ---------------------- |
+| `sonnet-4`     | claude-sonnet-4        |
+| `sonnet-4-5`   | claude-sonnet-4-5      |
+| `opus-4`       | claude-opus-4          |
+| `opus-4-5`     | claude-opus-4-5        |
+| `flash-2-5`    | gemini-2.5-flash       |
+| `pro-2-5`      | gemini-2.5-pro         |
+| `flash-3`      | gemini-3-flash-preview |
+| `pro-3`        | gemini-3-pro-preview   |
+| `gpt-oss-120b` | openai/gpt-oss-120b    |
+| `qwen3-32b`    | qwen/qwen3-32b         |
 
 ---
 
@@ -221,6 +192,7 @@ This command:
 2. Creates a git tag: `<issue>-<company>-<role>-YYYY-MM-DD`
 3. Pushes the tag to origin
 4. Updates GitHub project status to "Applied"
+5. Sets AppliedDate field
 
 If issue-number is omitted, it's inferred from the current branch name.
 
@@ -246,7 +218,7 @@ cvx view <issue> [flags]
 | `--letter` | `-l`  | Open cover letter |
 | `--cv`     | `-c`  | Open CV only      |
 
-Opens the PDF from the git tag created when the application was submitted. By default, opens the combined PDF (CV + letter) if available, otherwise falls back to CV.
+Opens the PDF from the git tag created when the application was submitted.
 
 **Examples:**
 
@@ -276,3 +248,36 @@ cvx rm <issue> [flags]
 cvx rm 123
 cvx rm 123 -r owner/repo
 ```
+
+---
+
+## cvx completion
+
+Generate shell completion scripts.
+
+```bash
+cvx completion [bash|zsh|fish|powershell]
+```
+
+**Examples:**
+
+```bash
+# Bash
+cvx completion bash > /etc/bash_completion.d/cvx
+
+# Zsh
+cvx completion zsh > "${fpath[1]}/_cvx"
+
+# Fish
+cvx completion fish > ~/.config/fish/completions/cvx.fish
+```
+
+---
+
+## Global Flags
+
+| Flag         | Short | Description                                     |
+| ------------ | ----- | ----------------------------------------------- |
+| `--quiet`    | `-q`  | Suppress non-essential output                   |
+| `--verbose`  | `-v`  | Enable debug logging                            |
+| `--env-file` | `-e`  | Path to .env file (overrides default locations) |

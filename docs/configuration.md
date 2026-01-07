@@ -2,64 +2,127 @@
 
 ## Config File
 
-Located at `.cvx-config.yaml` in your repo root:
+The configuration file is `cvx.toml` in your repo root (created by `cvx init`).
 
-```yaml
-repo: owner/repo
-agent: claude-code
-cv_path: src/cv.tex
-reference_path: reference/
-project: owner/1
+```toml
+[github]
+repo = "owner/repo"
+project = "owner/number"
+
+[agent]
+default = "claude"          # Default CLI agent for interactive mode
+
+[cv]
+source = "src/cv.toml"      # CV data source (toml)
+output = "out/cv.pdf"       # Generated CV output
+schema = "schema/schema.json"
+
+[letter]
+source = "src/letter.toml"  # Letter data source (toml)
+output = "out/letter.pdf"   # Generated letter output
+schema = "schema/schema.json"
+
+[paths]
+reference = "reference/"    # Reference materials for AI
+
+[schema]
+job_ad = ".github/ISSUE_TEMPLATE/job-ad-schema.yaml"
 ```
 
-## Settings
+## Settings Reference
 
-| Key              | Description                    | Default       |
-| ---------------- | ------------------------------ | ------------- |
-| `repo`           | GitHub repository (owner/repo) | Auto-detected |
-| `agent`          | AI agent to use                | `claude-code` |
-| `schema`         | Job schema file path           | Built-in      |
-| `cv_path`        | CV file for advise/build       | `src/cv.tex`  |
-| `reference_path` | Reference materials directory  | `reference/`  |
-| `project`        | GitHub Project (owner/number)  | -             |
+### GitHub Section
 
-## AI Agents and Models
+| Key       | Description                    | Default       |
+| --------- | ------------------------------ | ------------- |
+| `repo`    | GitHub repository (owner/repo) | Auto-detected |
+| `project` | GitHub Project (owner/number)  | -             |
 
-Use `--agent/-a` for CLI tools or `--model/-m` for API access. These flags are mutually exclusive.
+### Agent Section
 
-### CLI Agents (`--agent`)
+| Key       | Description       | Default  |
+| --------- | ----------------- | -------- |
+| `default` | Default CLI agent | `claude` |
 
-| Agent         | Notes                                                        |
-| ------------- | ------------------------------------------------------------ |
-| `claude-code` | [Claude Code CLI](https://github.com/anthropics/claude-code) |
-| `gemini-cli`  | [Gemini CLI](https://github.com/google-gemini/gemini-cli)    |
+### CV & Letter Sections
 
-### API Models (`--model`)
+| Key      | Description                | Default              |
+| -------- | -------------------------- | -------------------- |
+| `source` | Data file path (toml)      | `src/cv.toml`        |
+| `output` | Generated PDF path         | `out/cv.pdf`         |
+| `schema` | JSON schema for validation | `schema/schema.json` |
 
-| Model                    | Notes                        |
-| ------------------------ | ---------------------------- |
-| `claude-sonnet-4`        | Requires `ANTHROPIC_API_KEY` |
-| `claude-sonnet-4-5`      | Requires `ANTHROPIC_API_KEY` |
-| `claude-opus-4`          | Requires `ANTHROPIC_API_KEY` |
-| `claude-opus-4-5`        | Requires `ANTHROPIC_API_KEY` |
-| `gemini-2.5-flash`       | Requires `GEMINI_API_KEY`    |
-| `gemini-2.5-pro`         | Requires `GEMINI_API_KEY`    |
-| `gemini-3-flash-preview` | Requires `GEMINI_API_KEY`    |
-| `gemini-3-pro-preview`   | Requires `GEMINI_API_KEY`    |
+### Paths Section
 
-Priority order for default: CLI agents first (claude-code > gemini-cli), then API models.
+| Key         | Description                | Default      |
+| ----------- | -------------------------- | ------------ |
+| `reference` | Reference materials folder | `reference/` |
+
+### Schema Section
+
+| Key      | Description              | Default                                     |
+| -------- | ------------------------ | ------------------------------------------- |
+| `job_ad` | Job ad extraction schema | `.github/ISSUE_TEMPLATE/job-ad-schema.yaml` |
+
+## CLI Agents
+
+Available agents for interactive mode:
+
+| Agent    | Notes                                                     |
+| -------- | --------------------------------------------------------- |
+| `claude` | [Claude CLI](https://github.com/anthropics/claude-code)   |
+| `gemini` | [Gemini CLI](https://github.com/google-gemini/gemini-cli) |
+
+## API Models
+
+Available models for Python agent mode (`cvx build -m`):
+
+| Short Name     | Provider API Name      | Required Key        |
+| -------------- | ---------------------- | ------------------- |
+| `sonnet-4`     | claude-sonnet-4        | `ANTHROPIC_API_KEY` |
+| `sonnet-4-5`   | claude-sonnet-4-5      | `ANTHROPIC_API_KEY` |
+| `opus-4`       | claude-opus-4          | `ANTHROPIC_API_KEY` |
+| `opus-4-5`     | claude-opus-4-5        | `ANTHROPIC_API_KEY` |
+| `flash-2-5`    | gemini-2.5-flash       | `GEMINI_API_KEY`    |
+| `pro-2-5`      | gemini-2.5-pro         | `GEMINI_API_KEY`    |
+| `flash-3`      | gemini-3-flash-preview | `GEMINI_API_KEY`    |
+| `pro-3`        | gemini-3-pro-preview   | `GEMINI_API_KEY`    |
+| `gpt-oss-120b` | openai/gpt-oss-120b    | `GROQ_API_KEY`      |
+| `qwen3-32b`    | qwen/qwen3-32b         | `GROQ_API_KEY`      |
 
 ## Environment Variables
 
-| Variable            | Description                             |
-| ------------------- | --------------------------------------- |
-| `ANTHROPIC_API_KEY` | For Claude API agents                   |
-| `GEMINI_API_KEY`    | For Gemini API agents                   |
-| `CVX_*`             | Override any config (e.g., `CVX_AGENT`) |
+### API Keys
+
+| Variable            | Description            |
+| ------------------- | ---------------------- |
+| `ANTHROPIC_API_KEY` | For Claude API models  |
+| `GEMINI_API_KEY`    | For Gemini API models  |
+| `GROQ_API_KEY`      | For Groq-hosted models |
+| `OPENAI_API_KEY`    | For OpenAI models      |
+
+### Python Agent
+
+| Variable            | Description                                |
+| ------------------- | ------------------------------------------ |
+| `AI_MODEL`          | Primary model (set by cvx automatically)   |
+| `AI_FALLBACK_MODEL` | Fallback model (default: gemini-2.5-flash) |
+
+### Environment File Loading
+
+cvx loads `.env` files with the following priority:
+
+1. `--env-file` flag (highest)
+2. Current directory `.env`
+3. Git worktree main repo `.env`
+4. Parent directories `.env`
+5. `~/.config/cvx/env` (lowest)
+
+This enables API key management across git worktrees.
 
 ## GitHub Project
 
-cvx creates a project with:
+cvx creates a project with these fields:
 
 **Fields:**
 
@@ -81,11 +144,11 @@ cvx creates a project with:
 ## Directory Structure
 
 ```
-.cvx-config.yaml      # User config
+cvx.toml              # User config (editable)
 .cvx/
   cache.yaml          # Internal IDs (auto-managed)
-  workflows/          # Workflow definitions (customizable)
-  sessions/           # Agent session files
+  workflows/          # Workflow prompts (customizable)
+  sessions/           # CLI session files
   matches/            # Match analysis outputs
 ```
 
@@ -101,7 +164,7 @@ AI prompts in `.cvx/workflows/` can be edited:
 
 **Template variables:**
 
-- `{{.CVPath}}` - Path to CV file
+- `{{.CVYAMLPath}}` - Path to CV data file (legacy name, works with TOML)
 - `{{.ReferencePath}}` - Path to reference directory
 
-Reset to defaults: `cvx init -r`
+Reset to defaults: delete `cvx.toml` and run `cvx init`

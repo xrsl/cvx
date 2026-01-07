@@ -10,15 +10,17 @@
 
 # cvx
 
-`cvx` uses AI to extract job details from any job posting URL, tracks your applications in GitHub Issues + Projects, and helps you tailor your CV and cover letter using LaTeX — all from your terminal.
+**AI-powered CLI for CV tailoring and job application tracking.**
 
-## What it does
+`cvx` uses AI to extract job details from any job posting URL, tracks your applications in GitHub Issues + Projects, and tailors your CV and cover letter — all from your terminal.
 
-- **Extracts job details** from URLs using AI agents (Claude Code or Gemini CLI)
-- **Creates GitHub Issues** with structured job information using a custimizable template (default `job-ad-schema.yaml`).
-- **Tracks applications in a GitHub Project** with status, company, and deadlines
-- **Analyzes job-CV match** quality with AI agents
-- **Tailors CV and cover letter** with AI agents by editing your LaTeX source files
+## Key Features
+
+- **Multi-Provider AI**: Claude, Gemini, OpenAI, and Groq via [pydantic-ai](https://ai.pydantic.dev/)
+- **Structured Output**: Schema-validated TOML with automatic retry and fallback
+- **Interactive Mode**: Real-time editing with Claude CLI or Gemini CLI
+- **GitHub Integration**: Issues, Projects, GraphQL API for full workflow automation
+- **Polyglot Architecture**: Go CLI + embedded Python agent for AI operations
 
 ## Installation
 
@@ -28,10 +30,10 @@ go install github.com/xrsl/cvx@latest
 
 ## Requirements
 
-- `git` and [GitHub CLI](https://cli.github.com/) (`gh`) - installed and authenticated
-- One of: [Claude Code CLI](https://github.com/anthropics/claude-code), [Gemini CLI](https://github.com/google-gemini/gemini-cli), or an API key (`ANTHROPIC_API_KEY` or `GEMINI_API_KEY`)
-- LaTeX: [BasicTeX](https://tug.org/mactex/morepackages.html) (light, recommended for Mac), [MacTeX](https://tug.org/mactex/), or [TeX Live](https://tug.org/texlive/) - for building PDFs
-- [uv](https://docs.astral.sh/uv/) - required for Python agent mode (`cvx build -m`)
+- `git` + [GitHub CLI](https://cli.github.com/) (`gh`) - installed and authenticated
+- [Claude CLI](https://github.com/anthropics/claude-code) or [Gemini CLI](https://github.com/google-gemini/gemini-cli)
+- [Typst](https://typst.app/) - for PDF rendering
+- [uv](https://docs.astral.sh/uv/) - for Python agent mode
 
 ## Quickstart
 
@@ -39,222 +41,163 @@ go install github.com/xrsl/cvx@latest
 cvx init                              # Setup wizard
 cvx add https://company.com/job       # Add job posting
 cvx advise 42                         # Analyze job-CV match
-cvx build 42                          # Build tailored CV/cover letter
+cvx build 42                          # Build tailored CV/letter (interactive)
+cvx build -m sonnet-4                 # Build with Python agent (API)
 cvx approve 42                        # Commit, tag, push, update status
 cvx view 42                           # View submitted documents
 ```
 
 ## Commands
 
-### `cvx add <url>`
+| Command               | Description                                      |
+| --------------------- | ------------------------------------------------ |
+| `cvx add <url>`       | Extract job details with AI, create GitHub issue |
+| `cvx list`            | List all job applications                        |
+| `cvx advise <issue>`  | Analyze job-CV match quality                     |
+| `cvx build [issue]`   | Build tailored CV and cover letter               |
+| `cvx approve [issue]` | Commit, tag, push, update project status         |
+| `cvx view <issue>`    | View submitted documents                         |
+| `cvx rm <issue>`      | Remove job application                           |
+| `cvx init`            | Initialize configuration                         |
 
-Fetches job posting, extracts details with AI, creates GitHub issue.
+## Build Modes
 
-```bash
-cvx add https://company.com/job
-cvx add https://company.com/job --dry-run          # extract only
-cvx add https://company.com/job -a gemini          # use Gemini CLI
-cvx add https://company.com/job -m claude-sonnet-4 # use Claude API
-cvx add https://company.com/job --body             # use .cvx/body.md
-cvx add https://company.com/job -b job.md          # use custom file
-```
-
-### `cvx list`
-
-Lists all job applications with status, company, and deadline.
+### Interactive CLI Mode (Default)
 
 ```bash
-cvx list
-cvx list --state closed   # show closed issues
-cvx list --company google # filter by company
+cvx build 42                # Start/resume session
+cvx build -c "focus on ML"  # Add context
 ```
 
-### `cvx advise <issue>`
+- Direct file editing via AI tool use
+- Session persistence per issue
+- Auto-detects `claude` or `gemini` CLI
+- Uses the model configured within the CLI agent
 
-Get career advice on job match quality.
+### Python Agent Mode (API)
 
 ```bash
-cvx advise 42                         # Analyze issue #42
-cvx advise 42 --push                  # Post analysis as comment
-cvx advise 42 -a gemini               # Use Gemini CLI
-cvx advise 42 -m gemini-2.5-flash     # Use Gemini API
-cvx advise 42 -i                      # Interactive session
-cvx advise https://example.com/job
+cvx build -m sonnet-4       # Claude API
+cvx build -m flash-2-5      # Gemini API
+cvx build -m qwen3-32b      # Groq API
 ```
 
-### `cvx build [issue]`
+- Calls AI provider APIs directly
+- Structured TOML output validated against JSON Schema
+- Multi-provider support with automatic fallback
+- Uses [pydantic-ai](https://ai.pydantic.dev/) for structured generation
 
-Build tailored CV and cover letter. Automatically creates/switches to the issue branch (`42-company-role`).
+### Supported Models
 
-**Two Build Modes:**
+| Short Name     | Provider  | API Name               |
+| -------------- | --------- | ---------------------- |
+| `sonnet-4`     | Anthropic | claude-sonnet-4        |
+| `sonnet-4-5`   | Anthropic | claude-sonnet-4-5      |
+| `opus-4`       | Anthropic | claude-opus-4          |
+| `flash-2-5`    | Google    | gemini-2.5-flash       |
+| `pro-2-5`      | Google    | gemini-2.5-pro         |
+| `flash-3`      | Google    | gemini-3-flash-preview |
+| `gpt-oss-120b` | Groq      | openai/gpt-oss-120b    |
+| `qwen3-32b`    | Groq      | qwen/qwen3-32b         |
 
-1. **Python Agent** (default): Structured YAML with caching and validation
-2. **Interactive CLI**: Real-time editing with auto-detected CLI tools
+## Architecture
+
+```
+┌─────────────────────────────────────────────────────┐
+│                 Go CLI (cvx)                        │
+│  Orchestration • GitHub API • Subprocess mgmt      │
+└─────────────────────────────────────────────────────┘
+                        │
+         ┌──────────────┴──────────────┐
+         ▼                             ▼
+┌─────────────────────┐    ┌─────────────────────────┐
+│  Interactive Mode   │    │  Python Agent Mode      │
+│  claude/gemini CLI  │    │  pydantic-ai            │
+│  Direct editing     │    │  Structured output      │
+│  Session persist    │    │  Multi-provider         │
+└─────────────────────┘    └─────────────────────────┘
+                                       │
+                        ┌──────────────┼──────────────┐
+                        ▼              ▼              ▼
+                   Claude API    Gemini API    Groq API
+```
+
+**Key Technical Decisions:**
+
+1. **Go + Python Polyglot**: Go for CLI performance, Python for AI ecosystem (pydantic-ai)
+2. **Subprocess over FFI**: Clean JSON stdin/stdout protocol for process isolation
+3. **Embedded Agent**: Python agent embedded in Go binary, extracted at runtime via `uvx`
+4. **Schema-Driven**: Single JSON Schema drives Pydantic models, TOML output, and IDE completion
+
+## Configuration
+
+Config file: `cvx.toml`
+
+```toml
+[github]
+repo = "owner/repo"
+
+[agent]
+default = "claude"
+
+[cv]
+source = "src/cv.toml"
+schema = "schema/schema.json"
+
+[letter]
+source = "src/letter.toml"
+
+[paths]
+reference = "reference/"
+```
+
+## Environment Variables
+
+| Variable            | Description            |
+| ------------------- | ---------------------- |
+| `ANTHROPIC_API_KEY` | For Claude API models  |
+| `GEMINI_API_KEY`    | For Gemini API models  |
+| `GROQ_API_KEY`      | For Groq-hosted models |
+
+Environment files are loaded with priority:
+
+1. `--env-file` flag
+2. Current directory `.env`
+3. Git worktree main repo `.env`
+4. Parent directories `.env`
+5. `~/.config/cvx/env`
+
+## Git Workflow
+
+cvx uses branches for development and tags for archiving:
 
 ```bash
-# Python Agent Mode
-cvx build -m sonnet-4           # Structured YAML with caching
-cvx build -m flash              # Use Gemini
-cvx build -m sonnet-4 --dry-run # Preview without AI call
-cvx build -m sonnet-4 --no-cache # Skip cache
+# Build creates/switches to issue branch
+cvx build 42  # → branch: 42-company-role
 
-# Interactive CLI Mode
-cvx build -i                    # Auto-detect CLI, infer issue
-cvx build 42 -i                 # Interactive for issue #42
-cvx build -i -c "focus on ML"   # Interactive with context
+# Approve commits, tags, and pushes
+cvx approve 42  # → tag: 42-company-role-2025-01-07
+
+# View retrieves from tag
+cvx view 42  # Opens PDF from git tag
 ```
-
-**Python Agent Mode** requires [uv](https://docs.astral.sh/uv/) and works with YAML files (`src/cv.yaml`, `src/letter.yaml`) validated against `schema/schema.json`.
-
-**Interactive Mode** auto-detects claude-code or gemini-cli.
-
-### `cvx approve [issue]`
-
-Approve and finalize the tailored application: commits, tags, pushes, updates project status.
-
-```bash
-cvx approve                          # Infer issue from branch
-cvx approve 42                       # Approve issue #42
-```
-
-### `cvx view <issue>`
-
-View submitted application documents.
-
-```bash
-cvx view 42                      # Open combined or CV PDF
-cvx view 42 -l                   # Open cover letter
-cvx view 42 -c                   # Open CV only
-```
-
-Opens the PDF from the git tag. Tag format: `{issue}-{company}-{role}-{date}` (e.g., `42-saxo-bank-senior-data-scientist-2025-12-18`)
-
-### `cvx rm <issue>`
-
-Deletes an issue.
-
-```bash
-cvx rm 42
-```
-
-### `cvx init`
-
-Interactive setup wizard.
-
-```bash
-cvx init                # interactive wizard
-cvx init -q             # quiet mode with defaults
-cvx init -r             # reset workflows to defaults
-cvx init -c             # validate config resources
-cvx init -d             # delete .cvx/ and config
-```
-
-## AI Agents and Models
-
-Use `--agent/-a` for CLI tools or `--model/-m` for API access:
-
-```bash
-cvx add https://job.com -a claude            # Claude CLI
-cvx add https://job.com -m claude-sonnet-4   # Claude API
-cvx advise 42 -a gemini                      # Gemini CLI
-cvx advise 42 -m gemini-2.5-flash            # Gemini API
-```
-
-### CLI Agents (`--agent`)
-
-| Agent    | Notes                                                        |
-| -------- | ------------------------------------------------------------ |
-| `claude` | [Claude Code CLI](https://github.com/anthropics/claude-code) |
-| `gemini` | [Gemini CLI](https://github.com/google-gemini/gemini-cli)    |
-
-### API Models (`--model`)
-
-| Model                    | Notes                        |
-| ------------------------ | ---------------------------- |
-| `claude-sonnet-4`        | Requires `ANTHROPIC_API_KEY` |
-| `claude-sonnet-4-5`      | Requires `ANTHROPIC_API_KEY` |
-| `claude-opus-4`          | Requires `ANTHROPIC_API_KEY` |
-| `claude-opus-4-5`        | Requires `ANTHROPIC_API_KEY` |
-| `gemini-2.5-flash`       | Requires `GEMINI_API_KEY`    |
-| `gemini-2.5-pro`         | Requires `GEMINI_API_KEY`    |
-| `gemini-3-flash-preview` | Requires `GEMINI_API_KEY`    |
-| `gemini-3-pro-preview`   | Requires `GEMINI_API_KEY`    |
-
-Priority order for default: CLI agents first (claude-code > gemini-cli), then API models.
-
-## GitHub Project
-
-cvx automatically creates a GitHub Project with:
-
-**Fields:**
-
-- Application Status (single-select)
-- Company (text)
-- Deadline (date)
-- AppliedDate (date)
-
-**Statuses:**
-
-- To be Applied
-- Applied
-- Interview
-- Offered
-- Accepted
-- Gone
-- Let Go
-
-Issues are automatically added to the project when created with `cvx add`.
-
-## Config File
-
-Located at `.cvx-config.yaml` in your repo root:
-
-```yaml
-repo: owner/repo
-agent: claude-code
-default_cli_agent: claude-code
-cv_path: src/cv.tex
-reference_path: reference/
-project: owner/1
-```
-
-- `default_cli_agent`: CLI tool used for interactive mode (`cvx build -i`). Set during `cvx init` or auto-detected from available tools (claude-code, gemini-cli).
-- `reference_path`: Directory containing your experience documentation, guidelines, and other reference materials used by `advise` and `build` commands.
-
-Internal project IDs are cached in `.cvx/cache.yaml` (auto-managed).
-
-## Customizing Workflows
-
-AI prompts are stored in `.cvx/workflows/` and can be customized:
-
-| File        | Used by                              |
-| ----------- | ------------------------------------ |
-| `add.md`    | `cvx add` - job extraction prompt    |
-| `advise.md` | `cvx advise` - match analysis prompt |
-| `build.md`  | `cvx build` - CV tailoring prompt    |
-
-Template variables available: `{{.CVPath}}`, `{{.ReferencePath}}`
-
-Reset to defaults with `cvx init -r`.
 
 ## Shell Completion
 
-Generate shell completion scripts for your shell:
-
 ```bash
-# Bash
 cvx completion bash > /etc/bash_completion.d/cvx
-
-# Zsh
 cvx completion zsh > "${fpath[1]}/_cvx"
-
-# Fish
 cvx completion fish > ~/.config/fish/completions/cvx.fish
 ```
 
-## Global Flags
+## Documentation
 
-| Flag            | Description                   |
-| --------------- | ----------------------------- |
-| `-q, --quiet`   | Suppress non-essential output |
-| `-v, --verbose` | Enable debug logging          |
+- [Getting Started](docs/getting-started.md)
+- [Commands](docs/commands.md)
+- [Configuration](docs/configuration.md)
+- [Architecture](docs/architecture.md)
+- [Schema Reference](docs/schema.md)
+
+## License
+
+MIT

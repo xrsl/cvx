@@ -1,16 +1,18 @@
 # cvx
 
-`cvx` uses AI to extract job details from any job posting URL, tracks your applications in GitHub Issues + Projects, and helps you tailor your CV and cover letter using LaTeX — all from your terminal.
+**AI-powered CLI for CV tailoring and job application tracking.**
+
+`cvx` uses AI to extract job details from any job posting URL, tracks your applications in GitHub Issues + Projects, and helps you tailor your CV and cover letter — all from your terminal.
 
 ## What it does
 
-- **Extracts job details** from URLs using AI agents (Claude Code or Gemini CLI)
-- **Creates GitHub Issues** with structured job information using a customizable template (default `job-ad-schema.yaml`)
-- **Tracks applications in a GitHub Project** with status, company, and deadlines
-- **Analyzes job-CV match** quality with AI agents
-- **Tailors CV and cover letter** with AI agents using:
-  - **Python agent mode**: Structured YAML output with schema validation
-  - **CLI agent mode**: Direct LaTeX file editing
+- **Extracts job details** from URLs using AI (Claude or Gemini)
+- **Creates GitHub Issues** with structured job information
+- **Tracks applications** in a GitHub Project with status, company, and deadlines
+- **Analyzes job-CV match** quality with AI-powered career advice
+- **Tailors CV and cover letter** using:
+  - **Python Agent Mode**: Structured YAML/TOML output with Pydantic validation
+  - **Interactive CLI Mode**: Direct file editing with session persistence
 
 ## Quick Example
 
@@ -25,10 +27,10 @@ cvx add https://company.com/careers/software-engineer
 cvx advise 42
 
 # Build tailored CV/cover letter (Python agent mode)
-cvx build 42 -m claude-sonnet-4
+cvx build -m sonnet-4
 
-# Or use CLI agent mode
-cvx build 42 -i
+# Or use interactive CLI mode (default)
+cvx build 42
 
 # Approve and finalize
 cvx approve 42
@@ -37,7 +39,7 @@ cvx approve 42
 cvx view 42
 ```
 
-## Branching and Tagging strategy
+## Branching and Tagging Strategy
 
 `cvx` uses git branches for building and git tags for archiving submitted applications:
 
@@ -64,9 +66,9 @@ This keeps a permanent record of exactly what you sent to each company.
 ## Requirements
 
 - `git` and [GitHub CLI](https://cli.github.com/) (`gh`) - installed and authenticated
-- One of: [Claude Code CLI](https://github.com/anthropics/claude-code), [Gemini CLI](https://github.com/google-gemini/gemini-cli), or an API key (`ANTHROPIC_API_KEY` or `GEMINI_API_KEY`)
-- LaTeX: [BasicTeX](https://tug.org/mactex/morepackages.html) (light, recommended for Mac), [MacTeX](https://tug.org/mactex/), or [TeX Live](https://tug.org/texlive/) - for building PDFs
-- [uv](https://docs.astral.sh/uv/) - required for Python agent mode (`cvx build -m`)
+- One of: [Claude CLI](https://github.com/anthropics/claude-code), [Gemini CLI](https://github.com/google-gemini/gemini-cli), or API keys
+- LaTeX: [BasicTeX](https://tug.org/mactex/morepackages.html), [MacTeX](https://tug.org/mactex/), or [TeX Live](https://tug.org/texlive/)
+- [uv](https://docs.astral.sh/uv/) - required for Python agent mode
 
 ## Documentation
 
@@ -74,4 +76,4 @@ This keeps a permanent record of exactly what you sent to each company.
 - [Commands](commands.md) - Detailed command reference
 - [Configuration](configuration.md) - Config file and customization
 - [Architecture](architecture.md) - How cvx works internally
-- [Schema Reference](schema.md) - YAML structure for Python agent mode
+- [Schema Reference](schema.md) - YAML/TOML structure for Python agent mode

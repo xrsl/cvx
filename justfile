@@ -41,3 +41,11 @@ clean:
     rm -rf agent/htmlcov agent/.coverage
     rm -rf agent/.pytest_cache
     rm -f agent/test_input.json agent/output.json
+
+serve-docs:
+    @echo "🚀 Serving docs..."
+    uv run mkdocs serve
+
+
+prek:
+    prek run --all-files

@@ -2,13 +2,84 @@
 
 ## Overview
 
-`cvx` is a Go CLI tool that integrates with AI agents to automate job application workflows. It uses GitHub for tracking, LaTeX for document generation, and supports multiple AI providers.
+`cvx` is a Go CLI that orchestrates AI-powered CV tailoring and job application workflows. It uses a **polyglot architecture**:
+
+- **Go**: CLI, orchestration, caching, GitHub integration
+- **Python**: AI agent with multi-provider support and schema validation
+- **LaTeX/Typst**: Document rendering
+
+## System Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                         User Interface                          │
+│                    cvx CLI (Go + Cobra)                        │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+         ┌────────────────────┼────────────────────┐
+         ▼                    ▼                    ▼
+┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐
+│  Interactive    │  │  Python Agent   │  │   GitHub API    │
+│  CLI Mode       │  │  Mode           │  │   Integration   │
+│                 │  │                 │  │                 │
+│  claude/gemini  │  │  pydantic-ai    │  │  Issues, Projects│
+│  Direct editing │  │  Structured out │  │  GraphQL/REST   │
+└─────────────────┘  └─────────────────┘  └─────────────────┘
+         │                    │                    │
+         ▼                    ▼                    ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                      AI Provider Layer                          │
+│   Claude │ Gemini │ OpenAI │ Groq │ Claude CLI │ Gemini CLI    │
+└─────────────────────────────────────────────────────────────────┘
+```
 
 ## Build Modes
 
-### Python Agent Mode (Recommended)
+### Interactive CLI Mode (Default)
 
-Used when running `cvx build -m <model>` (without `--call-api-directly`).
+Invoked when running `cvx build` without `-m` flag.
+
+```
+┌────────────┐
+│ User       │
+│ cvx build  │
+└─────┬──────┘
+      │
+      ▼
+┌───────────────────────────┐
+│ Go CLI (cvx)              │
+│ - Check for existing      │
+│   session (.cvx/sessions) │
+│ - Fetch job from GH issue │
+│ - Build prompt from       │
+│   .cvx/workflows/build.md │
+└─────┬─────────────────────┘
+      │
+      ▼
+┌───────────────────────────┐
+│ claude / gemini CLI       │
+│ - Tool use (Read/Edit)    │
+│ - Session persistence     │
+│ - Interactive mode        │
+└─────┬─────────────────────┘
+      │
+      ▼
+┌───────────────────────────┐
+│ LaTeX/Typst files         │
+│ (modified directly)       │
+└───────────────────────────┘
+```
+
+**Key Features:**
+
+- **Session Persistence**: Resume sessions per issue
+- **Direct Tool Use**: AI directly edits files
+- **Interactive Mode**: Full CLI access
+- **Auto-detection**: Detects claude or gemini CLI
+
+### Python Agent Mode
+
+Invoked when running `cvx build -m <model>`.
 
 ```
 ┌────────────┐
@@ -18,183 +89,209 @@ Used when running `cvx build -m <model>` (without `--call-api-directly`).
 └─────┬──────┘
       │
       ▼
-┌───────────────────────────┐
-│ Go CLI (cvx)              │
-│ - Fetch job from GH issue │
-│ - Read cv.yaml/letter.yaml│
-│ - Compute cache hash      │
-│ - Check cache (.cvx/)     │
-└─────┬─────────────────────┘
-      │ cache miss
+┌────────────────────────────┐
+│ Go CLI (cvx)               │
+│ - Fetch job from GH issue  │
+│ - Read cv.toml/letter.toml │
+│ - Set AI_MODEL env var     │
+└─────┬──────────────────────┘
+      │
       ▼
 ┌────────────────────────────┐
 │ uvx --from <agent> cvx-agent│
 │ (isolated Python env)      │
 │ - pydantic-ai              │
-│ - multi-provider support   │
-│ - retry logic              │
+│ - Multi-provider support   │
+│ - Structured output        │
 └─────┬──────────────────────┘
       │ JSON stdin/stdout
       ▼
 ┌───────────────────────────┐
 │ AI Provider               │
-│ (Claude/Gemini/OpenAI)    │
-│ Structured output         │
+│ (Claude/Gemini/OpenAI/    │
+│  Groq)                    │
 └─────┬─────────────────────┘
       │
       ▼
 ┌───────────────────────────┐
 │ Pydantic Validation       │
-│ schema.json conformance   │
+│ - Model conformance       │
+│ - Automatic retry         │
+│ - Provider fallback       │
 └─────┬─────────────────────┘
       │
       ▼
 ┌───────────────────────────┐
 │ Go CLI (cvx)              │
-│ - Write cv.yaml           │
-│ - Write letter.yaml       │
-│ - Save to cache           │
-└─────┬─────────────────────┘
-      │
-      ▼
-┌───────────────────────────┐
-│ LaTeX Rendering           │
-│ make combined             │
+│ - Write cv.toml           │
+│ - Write letter.toml       │
+│ - Auto-format with tombi  │
 └───────────────────────────┘
 ```
 
 **Key Features:**
 
-- **Structured Output**: YAML files validated against JSON Schema
-- **Caching**: SHA256 hash of (job + CV + letter + schema + model)
-- **Reliability**: Multi-provider fallback, retry logic
-- **Isolation**: Python agent runs in isolated environment via `uvx`
+- **Structured Output**: YAML/TOML conforming to JSON Schema
+- **Multi-Provider**: Claude, Gemini, OpenAI, Groq via pydantic-ai
+- **Automatic Fallback**: Retry with fallback model on failure
+- **Isolation**: Python agent runs via `uvx` in isolated environment
 
-### CLI Agent Mode
+## Python Agent Design
 
-Used when running `cvx build` or `cvx build -a <agent>`.
+The Python agent is an **embedded subprocess** designed for:
 
-```
-┌────────────┐
-│ User       │
-│ cvx build  │
-│ -a claude  │
-└─────┬──────┘
-      │
-      ▼
-┌───────────────────────────┐
-│ Go CLI (cvx)              │
-│ - Fetch job from GH issue │
-│ - Build prompt            │
-│ - Check session cache     │
-└─────┬─────────────────────┘
-      │
-      ▼
-┌───────────────────────────┐
-│ claude / gemini CLI       │
-│ - Direct file editing     │
-│ - Tool use (Read/Edit)    │
-│ - Interactive mode        │
-└─────┬─────────────────────┘
-      │
-      ▼
-┌───────────────────────────┐
-│ cv.tex / letter.tex       │
-│ (modified directly)       │
-└─────┬─────────────────────┘
-      │
-      ▼
-┌───────────────────────────┐
-│ LaTeX Rendering           │
-│ make combined             │
-└───────────────────────────┘
+### Multi-Provider AI Support
+
+```python
+def get_agent(model_name: str) -> Agent:
+    if "gemini" in model_name or "flash" in model_name:
+        model = GoogleModel(model_name)
+    elif "claude" in model_name or "sonnet" in model_name:
+        model = AnthropicModel(model_name)
+    elif "openai/" in model_name or "qwen/" in model_name:
+        model = GroqModel(model_name)
+    else:
+        model = OpenAIChatModel(model_name)
+
+    return Agent(model=model, ...)
 ```
 
-**Key Features:**
+### Structured Output with Pydantic
 
-- **Interactive Sessions**: Full CLI access with `-i` flag
-- **Session Persistence**: Resume sessions per issue
-- **Direct Editing**: LaTeX files modified by AI agents
-- **Flexibility**: Free-form document generation
+```python
+from pydantic_ai import Agent
+from cvx_agent.models import Model
 
-## Data Flow
+result = agent.run_sync(
+    user_prompt=prompt,
+    output_type=Model  # Pydantic model from schema.json
+)
+```
 
-### Python Agent Mode
+### Automatic Retry & Fallback
 
-1. **Input Processing**:
+```python
+PRIMARY_MODEL = os.getenv("AI_MODEL", "claude-haiku-4-5")
+FALLBACK_MODEL = os.getenv("AI_FALLBACK_MODEL", "gemini-2.5-flash")
 
-   - Job posting fetched from GitHub issue
-   - Current CV/letter read from `src/cv.yaml` and `src/letter.yaml`
-   - Schema loaded from `schema/schema.json`
+for model_name in [PRIMARY_MODEL, FALLBACK_MODEL]:
+    for attempt in range(max_retries):
+        try:
+            result = agent.run_sync(...)
+            return result.output.model_dump()
+        except Exception:
+            continue
+```
 
-2. **Cache Check**:
+## Subprocess Communication
 
-   - Cache key: `SHA256(job + cv + letter + schema + model)`
-   - Cache location: `.cvx/cache.yaml`
-   - Skip with `--no-cache` flag
+The Go CLI and Python agent communicate via JSON over stdin/stdout:
 
-3. **AI Generation**:
+```go
+// Go: Send input
+input := map[string]interface{}{
+    "job_posting": issueBody,
+    "cv":          cvData,
+    "letter":      letterData,
+}
+json.NewEncoder(stdin).Encode(input)
 
-   - Python agent called via `uvx --from <agent-dir> cvx-agent`
-   - JSON input sent via stdin
-   - Structured JSON output received via stdout
-   - Pydantic validation against schema
+// Go: Receive output
+var output struct {
+    CV     map[string]interface{} `json:"cv"`
+    Letter map[string]interface{} `json:"letter"`
+}
+json.NewDecoder(stdout).Decode(&output)
+```
 
-4. **Output Writing**:
-   - Validated data written to YAML files
-   - Cache updated (unless `--no-cache`)
-   - LaTeX rendering triggered
+## Environment Variable Loading
 
-### Environment Variables
+`cvx` implements priority-based environment loading:
 
-**Python Agent Mode:**
+```
+Priority (highest to lowest):
+1. --env-file flag (explicit)
+2. Current directory .env
+3. Git worktree main repo .env
+4. Parent directories .env
+5. ~/.config/cvx/env (user-level)
+```
 
-- `AI_MODEL` - Model to use (set automatically by cvx)
-- `AI_FALLBACK_MODEL` - Fallback model (default: `gemini-2.5-flash`)
-- `CVX_AGENT_CACHE` - Cache directory (default: `.cache`)
-- `ANTHROPIC_API_KEY` - For Claude models
-- `GEMINI_API_KEY` - For Gemini models
-- `OPENAI_API_KEY` - For OpenAI models
+This enables secure API key management across worktrees and CI/CD.
 
 ## File Structure
 
 ```
 .
+├── cvx.toml                # User configuration (editable)
 ├── .cvx/
-│   ├── workflows/          # AI prompts (add.md, advise.md, build.md)
-│   └── cache.yaml          # GitHub project ID cache
-├── .cvx-config.yaml        # cvx configuration
+│   ├── cache.yaml          # GitHub project ID cache (auto-managed)
+│   ├── workflows/          # AI prompts (customizable)
+│   │   ├── add.md          # Job extraction prompt
+│   │   ├── advise.md       # Match analysis prompt
+│   │   └── build.md        # CV tailoring prompt
+│   ├── sessions/           # CLI session files
+│   └── matches/            # Match analysis outputs
 ├── schema/
 │   └── schema.json         # CV/letter JSON schema
 ├── src/
-│   ├── cv.yaml             # Structured CV data (Python agent)
-│   ├── letter.yaml         # Structured letter data (Python agent)
+│   ├── cv.toml             # Structured CV data
+│   ├── letter.toml         # Structured letter data
 │   ├── cv.tex              # LaTeX CV template
 │   └── letter.tex          # LaTeX letter template
-└── build/
+└── out/
     └── combined.pdf        # Generated PDF
 ```
 
-## Python Agent Internals
+## Agent Embedding
 
-Located in embedded `agent/` directory, extracted to `~/.cache/cvx/agent/`:
+The Python agent is **embedded** in the Go binary:
 
-```
-agent/
-├── pyproject.toml          # uv project config
-├── cvx_agent/
-│   ├── __init__.py
-│   ├── main.py            # Entry point (stdin/stdout)
-│   ├── agents.py          # Core AI logic
-│   └── models.py          # Pydantic models (from schema.json)
+```go
+//go:embed agent/*
+var agentFS embed.FS
 ```
 
-**Key Components:**
+At runtime, it's extracted to `~/.cache/cvx/agent/`:
 
-- **main.py**: Reads JSON from stdin, calls agent, writes to stdout
-- **agents.py**:
-  - Multi-provider support (Claude, Gemini, OpenAI)
-  - Automatic fallback on failure
-  - Retry logic (2 attempts per model)
-  - Caching (SHA256 hash)
-- **models.py**: Auto-generated from `schema/schema.json` using `datamodel-codegen`
+```go
+func extractAgentToCache() (string, error) {
+    cacheDir := filepath.Join(os.UserCacheDir(), "cvx", "agent")
+    // Extract if not present or version changed
+    fs.WalkDir(agentFS, "agent", func(path string, d fs.DirEntry) {
+        // Copy files to cache
+    })
+    return cacheDir, nil
+}
+```
+
+## Model Generation
+
+Pydantic models are auto-generated from `schema/schema.json`:
+
+```bash
+datamodel-codegen --input schema/schema.json --output agent/cvx_agent/models.py
+```
+
+The Go CLI regenerates models when schema changes:
+
+```go
+func regenerateModels(agentDir, schemaPath string) {
+    schemaHash := sha256(schemaContent)
+    if schemaHash != cachedHash {
+        exec.Command("uv", "run", "datamodel-codegen", ...)
+    }
+}
+```
+
+## Key Technical Decisions
+
+1. **Go + Python Polyglot**: Go for CLI performance and GitHub integration, Python for AI ecosystem compatibility (pydantic-ai, LangChain-compatible)
+
+2. **Subprocess over FFI**: JSON stdin/stdout for clean process isolation and error handling
+
+3. **uv/uvx for Python**: Fast, reliable Python environment management without system dependencies
+
+4. **Embedded Agent**: Single binary distribution with embedded Python agent
+
+5. **Schema-Driven**: Single JSON Schema drives Pydantic validation, YAML/TOML output, and IDE completion
