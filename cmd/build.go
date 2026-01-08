@@ -252,8 +252,8 @@ func buildBuildPrompt(cfg *config.Config, issueBody string) (string, error) {
 // Agent Mode Functions
 // ========================================
 
-// readYAMLCV reads cv.yaml and extracts the cv field
-func readYAMLCV(path string) (map[string]interface{}, error) {
+// readCV reads cv.yaml or cv.toml and extracts the cv field
+func readCV(path string) (map[string]interface{}, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
@@ -276,8 +276,8 @@ func readYAMLCV(path string) (map[string]interface{}, error) {
 	return wrapper.CV, nil
 }
 
-// readYAMLLetter reads letter.yaml/toml and extracts the letter field
-func readYAMLLetter(path string) (map[string]interface{}, error) {
+// readLetter reads letter.yaml or letter.toml and extracts the letter field
+func readLetter(path string) (map[string]interface{}, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
@@ -331,8 +331,8 @@ func removeNilValues(data interface{}) interface{} {
 	}
 }
 
-// writeYAMLData is a generic function to write CV or Letter data with schema support
-func writeYAMLData(path string, data map[string]interface{}, fieldName, schemaPath string) error {
+// writeData is a generic function to write CV or Letter data with schema support
+func writeData(path string, data map[string]interface{}, fieldName, schemaPath string) error {
 	// Remove nil values to avoid "null" in output
 	cleaned := removeNilValues(data).(map[string]interface{})
 
@@ -385,14 +385,14 @@ func writeYAMLData(path string, data map[string]interface{}, fieldName, schemaPa
 	return nil
 }
 
-// writeYAMLCV writes cv data back to cv.yaml or cv.toml
-func writeYAMLCV(path string, cv map[string]interface{}, schemaPath string) error {
-	return writeYAMLData(path, cv, "cv", schemaPath)
+// writeCV writes cv data back to cv.yaml or cv.toml
+func writeCV(path string, cv map[string]interface{}, schemaPath string) error {
+	return writeData(path, cv, "cv", schemaPath)
 }
 
-// writeYAMLLetter writes letter data back to letter.yaml or letter.toml
-func writeYAMLLetter(path string, letter map[string]interface{}, schemaPath string) error {
-	return writeYAMLData(path, letter, "letter", schemaPath)
+// writeLetter writes letter data back to letter.yaml or letter.toml
+func writeLetter(path string, letter map[string]interface{}, schemaPath string) error {
+	return writeData(path, letter, "letter", schemaPath)
 }
 
 // formatTOML formats a TOML file using tombi if available
@@ -701,12 +701,12 @@ func runBuildWithAgent(cfg *config.Config, issueNum string) error {
 		letterPath = "src/letter.yaml"
 	}
 
-	cv, err := readYAMLCV(cvPath)
+	cv, err := readCV(cvPath)
 	if err != nil {
 		return fmt.Errorf("failed to read %s: %w", cvPath, err)
 	}
 
-	letter, err := readYAMLLetter(letterPath)
+	letter, err := readLetter(letterPath)
 	if err != nil {
 		return fmt.Errorf("failed to read %s: %w", letterPath, err)
 	}
@@ -727,12 +727,12 @@ func runBuildWithAgent(cfg *config.Config, issueNum string) error {
 	}
 
 	// 5. Write output files
-	if err := writeYAMLCV(cvPath, cvOut, schemaPath); err != nil {
+	if err := writeCV(cvPath, cvOut, schemaPath); err != nil {
 		return fmt.Errorf("failed to write %s: %w", cvPath, err)
 	}
 	fmt.Printf("%s Wrote %s\n", style.C(style.Green, "✓"), cvPath)
 
-	if err := writeYAMLLetter(letterPath, letterOut, schemaPath); err != nil {
+	if err := writeLetter(letterPath, letterOut, schemaPath); err != nil {
 		return fmt.Errorf("failed to write %s: %w", letterPath, err)
 	}
 	fmt.Printf("%s Wrote %s\n", style.C(style.Green, "✓"), letterPath)

@@ -1,7 +1,6 @@
 package ai
 
 import (
-	"strings"
 	"testing"
 )
 
@@ -36,20 +35,40 @@ func TestIsAgentSupported(t *testing.T) {
 func TestSupportedAgents(t *testing.T) {
 	agents := SupportedAgents()
 
-	if len(agents) == 0 {
-		t.Error("SupportedAgents() returned empty list")
+	// SupportedAgents returns CLI agents that are available
+	// In CI, no CLI tools are installed so this may be empty
+	if !IsClaudeCLIAvailable() && !IsGeminiCLIAvailable() {
+		if len(agents) != 0 {
+			t.Errorf("SupportedAgents() = %v, want empty (no CLI available)", agents)
+		}
+		return
 	}
 
-	// Should include Gemini agents
-	hasGemini := false
-	for _, a := range agents {
-		if strings.HasPrefix(a, "gemini") {
-			hasGemini = true
-			break
+	// If any CLI is available, check the list is correct
+	if IsClaudeCLIAvailable() {
+		found := false
+		for _, a := range agents {
+			if a == "claude" {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Error("SupportedAgents() should include 'claude' when CLI is available")
 		}
 	}
-	if !hasGemini {
-		t.Error("SupportedAgents() should include Gemini agents")
+
+	if IsGeminiCLIAvailable() {
+		found := false
+		for _, a := range agents {
+			if a == "gemini" {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Error("SupportedAgents() should include 'gemini' when CLI is available")
+		}
 	}
 }
 

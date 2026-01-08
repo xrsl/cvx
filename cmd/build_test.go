@@ -6,8 +6,8 @@ import (
 	"testing"
 )
 
-func TestReadYAMLCV(t *testing.T) {
-	// Create temporary YAML file
+func TestReadCV(t *testing.T) {
+	// Create temporary test file
 	tmpDir := t.TempDir()
 	cvPath := filepath.Join(tmpDir, "cv.yaml")
 
@@ -28,9 +28,9 @@ func TestReadYAMLCV(t *testing.T) {
 	}
 
 	// Test reading
-	cv, err := readYAMLCV(cvPath)
+	cv, err := readCV(cvPath)
 	if err != nil {
-		t.Fatalf("readYAMLCV failed: %v", err)
+		t.Fatalf("readCV failed: %v", err)
 	}
 
 	// Validate structure
@@ -51,7 +51,7 @@ func TestReadYAMLCV(t *testing.T) {
 	}
 }
 
-func TestReadYAMLLetter(t *testing.T) {
+func TestReadLetter(t *testing.T) {
 	tmpDir := t.TempDir()
 	letterPath := filepath.Join(tmpDir, "letter.yaml")
 
@@ -75,9 +75,9 @@ func TestReadYAMLLetter(t *testing.T) {
 		t.Fatalf("Failed to create test file: %v", err)
 	}
 
-	letter, err := readYAMLLetter(letterPath)
+	letter, err := readLetter(letterPath)
 	if err != nil {
-		t.Fatalf("readYAMLLetter failed: %v", err)
+		t.Fatalf("readLetter failed: %v", err)
 	}
 
 	// Validate sender
@@ -99,7 +99,7 @@ func TestReadYAMLLetter(t *testing.T) {
 	}
 }
 
-func TestWriteYAMLCV(t *testing.T) {
+func TestWriteCV(t *testing.T) {
 	tmpDir := t.TempDir()
 	cvPath := filepath.Join(tmpDir, "cv.yaml")
 
@@ -118,8 +118,8 @@ func TestWriteYAMLCV(t *testing.T) {
 	}
 
 	// Write CV
-	if err := writeYAMLCV(cvPath, cv, ""); err != nil {
-		t.Fatalf("writeYAMLCV failed: %v", err)
+	if err := writeCV(cvPath, cv, ""); err != nil {
+		t.Fatalf("writeCV failed: %v", err)
 	}
 
 	// Verify file was created
@@ -128,7 +128,7 @@ func TestWriteYAMLCV(t *testing.T) {
 	}
 
 	// Read it back and verify
-	cvRead, err := readYAMLCV(cvPath)
+	cvRead, err := readCV(cvPath)
 	if err != nil {
 		t.Fatalf("Failed to read written CV: %v", err)
 	}
@@ -138,7 +138,7 @@ func TestWriteYAMLCV(t *testing.T) {
 	}
 }
 
-func TestWriteYAMLLetter(t *testing.T) {
+func TestWriteLetter(t *testing.T) {
 	tmpDir := t.TempDir()
 	letterPath := filepath.Join(tmpDir, "letter.yaml")
 
@@ -161,8 +161,8 @@ func TestWriteYAMLLetter(t *testing.T) {
 		},
 	}
 
-	if err := writeYAMLLetter(letterPath, letter, ""); err != nil {
-		t.Fatalf("writeYAMLLetter failed: %v", err)
+	if err := writeLetter(letterPath, letter, ""); err != nil {
+		t.Fatalf("writeLetter failed: %v", err)
 	}
 
 	// Verify file was created
@@ -171,7 +171,7 @@ func TestWriteYAMLLetter(t *testing.T) {
 	}
 
 	// Read it back
-	letterRead, err := readYAMLLetter(letterPath)
+	letterRead, err := readLetter(letterPath)
 	if err != nil {
 		t.Fatalf("Failed to read written letter: %v", err)
 	}
@@ -204,12 +204,12 @@ func TestReadWriteRoundTrip(t *testing.T) {
 	}
 
 	// Write
-	if err := writeYAMLCV(cvPath, original, ""); err != nil {
+	if err := writeCV(cvPath, original, ""); err != nil {
 		t.Fatalf("Write failed: %v", err)
 	}
 
 	// Read
-	readBack, err := readYAMLCV(cvPath)
+	readBack, err := readCV(cvPath)
 	if err != nil {
 		t.Fatalf("Read failed: %v", err)
 	}
@@ -223,14 +223,14 @@ func TestReadWriteRoundTrip(t *testing.T) {
 	}
 }
 
-func TestReadYAMLCV_FileNotFound(t *testing.T) {
-	_, err := readYAMLCV("/nonexistent/path/cv.yaml")
+func TestReadCV_FileNotFound(t *testing.T) {
+	_, err := readCV("/nonexistent/path/cv.yaml")
 	if err == nil {
 		t.Errorf("Expected error for nonexistent file, got nil")
 	}
 }
 
-func TestReadYAMLCV_InvalidYAML(t *testing.T) {
+func TestReadCV_InvalidYAML(t *testing.T) {
 	tmpDir := t.TempDir()
 	cvPath := filepath.Join(tmpDir, "invalid.yaml")
 
@@ -243,13 +243,13 @@ func TestReadYAMLCV_InvalidYAML(t *testing.T) {
 		t.Fatalf("Failed to create test file: %v", err)
 	}
 
-	_, err := readYAMLCV(cvPath)
+	_, err := readCV(cvPath)
 	if err == nil {
-		t.Errorf("Expected error for invalid YAML, got nil")
+		t.Errorf("Expected error for invalid file, got nil")
 	}
 }
 
-func TestReadYAMLCV_MissingCVField(t *testing.T) {
+func TestReadCV_MissingCVField(t *testing.T) {
 	tmpDir := t.TempDir()
 	cvPath := filepath.Join(tmpDir, "no-cv-field.yaml")
 
@@ -261,7 +261,7 @@ email: test@example.com
 		t.Fatalf("Failed to create test file: %v", err)
 	}
 
-	cv, err := readYAMLCV(cvPath)
+	cv, err := readCV(cvPath)
 	if err != nil {
 		t.Fatalf("Should not error on missing cv field: %v", err)
 	}
