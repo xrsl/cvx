@@ -27,9 +27,11 @@ func SetAgentFS(fs *embed.FS) {
 }
 
 var (
-	quiet   bool
-	verbose bool
-	envFile string
+	quiet     bool
+	verbose   bool
+	envFile   string
+	modelFlag string // Global: Use API with specified model
+	agentFlag string // Global: Use specified CLI agent
 )
 
 var rootCmd = &cobra.Command{
@@ -195,4 +197,6 @@ func init() {
 	rootCmd.PersistentFlags().BoolVarP(&quiet, "quiet", "q", false, "Suppress non-essential output")
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Enable debug logging")
 	rootCmd.PersistentFlags().StringVarP(&envFile, "env-file", "e", "", "Path to .env file (overrides default locations)")
+	rootCmd.PersistentFlags().StringVarP(&modelFlag, "model", "m", "", "Use API with specified model (sonnet-4, flash-2-5, etc.)")
+	rootCmd.PersistentFlags().StringVarP(&agentFlag, "agent", "a", "", "Use CLI agent (claude, gemini)")
 }

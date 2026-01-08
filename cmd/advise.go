@@ -23,8 +23,7 @@ import (
 )
 
 var (
-	adviseAgentFlag           string
-	adviseModelFlag           string
+	// advise-specific flags (agentFlag and modelFlag are global in root.go)
 	adviseContextFlag         string
 	advisePostAsCommentFlag   bool
 	adviseCallAPIDirectlyFlag bool
@@ -38,21 +37,24 @@ var adviseCmd = &cobra.Command{
 Takes a GitHub issue number or job posting URL and analyzes
 how well your CV matches the position.
 
+Two modes (like cvx build):
+  1. CLI agent (default): Uses claude/gemini CLI tools
+  2. API mode (-m flag): Direct API access with specified model
+
 Examples:
-  cvx advise 42                                  # Analyze issue #42
-  cvx advise 42 --post-as-comment                # Analyze and post as comment
-  cvx advise 42 -a gemini-cli                    # Gemini CLI agent
-  cvx advise 42 -m sonnet-4                      # Claude CLI with sonnet-4 model
-  cvx advise 42 --call-api-directly -m flash     # Gemini API directly with flash model
-  cvx advise 42 -c "Focus on backend"`,
+  cvx advise 42                       # CLI agent (default)
+  cvx advise 42 -m sonnet-4           # Claude API
+  cvx advise 42 -m flash-2-5          # Gemini API
+  cvx advise 42 -a gemini             # Gemini CLI agent
+  cvx advise 42 --post-as-comment     # Post analysis as comment
+  cvx advise 42 -c "Focus on backend" # Add context`,
 	Args: cobra.ExactArgs(1),
 	RunE: runAdvise,
 }
 
 func init() {
-	adviseCmd.Flags().StringVarP(&adviseAgentFlag, "agent", "a", "", "CLI agent: claude, gemini")
-	adviseCmd.Flags().StringVarP(&adviseModelFlag, "model", "m", "", "Model: sonnet-4, sonnet-4-5, opus-4, opus-4-5, flash, pro, flash-3, pro-3")
-	adviseCmd.Flags().BoolVar(&adviseCallAPIDirectlyFlag, "call-api-directly", false, "Explicitly call API directly (requires --model)")
+	// Note: -m and -a are global flags defined in root.go
+	adviseCmd.Flags().BoolVar(&adviseCallAPIDirectlyFlag, "call-api-directly", false, "Deprecated: use -m flag instead")
 	adviseCmd.Flags().StringVarP(&adviseContextFlag, "context", "c", "", "Additional context for analysis")
 	adviseCmd.Flags().BoolVar(&advisePostAsCommentFlag, "post-as-comment", false, "Post analysis to GitHub issue as comment")
 	rootCmd.AddCommand(adviseCmd)
@@ -70,15 +72,16 @@ func runAdvise(cmd *cobra.Command, args []string) error {
 	// Resolve agent/model (flags > config)
 	var agentSetting string
 
-	if adviseCallAPIDirectlyFlag {
+	// Use API when -m flag is set (like cvx build -m) or --call-api-directly
+	if modelFlag != "" || adviseCallAPIDirectlyFlag {
 		// API mode - requires explicit model
-		if adviseModelFlag == "" {
-			return fmt.Errorf("--call-api-directly requires --model")
+		if modelFlag == "" {
+			return fmt.Errorf("--model (-m) flag is required for API access")
 		}
 
-		modelConfig, hasModel := ai.GetModel(adviseModelFlag)
+		modelConfig, hasModel := ai.GetModel(modelFlag)
 		if !hasModel {
-			return fmt.Errorf("unsupported model: %s (supported: %v)", adviseModelFlag, ai.SupportedModelNames())
+			return fmt.Errorf("unsupported model: %s (supported: %v)", modelFlag, ai.SupportedModelNames())
 		}
 
 		agentSetting = modelConfig.APIName
@@ -86,27 +89,18 @@ func runAdvise(cmd *cobra.Command, args []string) error {
 	} else {
 		// CLI agent mode
 		baseAgent := ""
-		if adviseAgentFlag != "" {
-			if !ai.IsCLIAgentSupported(adviseAgentFlag) {
-				return fmt.Errorf("unsupported CLI agent: %s (supported: claude, gemini). Use --call-api-directly for API access", adviseAgentFlag)
+		if agentFlag != "" {
+			if !ai.IsCLIAgentSupported(agentFlag) {
+				return fmt.Errorf("unsupported CLI agent: %s (supported: claude, gemini). Use -m for API access", agentFlag)
 			}
-			baseAgent = adviseAgentFlag
+			baseAgent = agentFlag
 		} else if cfg.Agent.Default != "" {
 			baseAgent = cfg.Agent.Default
 		} else {
 			return fmt.Errorf("no CLI agent configured. Run: cvx init")
 		}
 
-		// Apply model if specified
-		if adviseModelFlag != "" {
-			modelConfig, hasModel := ai.GetModel(adviseModelFlag)
-			if !hasModel {
-				return fmt.Errorf("unsupported model: %s (supported: %v)", adviseModelFlag, ai.SupportedModelNames())
-			}
-			agentSetting = baseAgent + ":" + modelConfig.CLIName
-		} else {
-			agentSetting = baseAgent
-		}
+		agentSetting = baseAgent
 	}
 
 	// Validate final setting

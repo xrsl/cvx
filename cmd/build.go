@@ -36,8 +36,8 @@ func buildModelList() string {
 		entries = append(entries, modelEntry{short: short, long: model.APIName})
 	}
 
-	// Custom sort order: flash, pro, gpt, qwen, sonnet, opus
-	familyOrder := map[string]int{"flash": 0, "pro": 1, "gpt": 2, "qwen": 3, "sonnet": 4, "opus": 5}
+	// Custom sort order: flash, pro, gpt, qwen, haiku, sonnet, opus
+	familyOrder := map[string]int{"flash": 0, "pro": 1, "gpt": 2, "qwen": 3, "haiku": 4, "sonnet": 5, "opus": 6}
 	getFamily := func(name string) string {
 		for family := range familyOrder {
 			if strings.HasPrefix(name, family) {
@@ -87,14 +87,14 @@ Supported models (short → full name):
 }
 
 var (
-	buildModelFlag   string
+	// build-specific flags (modelFlag is global in root.go)
 	buildContextFlag string
 	buildSchemaFlag  string
 	buildBranchFlag  bool
 )
 
 func init() {
-	buildCmd.Flags().StringVarP(&buildModelFlag, "model", "m", "", "Use Python agent mode with specified model (sonnet-4, flash, etc.)")
+	// Note: -m is a global flag defined in root.go
 	buildCmd.Flags().StringVarP(&buildContextFlag, "context", "c", "", "Feedback or additional context")
 	buildCmd.Flags().StringVarP(&buildSchemaFlag, "schema", "s", "", "Schema path (defaults to schema from config)")
 	buildCmd.Flags().BoolVarP(&buildBranchFlag, "branch", "b", false, "Switch to issue branch (creates if not exists, format: issue_number-company_name-role)")
@@ -120,11 +120,11 @@ func runBuild(cmd *cobra.Command, args []string) error {
 	}
 
 	// Python Agent Mode (use -m flag)
-	if buildModelFlag != "" {
+	if modelFlag != "" {
 		// Resolve short model name to full API name
-		modelConfig, ok := ai.GetModel(buildModelFlag)
+		modelConfig, ok := ai.GetModel(modelFlag)
 		if !ok {
-			return fmt.Errorf("unsupported model: %s (supported: %v)", buildModelFlag, ai.SupportedModelNames())
+			return fmt.Errorf("unsupported model: %s (supported: %v)", modelFlag, ai.SupportedModelNames())
 		}
 		if err := os.Setenv("AI_MODEL", modelConfig.APIName); err != nil {
 			return fmt.Errorf("failed to set AI_MODEL: %w", err)

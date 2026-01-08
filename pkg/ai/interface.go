@@ -138,6 +138,8 @@ var SupportedModelMap = map[string]Model{
 	"sonnet-4-5":   {Name: "sonnet-4-5", CLIName: "sonnet-4-5", APIName: "claude-sonnet-4-5"},
 	"opus-4":       {Name: "opus-4", CLIName: "opus-4", APIName: "claude-opus-4"},
 	"opus-4-5":     {Name: "opus-4-5", CLIName: "opus-4-5", APIName: "claude-opus-4-5"},
+	"haiku-4":      {Name: "haiku-4", CLIName: "haiku-4", APIName: "claude-haiku-4"},
+	"haiku-4-5":    {Name: "haiku-4-5", CLIName: "haiku-4-5", APIName: "claude-haiku-4-5"},
 	"flash-2-5":    {Name: "flash-2-5", CLIName: "flash-2-5", APIName: "gemini-2.5-flash"},
 	"pro-2-5":      {Name: "pro-2-5", CLIName: "pro-2-5", APIName: "gemini-2.5-pro"},
 	"flash-3":      {Name: "flash-3", CLIName: "flash-3", APIName: "gemini-3-flash-preview"},

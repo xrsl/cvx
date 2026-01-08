@@ -23,13 +23,12 @@ import (
 )
 
 var (
-	agentFlag           string
-	modelFlag           string
-	repoFlag            string
-	schemaFlag          string
-	bodyFlag            string
-	dryRunFlag          bool
-	callAPIDirectlyFlag bool
+	// add-specific flags (agentFlag and modelFlag are global in root.go)
+	addRepoFlag            string
+	addSchemaFlag          string
+	addBodyFlag            string
+	addDryRunFlag          bool
+	addCallAPIDirectlyFlag bool
 )
 
 var addCmd = &cobra.Command{
@@ -40,25 +39,28 @@ var addCmd = &cobra.Command{
 Fields are extracted based on schema (GitHub issue template YAML).
 Use --body to read job posting from a file instead of fetching URL.
 
+Two modes (like cvx build):
+  1. CLI agent (default): Uses claude/gemini CLI tools
+  2. API mode (-m flag): Direct API access with specified model
+
 Examples:
-  cvx add https://company.com/job
-  cvx add https://company.com/job --dry-run
-  cvx add https://company.com/job -a gemini-cli                    # Gemini CLI agent
-  cvx add https://company.com/job -m sonnet-4                      # Claude CLI with sonnet-4 model
-  cvx add https://company.com/job --call-api-directly -m flash     # Gemini API directly with flash model
-  cvx add https://company.com/job --body                           # use .cvx/body.md`,
+  cvx add https://company.com/job                 # CLI agent (default)
+  cvx add https://company.com/job -m sonnet-4     # Claude API
+  cvx add https://company.com/job -m flash-2-5    # Gemini API
+  cvx add https://company.com/job -a gemini       # Gemini CLI agent
+  cvx add https://company.com/job --body          # Read from .cvx/body.md
+  cvx add https://company.com/job --dry-run       # Extract only`,
 	Args: cobra.ExactArgs(1),
 	RunE: runAdd,
 }
 
 func init() {
-	addCmd.Flags().StringVarP(&agentFlag, "agent", "a", "", "CLI agent: claude, gemini")
-	addCmd.Flags().StringVarP(&modelFlag, "model", "m", "", "Model: sonnet-4, sonnet-4-5, opus-4, opus-4-5, flash, pro, flash-3, pro-3")
-	addCmd.Flags().BoolVar(&callAPIDirectlyFlag, "call-api-directly", false, "Explicitly call API directly (requires --model)")
-	addCmd.Flags().StringVarP(&repoFlag, "repo", "r", "", "GitHub repo (overrides config)")
-	addCmd.Flags().StringVarP(&schemaFlag, "schema", "s", "", "Schema file (overrides config)")
-	addCmd.Flags().StringVarP(&bodyFlag, "body", "b", "", "Read job posting from file (default: .cvx/body.md)")
-	addCmd.Flags().BoolVar(&dryRunFlag, "dry-run", false, "Extract only, don't create issue")
+	// Note: -m and -a are global flags defined in root.go
+	addCmd.Flags().BoolVar(&addCallAPIDirectlyFlag, "call-api-directly", false, "Deprecated: use -m flag instead")
+	addCmd.Flags().StringVarP(&addRepoFlag, "repo", "r", "", "GitHub repo (overrides config)")
+	addCmd.Flags().StringVarP(&addSchemaFlag, "schema", "s", "", "Schema file (overrides config)")
+	addCmd.Flags().StringVarP(&addBodyFlag, "body", "b", "", "Read job posting from file (default: .cvx/body.md)")
+	addCmd.Flags().BoolVar(&addDryRunFlag, "dry-run", false, "Extract only, don't create issue")
 	rootCmd.AddCommand(addCmd)
 }
 
@@ -116,7 +118,7 @@ func runAdd(cmd *cobra.Command, args []string) error {
 	title := sch.GetTitle(data)
 	printDynamicResult(title, data)
 
-	if dryRunFlag {
+	if addDryRunFlag {
 		log("Dry run - no issue created")
 		return nil
 	}
@@ -126,18 +128,19 @@ func runAdd(cmd *cobra.Command, args []string) error {
 }
 
 func resolveAddRepo(cfg *config.Config) (string, error) {
-	repo := repoFlag
+	repo := addRepoFlag
 	if repo == "" {
 		repo = cfg.GitHub.Repo
 	}
-	if repo == "" && !dryRunFlag {
+	if repo == "" && !addDryRunFlag {
 		return "", fmt.Errorf("no repo configured. Run: cvx init")
 	}
 	return repo, nil
 }
 
 func resolveAddAgent(cfg *config.Config) (string, error) {
-	if callAPIDirectlyFlag {
+	// Use API when -m flag is set (like cvx build -m) or --call-api-directly
+	if modelFlag != "" || addCallAPIDirectlyFlag {
 		return resolveAddAPIAgent()
 	}
 	return resolveAddCLIAgent(cfg)
@@ -145,7 +148,7 @@ func resolveAddAgent(cfg *config.Config) (string, error) {
 
 func resolveAddAPIAgent() (string, error) {
 	if modelFlag == "" {
-		return "", fmt.Errorf("--call-api-directly requires --model")
+		return "", fmt.Errorf("--model (-m) flag is required for API access")
 	}
 
 	modelConfig, hasModel := ai.GetModel(modelFlag)
@@ -181,7 +184,7 @@ func resolveAddCLIAgent(cfg *config.Config) (string, error) {
 func resolveAddBaseAgent(cfg *config.Config) (string, error) {
 	if agentFlag != "" {
 		if !ai.IsCLIAgentSupported(agentFlag) {
-			return "", fmt.Errorf("unsupported CLI agent: %s (supported: claude, gemini). Use --call-api-directly for API access", agentFlag)
+			return "", fmt.Errorf("unsupported CLI agent: %s (supported: claude, gemini). Use -m for API access", agentFlag)
 		}
 		return agentFlag, nil
 	}
@@ -192,7 +195,7 @@ func resolveAddBaseAgent(cfg *config.Config) (string, error) {
 }
 
 func resolveAddSchema(cfg *config.Config) (*schema.Schema, error) {
-	schemaPath := schemaFlag
+	schemaPath := addSchemaFlag
 	if schemaPath == "" {
 		schemaPath = cfg.Schema.JobAd
 	}
@@ -209,10 +212,10 @@ func resolveAddBodyPath(cmd *cobra.Command) string {
 	if !cmd.Flags().Changed("body") {
 		return ""
 	}
-	if bodyFlag == "" {
+	if addBodyFlag == "" {
 		return ".cvx/body.md"
 	}
-	return bodyFlag
+	return addBodyFlag
 }
 
 func getJobText(ctx context.Context, url, bodyPath string) (string, error) {
