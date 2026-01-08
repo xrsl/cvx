@@ -20,7 +20,7 @@
 - **Structured Output**: Schema-validated TOML with automatic retry and fallback
 - **Interactive Mode**: Real-time editing with Claude CLI or Gemini CLI
 - **GitHub Integration**: Issues, Projects, GraphQL API for full workflow automation
-- **Polyglot Architecture**: Go CLI + embedded Python agent for AI operations
+- **Polyglot Architecture**: Go CLI + embedded agent for AI operations
 
 ## Installation
 
@@ -33,7 +33,7 @@ go install github.com/xrsl/cvx@latest
 - `git` + [GitHub CLI](https://cli.github.com/) (`gh`) - installed and authenticated
 - [Claude CLI](https://github.com/anthropics/claude-code) or [Gemini CLI](https://github.com/google-gemini/gemini-cli)
 - [Typst](https://typst.app/) - for PDF rendering
-- [uv](https://docs.astral.sh/uv/) - for Python agent mode
+- [uv](https://docs.astral.sh/uv/) - for agent mode
 
 ## Quickstart
 
@@ -42,7 +42,7 @@ cvx init                              # Setup wizard
 cvx add https://company.com/job       # Add job posting
 cvx advise 42                         # Analyze job-CV match
 cvx build 42                          # Build tailored CV/letter (interactive)
-cvx build -m sonnet-4                 # Build with Python agent (API)
+cvx build -m sonnet-4                 # Build with agent (API)
 cvx approve 42                        # Commit, tag, push, update status
 cvx view 42                           # View submitted documents
 ```
@@ -74,7 +74,7 @@ cvx build -c "focus on ML"  # Add context
 - Auto-detects `claude` or `gemini` CLI
 - Uses the model configured within the CLI agent
 
-### Python Agent Mode (API)
+### Agent Mode (API)
 
 ```bash
 cvx build -m sonnet-4       # Claude API
@@ -111,7 +111,7 @@ cvx build -m qwen3-32b      # Groq API
          ┌──────────────┴──────────────┐
          ▼                             ▼
 ┌─────────────────────┐    ┌─────────────────────────┐
-│  Interactive Mode   │    │  Python Agent Mode      │
+│  Interactive Mode   │    │  Agent Mode             │
 │  claude/gemini CLI  │    │  pydantic-ai            │
 │  Direct editing     │    │  Structured output      │
 │  Session persist    │    │  Multi-provider         │
@@ -126,7 +126,7 @@ cvx build -m qwen3-32b      # Groq API
 
 1. **Go + Python Polyglot**: Go for CLI performance, Python for AI ecosystem (pydantic-ai)
 2. **Subprocess over FFI**: Clean JSON stdin/stdout protocol for process isolation
-3. **Embedded Agent**: Python agent embedded in Go binary, extracted at runtime via `uvx`
+3. **Embedded Agent**: Agent embedded in Go binary, extracted at runtime via `uvx`
 4. **Schema-Driven**: Single JSON Schema drives Pydantic models, TOML output, and IDE completion
 
 ## Configuration

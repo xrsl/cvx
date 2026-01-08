@@ -69,57 +69,179 @@ func runAdvise(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("config error: %w", err)
 	}
 
-	// Resolve agent/model (flags > config)
-	var agentSetting string
-
-	// Use API when -m flag is set (like cvx build -m) or --call-api-directly
-	if modelFlag != "" || adviseCallAPIDirectlyFlag {
-		// API mode - requires explicit model
-		if modelFlag == "" {
-			return fmt.Errorf("--model (-m) flag is required for API access")
-		}
-
-		modelConfig, hasModel := ai.GetModel(modelFlag)
-		if !hasModel {
-			return fmt.Errorf("unsupported model: %s (supported: %v)", modelFlag, ai.SupportedModelNames())
-		}
-
-		agentSetting = modelConfig.APIName
-
-	} else {
-		// CLI agent mode
-		baseAgent := ""
-		if agentFlag != "" {
-			if !ai.IsCLIAgentSupported(agentFlag) {
-				return fmt.Errorf("unsupported CLI agent: %s (supported: claude, gemini). Use -m for API access", agentFlag)
-			}
-			baseAgent = agentFlag
-		} else if cfg.Agent.Default != "" {
-			baseAgent = cfg.Agent.Default
-		} else {
-			return fmt.Errorf("no CLI agent configured. Run: cvx init")
-		}
-
-		agentSetting = baseAgent
-	}
-
-	// Validate final setting
-	if !ai.IsAgentSupported(agentSetting) {
-		return fmt.Errorf("unsupported agent/model: %s", agentSetting)
-	}
-
-	// Get CLI agent name from agent setting
-	agent := cfg.AgentCLI()
-
 	// Check if target is URL or issue number
 	isURL := strings.HasPrefix(target, "http://") || strings.HasPrefix(target, "https://")
 
 	ctx := cmd.Context()
 
+	// Use agent when -m flag is set
+	if modelFlag != "" {
+		if err := os.Setenv("AI_MODEL", modelFlag); err != nil {
+			return fmt.Errorf("failed to set AI_MODEL: %w", err)
+		}
+		if isURL {
+			return runAdviseURLWithAgent(ctx, cfg, target)
+		}
+		return runAdviseIssueWithAgent(ctx, cfg, target)
+	}
+
+	// CLI agent mode
+	agent, err := resolveAdviseCLIAgent(cfg)
+	if err != nil {
+		return err
+	}
+
 	if isURL {
 		return runAdviseURL(ctx, cfg, agent, target)
 	}
 	return runAdviseIssue(ctx, cfg, agent, target)
+}
+
+func resolveAdviseCLIAgent(cfg *config.Config) (string, error) {
+	if agentFlag != "" {
+		if !ai.IsCLIAgentSupported(agentFlag) {
+			return "", fmt.Errorf("unsupported CLI agent: %s (supported: claude, gemini). Use -m for API access", agentFlag)
+		}
+		return agentFlag, nil
+	}
+	if cfg.Agent.Default != "" {
+		return cfg.Agent.Default, nil
+	}
+	return "", fmt.Errorf("no CLI agent configured. Run: cvx init")
+}
+
+// runAdviseURLWithAgent runs advise for URL using agent
+func runAdviseURLWithAgent(_ context.Context, cfg *config.Config, url string) error {
+	if advisePostAsCommentFlag {
+		fmt.Println("Warning: --post-as-comment flag is not supported for URL-based analysis")
+		fmt.Println("Create an issue first, then run 'cvx advise <issue-number> --post-as-comment'")
+	}
+
+	fmt.Printf("Running analysis with agent (%s) for: %s\n", modelFlag, url)
+
+	workflowPrompt, _, err := buildAdvisePromptParts(cfg, url, "")
+	if err != nil {
+		return err
+	}
+
+	result, err := runAdviseWithAgent(workflowPrompt, url, "", adviseContextFlag)
+	if err != nil {
+		return err
+	}
+
+	// Display result
+	fmt.Println("\nMatch Analysis:")
+	fmt.Println(result)
+
+	// Save to file
+	filename := sanitizeFilename(url) + ".md"
+	matchPath := filepath.Join(".cvx", "matches", filename)
+	if err := os.MkdirAll(filepath.Dir(matchPath), 0o755); err != nil {
+		return fmt.Errorf("failed to create matches directory: %w", err)
+	}
+	if err := os.WriteFile(matchPath, []byte(result), 0o644); err != nil {
+		fmt.Printf("Warning: Could not save analysis: %v\n", err)
+	} else {
+		fmt.Printf("\n%s%s\n", style.Success("Analysis saved to"), matchPath)
+	}
+
+	return nil
+}
+
+// runAdviseIssueWithAgent runs advise for issue using agent
+func runAdviseIssueWithAgent(ctx context.Context, cfg *config.Config, issueNum string) error {
+	matchPath := filepath.Join(".cvx", "matches", issueNum+".md")
+
+	// Handle --post-as-comment flag
+	if advisePostAsCommentFlag {
+		// Check if analysis exists
+		content, err := os.ReadFile(matchPath)
+		if err != nil && os.IsNotExist(err) {
+			// Create analysis first
+			fmt.Printf("No existing analysis found, creating new analysis for issue #%s...\n", issueNum)
+			if err := runAdviseIssueAnalysisWithAgent(ctx, cfg, issueNum, matchPath); err != nil {
+				return err
+			}
+			content, err = os.ReadFile(matchPath)
+			if err != nil {
+				return fmt.Errorf("error reading analysis: %w", err)
+			}
+		} else if err != nil {
+			return fmt.Errorf("error reading %s: %w", matchPath, err)
+		}
+
+		// Post as comment
+		fmt.Printf("Posting analysis to issue #%s...\n", issueNum)
+		cli := gh.New()
+		if err := cli.IssueComment(cfg.GitHub.Repo, issueNum, string(content)); err != nil {
+			return fmt.Errorf("error posting comment: %w", err)
+		}
+		fmt.Printf("%sissue #%s\n", style.Success("Analysis posted as comment to"), issueNum)
+		return nil
+	}
+
+	// Run analysis
+	return runAdviseIssueAnalysisWithAgent(ctx, cfg, issueNum, matchPath)
+}
+
+func runAdviseIssueAnalysisWithAgent(_ context.Context, cfg *config.Config, issueNum, matchPath string) error {
+	// Fetch issue body for context
+	issueBody, err := fetchIssueBody(cfg.GitHub.Repo, issueNum)
+	if err != nil {
+		return fmt.Errorf("error fetching issue: %w", err)
+	}
+
+	fmt.Printf("Running analysis with agent (%s) for issue #%s...\n", modelFlag, issueNum)
+
+	workflowPrompt, _, err := buildAdvisePromptParts(cfg, "", issueBody)
+	if err != nil {
+		return err
+	}
+
+	result, err := runAdviseWithAgent(workflowPrompt, issueBody, "", adviseContextFlag)
+	if err != nil {
+		return err
+	}
+
+	// Save output
+	_ = os.MkdirAll(filepath.Dir(matchPath), 0o755)
+	if err := os.WriteFile(matchPath, []byte(result), 0o644); err != nil {
+		fmt.Printf("Warning: Could not save analysis: %v\n", err)
+	} else {
+		fmt.Printf("%s%s\n", style.Success("Analysis saved to"), matchPath)
+	}
+
+	fmt.Println("\nMatch Analysis:")
+	fmt.Println(result)
+
+	return nil
+}
+
+func runAdviseWithAgent(workflowPrompt, jobPosting, cvContent, ctxStr string) (string, error) {
+	// Start spinner
+	done := make(chan bool)
+	go func() {
+		i := 0
+		for {
+			select {
+			case <-done:
+				fmt.Fprintf(os.Stderr, "\r\033[K")
+				return
+			default:
+				msg := fmt.Sprintf("Analyzing job match using 🤖 %s...", modelFlag)
+				fmt.Fprintf(os.Stderr, "\r%s %s", style.C(style.Cyan, spinnerFrames[i%len(spinnerFrames)]), msg)
+				time.Sleep(80 * time.Millisecond)
+				i++
+			}
+		}
+	}()
+
+	result, err := callAgentAdvise(jobPosting, cvContent, workflowPrompt, ctxStr)
+
+	done <- true
+	close(done)
+
+	return result, err
 }
 
 func runAdviseURL(ctx context.Context, cfg *config.Config, agent, url string) error {

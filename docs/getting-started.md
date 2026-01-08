@@ -16,7 +16,7 @@ go install github.com/xrsl/cvx@latest
   - [BasicTeX](https://tug.org/mactex/morepackages.html) (recommended for Mac)
   - [MacTeX](https://tug.org/mactex/)
   - [TeX Live](https://tug.org/texlive/)
-- **[uv](https://docs.astral.sh/uv/)** - required for Python agent mode
+- **[uv](https://docs.astral.sh/uv/)** - required for agent mode
 
 ## Setup
 
@@ -68,13 +68,13 @@ cvx build 42
 
 Uses Claude or Gemini CLI for real-time editing with tool use.
 
-**Python Agent Mode:**
+**Agent Mode:**
 
 ```bash
 cvx build -m sonnet-4
 ```
 
-Structured YAML output with Pydantic validation.
+Structured TOML output with Pydantic validation.
 
 ### 4. Approve and Submit
 
@@ -121,7 +121,7 @@ cvx build -c "more ML focus" # Add feedback
 - Interactive conversation
 - Auto-detects claude or gemini CLI
 
-### Python Agent Mode
+### Agent Mode
 
 Best for structured, repeatable output:
 

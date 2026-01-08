@@ -135,7 +135,7 @@ cvx build 42                     # Interactive for issue #42
 cvx build -c "focus on ML"       # Interactive with context
 ```
 
-#### 2. Python Agent Mode (API)
+#### 2. Agent Mode (API)
 
 Uses `-m` flag to call AI provider APIs directly:
 
@@ -154,7 +154,7 @@ cvx build -m qwen3-32b           # Groq API
 
 | Flag        | Short | Description                                    |
 | ----------- | ----- | ---------------------------------------------- |
-| `--model`   | `-m`  | Use Python agent (calls API directly)          |
+| `--model`   | `-m`  | Use agent (calls API directly)                 |
 | `--context` | `-c`  | Feedback or additional context                 |
 | `--schema`  | `-s`  | Schema path (overrides config)                 |
 | `--branch`  | `-b`  | Switch to issue branch (creates if not exists) |

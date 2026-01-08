@@ -86,12 +86,6 @@ func runAdd(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	// Resolve agent/model (flags > config)
-	agent, err := resolveAddAgent(cfg)
-	if err != nil {
-		return err
-	}
-
 	// Resolve schema (flag > config > default)
 	sch, err := resolveAddSchema(cfg)
 	if err != nil {
@@ -107,9 +101,25 @@ func runAdd(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	// Extract using AI
-	log("Extracting with %s...", agent)
-	data, err := extractWithSchema(ctx, agent, sch, url, jobText)
+	// Extract using AI - agent for -m flag, CLI for -a flag
+	var data map[string]any
+	if modelFlag != "" {
+		// Agent mode (API)
+		if err := os.Setenv("AI_MODEL", modelFlag); err != nil {
+			return fmt.Errorf("failed to set AI_MODEL: %w", err)
+		}
+		log("Extracting with agent (%s)...", modelFlag)
+		data, err = extractWithAgent(sch, url, jobText)
+	} else {
+		// CLI agent mode
+		var agent string
+		agent, err = resolveAddCLIAgent(cfg)
+		if err != nil {
+			return err
+		}
+		log("Extracting with CLI agent (%s)...", agent)
+		data, err = extractWithCLI(ctx, agent, sch, url, jobText)
+	}
 	if err != nil {
 		return err
 	}
@@ -138,50 +148,7 @@ func resolveAddRepo(cfg *config.Config) (string, error) {
 	return repo, nil
 }
 
-func resolveAddAgent(cfg *config.Config) (string, error) {
-	// Use API when -m flag is set (like cvx build -m) or --call-api-directly
-	if modelFlag != "" || addCallAPIDirectlyFlag {
-		return resolveAddAPIAgent()
-	}
-	return resolveAddCLIAgent(cfg)
-}
-
-func resolveAddAPIAgent() (string, error) {
-	if modelFlag == "" {
-		return "", fmt.Errorf("--model (-m) flag is required for API access")
-	}
-
-	modelConfig, hasModel := ai.GetModel(modelFlag)
-	if !hasModel {
-		return "", fmt.Errorf("unsupported model: %s (supported: %v)", modelFlag, ai.SupportedModelNames())
-	}
-
-	return modelConfig.APIName, nil
-}
-
 func resolveAddCLIAgent(cfg *config.Config) (string, error) {
-	baseAgent, err := resolveAddBaseAgent(cfg)
-	if err != nil {
-		return "", err
-	}
-
-	agent := baseAgent
-	if modelFlag != "" {
-		modelConfig, hasModel := ai.GetModel(modelFlag)
-		if !hasModel {
-			return "", fmt.Errorf("unsupported model: %s (supported: %v)", modelFlag, ai.SupportedModelNames())
-		}
-		agent = baseAgent + ":" + modelConfig.CLIName
-	}
-
-	if !ai.IsAgentSupported(agent) {
-		return "", fmt.Errorf("unsupported agent/model: %s", agent)
-	}
-
-	return agent, nil
-}
-
-func resolveAddBaseAgent(cfg *config.Config) (string, error) {
 	if agentFlag != "" {
 		if !ai.IsCLIAgentSupported(agentFlag) {
 			return "", fmt.Errorf("unsupported CLI agent: %s (supported: claude, gemini). Use -m for API access", agentFlag)
@@ -285,7 +252,42 @@ func cleanHTML(html string) (string, error) {
 	return result, nil
 }
 
-func extractWithSchema(ctx context.Context, agent string, sch *schema.Schema, url, jobText string) (map[string]any, error) {
+// extractWithAgent uses the pydantic-ai agent for extraction
+func extractWithAgent(sch *schema.Schema, url, jobText string) (map[string]any, error) {
+	schemaPrompt, _ := sch.GeneratePromptParts(url, jobText)
+
+	// Start spinner
+	done := make(chan bool)
+	go func() {
+		i := 0
+		for {
+			select {
+			case <-done:
+				fmt.Fprintf(os.Stderr, "\r\033[K")
+				return
+			default:
+				msg := fmt.Sprintf("Extracting job details using 🤖 %s...", modelFlag)
+				fmt.Fprintf(os.Stderr, "\r%s %s", style.C(style.Cyan, spinnerFrames[i%len(spinnerFrames)]), msg)
+				time.Sleep(80 * time.Millisecond)
+				i++
+			}
+		}
+	}()
+
+	data, err := callAgentExtract(jobText, url, schemaPrompt)
+
+	done <- true
+	close(done)
+
+	if err != nil {
+		return nil, fmt.Errorf("extraction failed: %w", err)
+	}
+
+	return data, nil
+}
+
+// extractWithCLI uses CLI agents (claude/gemini CLI) for extraction
+func extractWithCLI(ctx context.Context, agent string, sch *schema.Schema, url, jobText string) (map[string]any, error) {
 	client, err := ai.NewClient(agent)
 	if err != nil {
 		return nil, err

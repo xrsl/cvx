@@ -4,9 +4,6 @@ import (
 	"context"
 	"fmt"
 	"strings"
-
-	"github.com/xrsl/cvx/pkg/claude"
-	"github.com/xrsl/cvx/pkg/gemini"
 )
 
 // Client is the common interface for AI providers
@@ -22,6 +19,7 @@ type CachingClient interface {
 }
 
 // NewClient creates an AI client based on agent prefix
+// Only supports CLI agents (claude, gemini). API calls go through agent subprocess.
 func NewClient(agent string) (Client, error) {
 	switch {
 	case agent == "claude" || strings.HasPrefix(agent, "claude:"):
@@ -44,26 +42,18 @@ func NewClient(agent string) (Client, error) {
 			subAgent = agent[idx+1:]
 		}
 		return NewGeminiCLI(subAgent), nil
-	case strings.HasPrefix(agent, "gemini-"):
-		return gemini.NewClient(agent)
-	case strings.HasPrefix(agent, "claude-"):
-		return claude.NewClient(agent)
 	default:
-		return nil, fmt.Errorf("unknown agent: %s (use claude, gemini, gemini-*, or claude-*)", agent)
+		return nil, fmt.Errorf("unknown CLI agent: %s (use claude or gemini for CLI, or use -m flag for API)", agent)
 	}
 }
 
-// IsAgentSupported checks if an agent is supported by any provider
+// IsAgentSupported checks if an agent is supported (CLI agents only)
 func IsAgentSupported(agent string) bool {
 	switch {
 	case agent == "claude" || strings.HasPrefix(agent, "claude:"):
 		return IsClaudeCLIAvailable()
 	case agent == "gemini" || strings.HasPrefix(agent, "gemini:"):
 		return IsGeminiCLIAvailable()
-	case strings.HasPrefix(agent, "gemini-"):
-		return gemini.IsAgentSupported(agent)
-	case strings.HasPrefix(agent, "claude-"):
-		return claude.IsAgentSupported(agent)
 	default:
 		return false
 	}
@@ -87,19 +77,7 @@ func IsCLIAgentSupported(agent string) bool {
 	}
 }
 
-// IsModelSupported checks if an API model is supported
-func IsModelSupported(model string) bool {
-	switch {
-	case strings.HasPrefix(model, "gemini-"):
-		return gemini.IsAgentSupported(model)
-	case strings.HasPrefix(model, "claude-"):
-		return claude.IsAgentSupported(model)
-	default:
-		return false
-	}
-}
-
-// SupportedAgents returns all supported agents (CLI + API)
+// SupportedAgents returns all supported CLI agents
 func SupportedAgents() []string {
 	agents := []string{}
 	if IsClaudeCLIAvailable() {
@@ -108,21 +86,12 @@ func SupportedAgents() []string {
 	if IsGeminiCLIAvailable() {
 		agents = append(agents, "gemini")
 	}
-	agents = append(agents, gemini.SupportedAgents...)
-	agents = append(agents, claude.SupportedAgents...)
 	return agents
 }
 
 // SupportedCLIAgents returns supported CLI agents
 func SupportedCLIAgents() []string {
-	agents := []string{}
-	if IsClaudeCLIAvailable() {
-		agents = append(agents, "claude")
-	}
-	if IsGeminiCLIAvailable() {
-		agents = append(agents, "gemini")
-	}
-	return agents
+	return SupportedAgents()
 }
 
 // Model represents a model configuration for both CLI and API usage
@@ -133,6 +102,8 @@ type Model struct {
 }
 
 // SupportedModelMap maps short model names to their configurations
+// Note: When using -m flag, the model name is passed directly to the agent
+// which supports any model pydantic-ai supports. These short names are for convenience.
 var SupportedModelMap = map[string]Model{
 	"sonnet-4":     {Name: "sonnet-4", CLIName: "sonnet-4", APIName: "claude-sonnet-4"},
 	"sonnet-4-5":   {Name: "sonnet-4-5", CLIName: "sonnet-4-5", APIName: "claude-sonnet-4-5"},
@@ -149,9 +120,14 @@ var SupportedModelMap = map[string]Model{
 }
 
 // GetModel returns the model configuration for a given short name
+// If not found, returns the model name as-is (pass-through to agent)
 func GetModel(shortName string) (Model, bool) {
 	model, ok := SupportedModelMap[shortName]
-	return model, ok
+	if !ok {
+		// Pass through unknown models - agent can handle any model
+		return Model{Name: shortName, CLIName: shortName, APIName: shortName}, true
+	}
+	return model, true
 }
 
 // SupportedModelNames returns list of supported short model names
@@ -161,12 +137,4 @@ func SupportedModelNames() []string {
 		names = append(names, name)
 	}
 	return names
-}
-
-// SupportedModels returns supported API models (full names)
-func SupportedModels() []string {
-	models := []string{}
-	models = append(models, claude.SupportedAgents...)
-	models = append(models, gemini.SupportedAgents...)
-	return models
 }

@@ -6,27 +6,30 @@ import (
 )
 
 func TestIsAgentSupported(t *testing.T) {
-	tests := []struct {
-		agent    string
-		expected bool
-	}{
-		{"gemini-2.5-flash", true},
-		{"gemini-2.5-pro", true},
-		{"claude-sonnet-4", true},
-		{"claude-sonnet-4-5", true},
-		{"claude-opus-4", true},
-		{"claude-opus-4-5", true},
-		{"invalid-agent", false},
-		{"", false},
+	// IsAgentSupported only checks CLI agents (claude, gemini) based on CLI availability
+	// API model names are handled by the agent, not IsAgentSupported
+
+	// These should always return false (not CLI agent format)
+	alwaysFalse := []string{"gemini-2.5-flash", "claude-sonnet-4", "invalid-agent", ""}
+	for _, agent := range alwaysFalse {
+		if IsAgentSupported(agent) {
+			t.Errorf("IsAgentSupported(%q) = true, want false (not a CLI agent)", agent)
+		}
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.agent, func(t *testing.T) {
-			got := IsAgentSupported(tt.agent)
-			if got != tt.expected {
-				t.Errorf("IsAgentSupported(%q) = %v, want %v", tt.agent, got, tt.expected)
-			}
-		})
+	// CLI agents depend on CLI availability
+	if IsClaudeCLIAvailable() {
+		if !IsAgentSupported("claude") {
+			t.Error("IsAgentSupported(claude) = false, want true (CLI available)")
+		}
+		if !IsAgentSupported("claude:opus-4.5") {
+			t.Error("IsAgentSupported(claude:opus-4.5) = false, want true (CLI available)")
+		}
+	}
+	if IsGeminiCLIAvailable() {
+		if !IsAgentSupported("gemini") {
+			t.Error("IsAgentSupported(gemini) = false, want true (CLI available)")
+		}
 	}
 }
 
@@ -51,13 +54,15 @@ func TestSupportedAgents(t *testing.T) {
 }
 
 func TestNewClientGemini(t *testing.T) {
-	// Skip if no API key (just test that it doesn't panic)
-	client, err := NewClient("gemini-2.5-flash")
+	// NewClient only supports CLI agents (gemini, claude)
+	// API model names like gemini-2.5-flash go through the agent subprocess
+	if !IsGeminiCLIAvailable() {
+		t.Skip("Gemini CLI not available")
+	}
+
+	client, err := NewClient("gemini")
 	if err != nil {
-		// Expected if no API key
-		if !strings.Contains(err.Error(), "GEMINI_API_KEY") {
-			t.Errorf("Unexpected error: %v", err)
-		}
+		t.Errorf("NewClient(gemini) error: %v", err)
 		return
 	}
 	defer client.Close()

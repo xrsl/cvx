@@ -1,7 +1,7 @@
 """Entry point for running cvx_agent as a module."""
 import sys
 import json
-from cvx_agent.agents import build_cv_and_letter
+from cvx_agent.agents import dispatch
 
 
 def main():
@@ -9,8 +9,8 @@ def main():
         # read input JSON from stdin
         input_json = json.load(sys.stdin)
 
-        # call the AI agent
-        output = build_cv_and_letter(input_json)
+        # dispatch to appropriate action
+        output = dispatch(input_json)
 
         # write result JSON to stdout
         json.dump(output, sys.stdout, indent=2)

@@ -70,15 +70,15 @@ var buildCmd = &cobra.Command{
 
 Two build modes:
   1. Interactive CLI (default): Real-time editing with auto-detected CLI tools
-  2. Python Agent: Structured output with validation
+  2. Agent Mode: Structured output with validation
 
 Examples:
   cvx build                      # Interactive mode (default)
   cvx build 42                   # Interactive for issue #42
   cvx build -c "focus on ML"     # Interactive with context
 
-  cvx build -m sonnet-4          # Python agent mode
-  cvx build -m flash-2-5         # Python agent with Gemini
+  cvx build -m sonnet-4          # Agent mode
+  cvx build -m flash-2-5         # Agent mode with Gemini
 
 Supported models (short → full name):
 ` + buildModelList(),
@@ -119,7 +119,7 @@ func runBuild(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	// Python Agent Mode (use -m flag)
+	// Agent Mode (use -m flag)
 	if modelFlag != "" {
 		// Resolve short model name to full API name
 		modelConfig, ok := ai.GetModel(modelFlag)
@@ -129,7 +129,7 @@ func runBuild(cmd *cobra.Command, args []string) error {
 		if err := os.Setenv("AI_MODEL", modelConfig.APIName); err != nil {
 			return fmt.Errorf("failed to set AI_MODEL: %w", err)
 		}
-		return runBuildWithPythonAgent(cfg, issueNum)
+		return runBuildWithAgent(cfg, issueNum)
 	}
 
 	// Interactive CLI mode (default)
@@ -249,7 +249,7 @@ func buildBuildPrompt(cfg *config.Config, issueBody string) (string, error) {
 }
 
 // ========================================
-// Python Agent Mode Functions
+// Agent Mode Functions
 // ========================================
 
 // readYAMLCV reads cv.yaml and extracts the cv field
@@ -405,7 +405,7 @@ func formatTOML(path string) {
 	_ = cmd.Run() // ignore errors - formatting is best-effort
 }
 
-// callPythonAgent calls the Python agent subprocess with JSON stdin/stdout
+// callAgent calls the agent subprocess with JSON stdin/stdout
 // extractAgentToCache extracts the embedded agent to a cache directory for reuse
 func extractAgentToCache() (string, error) {
 	if agentFS == nil {
@@ -578,8 +578,8 @@ func fixRefs(v interface{}) {
 }
 
 // Go boundary: subprocess management, JSON marshaling
-// Python boundary: AI calls, validation, caching
-func callPythonAgent(jobPosting string, cv, letter map[string]interface{}, schemaPath string) (cvOut, letterOut map[string]interface{}, err error) {
+// Agent boundary: AI calls, validation, caching
+func callAgent(jobPosting string, cv, letter map[string]interface{}, schemaPath string) (cvOut, letterOut map[string]interface{}, err error) {
 	// Check if uv is available
 	if _, err := exec.LookPath("uv"); err != nil {
 		return nil, nil, fmt.Errorf("uv is not installed. Please install uv: https://docs.astral.sh/uv/")
@@ -606,7 +606,7 @@ func callPythonAgent(jobPosting string, cv, letter map[string]interface{}, schem
 		return nil, nil, fmt.Errorf("failed to marshal input: %w", err)
 	}
 
-	// Call Python agent via uvx
+	// Call agent via uvx
 	cmd := exec.Command("uvx", "--from", agentDir, "cvx-agent")
 	cmd.Stdin = bytes.NewReader(inputJSON)
 
@@ -625,7 +625,7 @@ func callPythonAgent(jobPosting string, cv, letter map[string]interface{}, schem
 	cmd.Stderr = &stderr
 
 	if err := cmd.Run(); err != nil {
-		return nil, nil, fmt.Errorf("python agent failed: %w\nstderr: %s", err, stderr.String())
+		return nil, nil, fmt.Errorf("agent failed: %w\nstderr: %s", err, stderr.String())
 	}
 
 	// Parse output JSON
@@ -641,15 +641,15 @@ func callPythonAgent(jobPosting string, cv, letter map[string]interface{}, schem
 	// Validate output has required fields
 	if output.CV == nil || output.Letter == nil {
 		// Debug: show what we actually got
-		fmt.Fprintf(os.Stderr, "Debug: Python agent output:\n%s\n", stdout.String())
+		fmt.Fprintf(os.Stderr, "Debug: agent output:\n%s\n", stdout.String())
 		return nil, nil, fmt.Errorf("invalid output: missing cv or letter fields (cv=%v, letter=%v)", output.CV == nil, output.Letter == nil)
 	}
 
 	return output.CV, output.Letter, nil
 }
 
-// callPythonAgentWithSpinner wraps callPythonAgent with a spinner
-func callPythonAgentWithSpinner(modelName string, jobPosting string, cv, letter map[string]interface{}, schemaPath string) (cvOut, letterOut map[string]interface{}, err error) {
+// callAgentWithSpinner wraps callAgent with a spinner
+func callAgentWithSpinner(modelName string, jobPosting string, cv, letter map[string]interface{}, schemaPath string) (cvOut, letterOut map[string]interface{}, err error) {
 	// Start spinner
 	done := make(chan bool)
 	go func() {
@@ -668,7 +668,7 @@ func callPythonAgentWithSpinner(modelName string, jobPosting string, cv, letter 
 		}
 	}()
 
-	cvOut, letterOut, err = callPythonAgent(jobPosting, cv, letter, schemaPath)
+	cvOut, letterOut, err = callAgent(jobPosting, cv, letter, schemaPath)
 
 	done <- true
 	close(done)
@@ -676,9 +676,9 @@ func callPythonAgentWithSpinner(modelName string, jobPosting string, cv, letter 
 	return cvOut, letterOut, err
 }
 
-// runBuildWithPythonAgent executes the build command using the Python agent
+// runBuildWithAgent executes the build command using the agent
 // This mode is triggered when -m flag is used without --call-api-directly
-func runBuildWithPythonAgent(cfg *config.Config, issueNum string) error {
+func runBuildWithAgent(cfg *config.Config, issueNum string) error {
 	// Get full model name from AI_MODEL env var (already set to full API name)
 	modelFullName := os.Getenv("AI_MODEL")
 
@@ -720,8 +720,8 @@ func runBuildWithPythonAgent(cfg *config.Config, issueNum string) error {
 		schemaPath = "schema/schema.json" // fallback default
 	}
 
-	// 4. Call Python agent with spinner
-	cvOut, letterOut, err := callPythonAgentWithSpinner(modelFullName, issueBody, cv, letter, schemaPath)
+	// 4. Call agent with spinner
+	cvOut, letterOut, err := callAgentWithSpinner(modelFullName, issueBody, cv, letter, schemaPath)
 	if err != nil {
 		return err
 	}

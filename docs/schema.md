@@ -1,6 +1,6 @@
 # Schema Reference
 
-When using Python agent mode (`cvx build -m <model>`), CV and letter data are stored in TOML files that conform to `schema/schema.json`.
+When using agent mode (`cvx build -m <model>`), CV and letter data are stored in TOML files that conform to `schema/schema.json`.
 
 ## Overview
 
@@ -12,7 +12,7 @@ When using Python agent mode (`cvx build -m <model>`), CV and letter data are st
 
 **Validation:**
 
-The Python agent uses [pydantic-ai](https://ai.pydantic.dev/) for structured output. Models are auto-generated from the JSON Schema using `datamodel-codegen`.
+The agent uses [pydantic-ai](https://ai.pydantic.dev/) for structured output. Models are auto-generated from the JSON Schema using `datamodel-codegen`.
 
 ## CV Schema
 
@@ -340,7 +340,7 @@ closing = "Thank you for your consideration."
 
 ## Validation
 
-The Python agent validates all output using Pydantic models generated from `schema/schema.json`:
+The agent validates all output using Pydantic models generated from `schema/schema.json`:
 
 - **Type checking**: Ensures all fields have correct types
 - **Required fields**: Validates all required fields are present

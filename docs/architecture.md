@@ -19,8 +19,8 @@
          ┌────────────────────┼────────────────────┐
          ▼                    ▼                    ▼
 ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐
-│  Interactive    │  │  Python Agent   │  │   GitHub API    │
-│  CLI Mode       │  │  Mode           │  │   Integration   │
+│  Interactive    │  │  Agent Mode     │  │   GitHub API    │
+│  CLI Mode       │  │                 │  │   Integration   │
 │                 │  │                 │  │                 │
 │  claude/gemini  │  │  pydantic-ai    │  │  Issues, Projects│
 │  Direct editing │  │  Structured out │  │  GraphQL/REST   │
@@ -77,7 +77,7 @@ Invoked when running `cvx build` without `-m` flag.
 - **Interactive Mode**: Full CLI access
 - **Auto-detection**: Detects claude or gemini CLI
 
-### Python Agent Mode
+### Agent Mode
 
 Invoked when running `cvx build -m <model>`.
 
@@ -134,11 +134,11 @@ Invoked when running `cvx build -m <model>`.
 - **Structured Output**: YAML/TOML conforming to JSON Schema
 - **Multi-Provider**: Claude, Gemini, OpenAI, Groq via pydantic-ai
 - **Automatic Fallback**: Retry with fallback model on failure
-- **Isolation**: Python agent runs via `uvx` in isolated environment
+- **Isolation**: Agent runs via `uvx` in isolated environment
 
-## Python Agent Design
+## Agent Design
 
-The Python agent is an **embedded subprocess** designed for:
+The agent is an **embedded subprocess** designed for:
 
 ### Multi-Provider AI Support
 
@@ -185,7 +185,7 @@ for model_name in [PRIMARY_MODEL, FALLBACK_MODEL]:
 
 ## Subprocess Communication
 
-The Go CLI and Python agent communicate via JSON over stdin/stdout:
+The Go CLI and agent communicate via JSON over stdin/stdout:
 
 ```go
 // Go: Send input
@@ -245,7 +245,7 @@ This enables secure API key management across worktrees and CI/CD.
 
 ## Agent Embedding
 
-The Python agent is **embedded** in the Go binary:
+The agent is **embedded** in the Go binary:
 
 ```go
 //go:embed agent/*
@@ -292,6 +292,6 @@ func regenerateModels(agentDir, schemaPath string) {
 
 3. **uv/uvx for Python**: Fast, reliable Python environment management without system dependencies
 
-4. **Embedded Agent**: Single binary distribution with embedded Python agent
+4. **Embedded Agent**: Single binary distribution with embedded agent
 
 5. **Schema-Driven**: Single JSON Schema drives Pydantic validation, YAML/TOML output, and IDE completion

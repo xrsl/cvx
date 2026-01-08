@@ -11,7 +11,7 @@
 - **Tracks applications** in a GitHub Project with status, company, and deadlines
 - **Analyzes job-CV match** quality with AI-powered career advice
 - **Tailors CV and cover letter** using:
-  - **Python Agent Mode**: Structured YAML/TOML output with Pydantic validation
+  - **Agent Mode**: Structured YAML/TOML output with Pydantic validation
   - **Interactive CLI Mode**: Direct file editing with session persistence
 
 ## Quick Example
@@ -26,7 +26,7 @@ cvx add https://company.com/careers/software-engineer
 # Analyze match quality
 cvx advise 42
 
-# Build tailored CV/cover letter (Python agent mode)
+# Build tailored CV/cover letter (agent mode)
 cvx build -m sonnet-4
 
 # Or use interactive CLI mode (default)
@@ -68,7 +68,7 @@ This keeps a permanent record of exactly what you sent to each company.
 - `git` and [GitHub CLI](https://cli.github.com/) (`gh`) - installed and authenticated
 - One of: [Claude CLI](https://github.com/anthropics/claude-code), [Gemini CLI](https://github.com/google-gemini/gemini-cli), or API keys
 - LaTeX: [BasicTeX](https://tug.org/mactex/morepackages.html), [MacTeX](https://tug.org/mactex/), or [TeX Live](https://tug.org/texlive/)
-- [uv](https://docs.astral.sh/uv/) - required for Python agent mode
+- [uv](https://docs.astral.sh/uv/) - required for agent mode
 
 ## Documentation
 
@@ -76,4 +76,4 @@ This keeps a permanent record of exactly what you sent to each company.
 - [Commands](commands.md) - Detailed command reference
 - [Configuration](configuration.md) - Config file and customization
 - [Architecture](architecture.md) - How cvx works internally
-- [Schema Reference](schema.md) - YAML/TOML structure for Python agent mode
+- [Schema Reference](schema.md) - YAML/TOML structure for agent mode

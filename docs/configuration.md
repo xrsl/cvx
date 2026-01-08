@@ -75,7 +75,7 @@ Available agents for interactive mode:
 
 ## API Models
 
-Available models for Python agent mode (`cvx build -m`):
+Available models for agent mode (`cvx build -m`):
 
 | Short Name     | Provider API Name      | Required Key        |
 | -------------- | ---------------------- | ------------------- |
@@ -101,7 +101,7 @@ Available models for Python agent mode (`cvx build -m`):
 | `GROQ_API_KEY`      | For Groq-hosted models |
 | `OPENAI_API_KEY`    | For OpenAI models      |
 
-### Python Agent
+### Agent
 
 | Variable            | Description                                |
 | ------------------- | ------------------------------------------ |
